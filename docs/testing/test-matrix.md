@@ -19,6 +19,9 @@
 | TEST-AGENT-005 | REQ-002 (AC-4) | internal/agent | Unit | PASS |
 | TEST-AGENT-006 | REQ-002 (AC-6) | internal/agent | Unit | PASS |
 | TEST-AGENT-007 | REQ-002 (pipeline wiring) | internal/agent | Integration | PASS |
+| TEST-CONFIG-001..010 | REQ-003 (AC-1..AC-6) | internal/config | Unit | PASS |
+| TEST-CONFIG-011..015 | REQ-003 (AC-7..AC-11) | internal/config | Unit | PASS |
+| TEST-CONFIG-016 | REQ-003 (shipped config regression) | internal/config | Integration | PASS |
 
 > این جدول باید با هر Milestone به‌روزرسانی شود. در آینده می‌توان یک اسکریپت
 > نوشت که این جدول را مستقیم از خروجی `go test -json` تولید کند تا دستی

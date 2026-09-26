@@ -1,0 +1,4 @@
+[
+  { "name": "viewer", "description": "Read-only access to safe, non-sensitive operations." },
+  { "name": "netops", "description": "Network diagnostics and traffic capture operations." }
+]
