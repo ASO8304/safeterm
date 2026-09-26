@@ -1,0 +1,17 @@
+# Build artifacts
+/bin/
+*.exe
+*.test
+*.out
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local env files (never commit secrets)
+.env
+*.local
