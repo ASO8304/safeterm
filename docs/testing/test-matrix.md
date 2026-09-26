@@ -12,6 +12,13 @@
 | TEST-CONTRACT-004 | REQ-001 (AC-4) | internal/contract | Unit | PASS |
 | TEST-CONTRACT-005 | REQ-001 (AC-5) | internal/contract | Unit | PASS |
 | TEST-CONTRACT-006 | REQ-001 (AC-6) | internal/contract | Unit | PASS |
+| TEST-AGENT-001 | REQ-002 (AC-5) | internal/agent | Unit | PASS |
+| TEST-AGENT-002 | REQ-002 (AC-1) | internal/agent | Unit | PASS |
+| TEST-AGENT-003 | REQ-002 (AC-2) | internal/agent | Unit | PASS |
+| TEST-AGENT-004 | REQ-002 (AC-3) | internal/agent | Unit | PASS |
+| TEST-AGENT-005 | REQ-002 (AC-4) | internal/agent | Unit | PASS |
+| TEST-AGENT-006 | REQ-002 (AC-6) | internal/agent | Unit | PASS |
+| TEST-AGENT-007 | REQ-002 (pipeline wiring) | internal/agent | Integration | PASS |
 
 > این جدول باید با هر Milestone به‌روزرسانی شود. در آینده می‌توان یک اسکریپت
 > نوشت که این جدول را مستقیم از خروجی `go test -json` تولید کند تا دستی
