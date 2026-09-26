@@ -22,6 +22,8 @@
 | TEST-CONFIG-001..010 | REQ-003 (AC-1..AC-6) | internal/config | Unit | PASS |
 | TEST-CONFIG-011..015 | REQ-003 (AC-7..AC-11) | internal/config | Unit | PASS |
 | TEST-CONFIG-016 | REQ-003 (shipped config regression) | internal/config | Integration | PASS |
+| TEST-VAL-001..013 | REQ-004 (AC-1..AC-8) | internal/validation | Unit | PASS |
+| TEST-INTEG-001..003 | REQ-002 + REQ-004 (end-to-end) | tests/integration | Integration | PASS |
 
 > این جدول باید با هر Milestone به‌روزرسانی شود. در آینده می‌توان یک اسکریپت
 > نوشت که این جدول را مستقیم از خروجی `go test -json` تولید کند تا دستی
