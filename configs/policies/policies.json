@@ -1,0 +1,4 @@
+[
+  { "role": "viewer", "operations": ["system_info"] },
+  { "role": "netops", "operations": ["system_info", "trace"] }
+]
