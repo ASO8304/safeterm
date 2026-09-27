@@ -40,7 +40,9 @@ type AllowAllPolicy struct{}
 func (AllowAllPolicy) Authorize(_ *contract.ExecutionRequest) error { return nil }
 
 // IdentityTranslator implements Translator by returning the request's
-// Command field unchanged, with no arguments. This is only safe for the
+// Command field unchanged, with no arguments. Replaced by internal/translation
+// in the M6 integration pipeline; retained for isolated M2/M4 tests.
+// This is only safe for the
 // M2 test/demo operation ("system_info") because NoOpExecutor (below)
 // never actually calls exec() on it.
 type IdentityTranslator struct{}

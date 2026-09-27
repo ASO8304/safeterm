@@ -26,9 +26,9 @@ type ParameterDefinition struct {
 }
 
 // OperationDefinition describes one safe operation SafeTerm exposes to
-// users, and how it will eventually map to a real system command
-// (Translation Layer, M6). ArgsTemplate is not interpreted by this
-// package at all — it is inert data until M6 exists.
+// users, and how internal/translation maps it to a real system command
+// (M6). ArgsTemplate remains inert data in this package; translation.New
+// validates and compiles its whole-token placeholders (ADR-007).
 type OperationDefinition struct {
 	Name         string                `json:"name"`
 	Description  string                `json:"description"`
