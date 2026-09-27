@@ -32,8 +32,8 @@ type PolicyEnforcer interface {
 }
 
 // Translator maps a validated, authorized ExecutionRequest to a concrete
-// system command and argument list. Real implementation arrives in M6
-// (Translation Layer).
+// system command and argument list. The real implementation is in
+// internal/translation (M6).
 type Translator interface {
 	Translate(req *contract.ExecutionRequest) (command string, args []string, err error)
 }

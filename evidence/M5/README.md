@@ -1,41 +1,42 @@
-# شواهد M5 — Policy Engine
+# M5 Evidence — Policy Engine
 
-تاریخ بررسی: ۲۰۲۶-۰۹-۲۷. محیط اجرا: WSL، `go version go1.22.2 linux/amd64`.
+Verification date: 2026-09-27. Environment: WSL, `go version go1.22.2 linux/amd64`.
 
-## وضعیت اولیه و اصلاحات
-- نسخه‌ی باز در این چت در `C:\Users\abolf\OneDrive\Documents\safeterm` بود.
-  فایل policy به‌اشتباه داخل `internal/agent` و فایل تست صفر بایت بود.
-- نسخه‌ی جداگانه‌ی `/home/abolfazl/safeterm` شامل انتقال صحیح فایل و ۷ تست
-  Policy بود. تست‌های موجود از آن نسخه به پروژه‌ی این چت منتقل و تکمیل شدند؛
-  نسخه‌ی جداگانه‌ی WSL تغییر داده نشد.
-- بررسی پایه پیش از اصلاحات به‌علت فایل تست خالی و پایان خط CRLF شکست خورد.
-  درخواست صریح مالک برای رفع کمبودهای M5 مبنای تعمیر این وضعیت بود.
-- پیاده‌سازی Policy حفظ شد و کنترل nil برای درخواست و config اضافه شد.
-  Core و چهار interface آن از نظر رفتار و امضا تغییر نکردند.
-- REQ-005 و ADR-006 اضافه شدند؛ test matrix، README و توضیحات مرز احراز
-  هویت اصلاح شدند. پایان خط Go و Makefile با `.gitattributes` تثبیت شد.
-- `fmt-check` اکنون خطای اجرای gofmt را نیز برمی‌گرداند؛ نسخه‌ی قبلی می‌توانست
-  در نبود خروجی stdout، شکست خود ابزار را پنهان کند. CI شاخه‌های `codex/**` را نیز اجرا می‌کند.
+## Initial State and Corrections
+- The checkout used for this work was `C:\Users\abolf\OneDrive\Documents\safeterm`.
+  The policy file was incorrectly located under `internal/agent`, and the test file was empty.
+- A separate `/home/abolfazl/safeterm` checkout had the file in the correct
+  directory and contained seven Policy tests. Those tests were brought into
+  this checkout and expanded; the separate WSL checkout was not modified.
+- Baseline verification initially failed because of the empty test file and
+  CRLF line endings. The owner's explicit request to complete M5 authorized
+  correcting that state.
+- The Policy implementation was preserved, with nil request and nil config
+  handling added. Core and its four interfaces did not change in behavior or signature.
+- REQ-005 and ADR-006 were added. The test matrix, README, and authentication-
+  boundary wording were corrected. `.gitattributes` stabilized Go and Makefile line endings.
+- `fmt-check` now propagates gofmt execution failures. The prior version could
+  hide a tool failure when it produced no stdout. CI also runs for `codex/**` branches.
 
-## نتیجه‌ی بررسی
-[خروجی کامل و بدون خلاصه‌سازی make verify](make-verify.log):
+## Verification Result
+[Complete, unabridged make verify output](make-verify.log):
 
 ```text
 SafeTerm Verification: PASS
 ```
 
-هر ۱۴ تست واحد Policy و ۳ تست یکپارچه‌ی M5 (با ۱۴ سناریوی یکپارچه)
-موفق شدند. پوشش statementهای `internal/policy` برابر ۱۰۰٪ است.
-تمام تست‌های مراحل قبل نیز موفق بودند. نگاشت دقیق معیارهای پذیرش و تست‌ها
-در [test matrix](../../docs/testing/test-matrix.md) ثبت شده است.
+All 14 Policy unit tests and three M5 integration tests (covering 14 integration
+scenarios) passed. Statement coverage for `internal/policy` is 100%. All tests
+from earlier milestones also passed. The exact acceptance-criterion-to-test
+mapping is recorded in the [test matrix](../../docs/testing/test-matrix.md).
 
-[بررسی منفی fmt-check](fmt-check-negative.log) نیز تأیید کرد که gofmt ساختگی
-با خروجی خالی و exit code ناموفق، باعث شکست هدف make می‌شود.
+The [negative fmt-check verification](fmt-check-negative.log) also confirmed
+that a fake gofmt returning a failure with empty stdout causes the Make target to fail.
 
-## بازتولید اجرا در WSL
-به‌دلیل تفاوت مالکیت فایل‌ها روی درایو ویندوز، Git در WSL ابتدا خطای
-`detected dubious ownership` داد. برای همان اجرای بررسی، فقط مسیر این پروژه
-به Git معرفی شد؛ تنظیمات global تغییر نکرد و VCS stamping غیرفعال نشد:
+## Reproducing in WSL
+Because Windows-drive ownership differs under WSL, Git initially reported
+`detected dubious ownership`. For this verification command only, the specific
+project path was supplied to Git. No global settings changed and VCS stamping remained enabled:
 
 ```sh
 cd /mnt/c/Users/abolf/OneDrive/Documents/safeterm
@@ -45,16 +46,16 @@ GIT_CONFIG_VALUE_0=/mnt/c/Users/abolf/OneDrive/Documents/safeterm \
 make verify
 ```
 
-## محدوده و انتشار
-این شواهد برای تکمیل محلی M5 است. احراز هویت، Translation واقعی و Executor
-واقعی در این تغییر پیاده‌سازی نشده‌اند. تست‌های M4 برای آزمون مستقل Validator
-placeholder خود را نگه داشته‌اند؛ تست‌های M5 از Policy واقعی استفاده می‌کنند.
+## Scope and Release
+This evidence covers local completion of M5. Authentication, the real
+Translation layer, and the real Executor were not implemented in this change.
+M4 tests retain their placeholder to isolate Validator; M5 tests use the real Policy.
 
-شاخه‌ی کار با دستور زیر ساخته شد:
+The working branch was created with:
 
 ```sh
 git switch -c codex/m5-policy-completion
 ```
 
-ادغام PR و ثبت تگ M5 پس از بازبینی مالک انجام می‌شود؛ PASS محلی به‌تنهایی
-شاهد ادغام یا انتشار نیست. وضعیت CI باید در PR بررسی شود.
+PR merge and the M5 tag occur after owner review. A local PASS alone is not
+evidence of merge or release; CI status must be checked in the PR.

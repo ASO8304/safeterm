@@ -1,0 +1,93 @@
+// Package translation maps validated, authorized requests to a configured
+// executable and separate arguments. It never runs a shell or a process.
+// See REQ-006 and ADR-007 for the intentionally limited template grammar.
+package translation
+
+import (
+	"fmt"
+	"strings"
+
+	"safeterm/internal/config"
+	"safeterm/internal/contract"
+)
+
+type argument struct {
+	literal   string
+	parameter string
+}
+
+type operation struct {
+	command string
+	args    []argument
+}
+
+// Translator implements agent.Translator. Its private template snapshot is
+// read-only after construction; returned slices never alias that snapshot.
+type Translator struct {
+	operations map[string]operation
+}
+
+// New validates configuration and compiles whole-token placeholders. A
+// malformed template fails before requests can be served by this stage.
+func New(cfg *config.Config) (*Translator, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("translation: nil configuration")
+	}
+	if err := config.ValidateConfig(cfg); err != nil {
+		return nil, fmt.Errorf("translation: invalid configuration: %w", err)
+	}
+	ops := make(map[string]operation, len(cfg.Operations))
+	for _, op := range cfg.Operations {
+		defined := make(map[string]bool, len(op.Parameters))
+		for _, p := range op.Parameters {
+			if defined[p.Name] {
+				return nil, fmt.Errorf("translation: operation %q: duplicate parameter %q", op.Name, p.Name)
+			}
+			defined[p.Name] = true
+		}
+		args := make([]argument, len(op.ArgsTemplate))
+		for i, token := range op.ArgsTemplate {
+			if !strings.ContainsAny(token, "{}") {
+				args[i].literal = token
+				continue
+			}
+			if len(token) < 3 || token[0] != '{' || token[len(token)-1] != '}' || strings.ContainsAny(token[1:len(token)-1], "{}") {
+				return nil, fmt.Errorf("translation: operation %q: args_template[%d]: invalid placeholder %q; expected a whole {name} token", op.Name, i, token)
+			}
+			name := token[1 : len(token)-1]
+			if !defined[name] {
+				return nil, fmt.Errorf("translation: operation %q: args_template[%d]: undefined parameter %q", op.Name, i, name)
+			}
+			args[i].parameter = name
+		}
+		ops[op.Name] = operation{command: op.Command, args: args}
+	}
+	return &Translator{operations: ops}, nil
+}
+
+// Translate requires a request that has passed Validation and Policy using
+// the same configuration. It checks missing substitutions defensively, but
+// does not replace either of those security stages. Every error returns no
+// executable and no partial arguments.
+func (t *Translator) Translate(req *contract.ExecutionRequest) (string, []string, error) {
+	if req == nil {
+		return "", nil, fmt.Errorf("translation: nil request")
+	}
+	op, ok := t.operations[req.Command]
+	if !ok {
+		return "", nil, fmt.Errorf("translation: unknown operation %q", req.Command)
+	}
+	args := make([]string, len(op.args))
+	for i, token := range op.args {
+		if token.parameter == "" {
+			args[i] = token.literal
+			continue
+		}
+		value, present := req.Arguments[token.parameter]
+		if !present {
+			return "", nil, fmt.Errorf("translation: operation %q: missing argument %q required by template", req.Command, token.parameter)
+		}
+		args[i] = value
+	}
+	return op.command, args, nil
+}
