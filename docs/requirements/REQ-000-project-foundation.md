@@ -1,25 +1,25 @@
-# REQ-000: پروژه باید از روز اول قابل build، تست و verify باشد
+# REQ-000: The Project Must Be Buildable, Testable, and Verifiable from Day One
 
-**Source:** روش‌شناسی توسعه (M0 — Project Foundation)
+**Source:** Development methodology (M0 — Project Foundation)
 **Priority:** Critical
 **Status:** In Progress
 
 ## Description
-پیش از پیاده‌سازی هر قابلیت امنیتی (Validation، Policy، Translation و ...)،
-باید یک اسکلت پروژه وجود داشته باشد که با یک دستور واحد (`make verify`)
-قابل build، لینت و تست خودکار باشد؛ و این فرآیند در CI هم به‌صورت خودکار
-روی هر push اجرا شود.
+Before implementing any security capability such as Validation, Policy, or
+Translation, the project must have a skeleton that can be built, linted, and
+tested automatically with one command (`make verify`). CI must also run this
+process automatically on every push.
 
 ## Acceptance Criteria
-- [x] ساختار پوشه‌بندی پروژه ایجاد شده
-- [x] `go.mod` و ماژول پایه ایجاد شده
-- [x] یک پکیج نمونه (`internal/config`) با حداقل یک تست واحد وجود دارد
-- [x] `make verify` به‌صورت محلی PASS می‌شود
-- [ ] GitHub Actions روی اولین push سبز می‌شود (بعد از push توسط کاربر تایید می‌شود)
-- [ ] اولین commit و اولین git tag (`v0.1.0-m0`) ثبت شده
+- [x] Create the project directory structure
+- [x] Create `go.mod` and the base module
+- [x] Provide a sample package (`internal/config`) with at least one unit test
+- [x] `make verify` passes locally
+- [ ] GitHub Actions passes on the first push (confirmed after the user pushes)
+- [ ] Record the first commit and first Git tag (`v0.1.0-m0`)
 
 ## Related Tests
 - TEST-CFG-001 (`internal/config/config_test.go`)
 
 ## Related ADRs
-- ADR-001 (زبان، محیط توسعه، CI/CD)
+- ADR-001 (language, development environment, and CI/CD)

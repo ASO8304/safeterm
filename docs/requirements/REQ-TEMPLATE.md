@@ -1,15 +1,15 @@
-# REQ-XXX: <عنوان نیازمندی>
+# REQ-XXX: <Requirement Title>
 
-**Source:** (کدام بخش از سند پروژه یا کدام تصمیم باعث این نیازمندی شده)
+**Source:** (Which section of the project specification or which decision created this requirement?)
 **Priority:** Critical / High / Medium / Low
 **Status:** Planned / In Progress / Done
 
 ## Description
-شرح دقیق نیازمندی.
+Detailed requirement description.
 
 ## Acceptance Criteria
-- [ ] معیار ۱
-- [ ] معیار ۲
+- [ ] Criterion 1
+- [ ] Criterion 2
 
 ## Related Tests
 - TEST-XXX-001

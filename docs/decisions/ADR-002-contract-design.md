@@ -1,41 +1,42 @@
-# ADR-002: طراحی قرارداد ExecutionRequest / ExecutionResponse
+# ADR-002: ExecutionRequest / ExecutionResponse Contract Design
 
 ## Status
 Accepted
 
 ## Context
-Broker و Agent باید از طریق یک قرارداد داده‌ای واحد و پایدار با هم صحبت کنند
-(REQ-001). چند تصمیم طراحی باید گرفته می‌شد:
-1. تولید شناسه یکتا (RequestID) با چه روشی انجام شود؟
-2. آیا از یک کتابخانه خارجی (مثل UUID) استفاده شود یا فقط کتابخانه استاندارد Go؟
-3. آیا Broker و Agent همیشه در یک پردازش (process) واحد اجرا می‌شوند یا ممکن است
-   بعداً به دو سرویس/پردازش جدا تبدیل شوند؟
+Broker and Agent need a single, stable data contract for communication (REQ-001).
+Several design decisions were required:
+
+1. How should a unique identifier (`RequestID`) be generated?
+2. Should the project use an external library such as UUID or only the Go standard library?
+3. Will Broker and Agent always run in one process, or might they later become separate services or processes?
 
 ## Decision
-- `RequestID` با استفاده از `crypto/rand` (۱۶ بایت تصادفی، hex-encoded) تولید
-  می‌شود — نه با یک کتابخانه‌ی UUID خارجی.
-- `ExecutionRequest` و `ExecutionResponse` هر دو دارای JSON tag هستند و باید
-  بتوانند بدون از دست دادن داده، Marshal/Unmarshal شوند؛ حتی اگر در M1
-  Broker و Agent در یک باینری واحد اجرا می‌شوند.
-- منطق ساخت instance (`NewExecutionRequest`) این دو قاعده را همیشه اجرا می‌کند:
-  رد کردن Command خالی، و نرمالایز کردن مقادیر خالی/صفر (nil Arguments،
-  ReceivedAt صفر).
+- `RequestID` is generated with `crypto/rand` using 16 random bytes encoded as
+  hexadecimal, rather than an external UUID library.
+- `ExecutionRequest` and `ExecutionResponse` both have JSON tags and must
+  survive Marshal/Unmarshal without data loss, even though Broker and Agent
+  run in the same binary during M1.
+- The instance constructor (`NewExecutionRequest`) always enforces two rules:
+  reject an empty Command and normalize empty/zero values (`nil` Arguments and
+  a zero `ReceivedAt`).
 
 ## Alternatives Considered
-1. **استفاده از یک کتابخانه UUID خارجی (مثل google/uuid)** — رد شد در M1،
-   چون یک وابستگی خارجی اضافه می‌کند بدون نیاز واقعی؛ `RequestID` صرفاً یک
-   رشته‌ی غیرشفاف (opaque string) است و جایگزینی آن با UUID واقعی در آینده،
-   بدون تغییر در قرارداد عمومی امکان‌پذیر است.
-2. **عدم افزودن JSON tags (فرض این‌که Broker/Agent همیشه در یک پردازش می‌مانند)**
-   — رد شد، چون معماری سند پروژه صراحتاً Broker را به‌عنوان یک adapter مستقل
-   و قابل‌جایگزینی توصیف کرده (SSH، Web، Console، ...)، و جدا شدن آن‌ها به
-   پردازش‌های مجزا در آینده محتمل است.
+1. **Use an external UUID library such as google/uuid** — Rejected in M1 because
+   it adds a dependency without a real need. `RequestID` is only an opaque
+   string, so a real UUID implementation can replace the internals later
+   without changing the public contract.
+2. **Omit JSON tags because Broker and Agent remain in one process** — Rejected
+   because the project architecture explicitly describes Broker as an
+   independent, replaceable adapter (SSH, Web, Console, and others). Separating
+   them into distinct processes is plausible in the future.
 
 ## Consequences
-- افزودن یک کتابخانه‌ی UUID واقعی در آینده (اگر لازم شد) صرفاً پیاده‌سازی
-  داخلی `generateRequestID` را تغییر می‌دهد، نه امضای عمومی تابع را.
-- چون قرارداد از همین ابتدا JSON-safe طراحی شده، اضافه کردن یک Broker که در
-  پردازش جدا اجرا می‌شود (مثلاً از طریق HTTP یا Unix socket) در آینده، نیازی
-  به بازطراحی `ExecutionRequest`/`ExecutionResponse` ندارد.
-- `Metadata.ClaimedRoles` عمداً به همین اسم نام‌گذاری شده (نه فقط `Roles`)
-  تا صراحتاً یادآوری کند این مقدار تا پیاده‌سازی Policy Engine (M5) قابل اعتماد نیست.
+- Adding a real UUID library later, if necessary, changes only the internal
+  `generateRequestID` implementation and not the public function signature.
+- Because the contract is JSON-safe from the beginning, a future Broker in a
+  separate process (for example, over HTTP or a Unix socket) will not require
+  redesigning `ExecutionRequest` or `ExecutionResponse`.
+- `Metadata.ClaimedRoles` is deliberately named that way rather than simply
+  `Roles`, emphasizing that the value is an unverified claim. ADR-006 clarifies
+  that the M5 Policy Engine checks authorization but still does not authenticate it.

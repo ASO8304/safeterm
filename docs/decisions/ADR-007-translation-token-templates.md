@@ -1,50 +1,59 @@
-# ADR-007: قالب توکن کامل و ترجمه‌ی بدون shell
+# ADR-007: Whole-Token Templates and Shell-Free Translation
 
 ## Status
 Accepted
 
 ## Context
-ArgsTemplate از M3 یک آرایه‌ی JSON است. M6 باید مشخص کند placeholderها چگونه
-جایگزین می‌شوند و در برابر اشتباه نویسنده‌ی config چه رفتاری دارد. نمونه‌ی
-واقعی trace همه‌ی placeholderها را به‌صورت توکن کامل تعریف کرده است.
+`ArgsTemplate` has been a JSON array since M3. M6 must define how placeholders
+are substituted and how config-author mistakes are handled. Every placeholder
+in the shipped `trace` example occupies a complete token.
 
-برخلاف خلاصه‌ی پرامپت ادامه، قالب system_info در مخزن خالی نیست و `-a` دارد؛
-تعریف مخزن حفظ می‌شود و حالت قالب خالی نیز مستقل پوشش داده می‌شود.
+Contrary to the continuation prompt summary, the repository's `system_info`
+template is not empty; it contains `-a`. The repository definition is retained,
+and the empty-template case is covered independently.
 
 ## Decision
-- سازنده‌ی `translation.New(cfg)` برخلاف سازنده‌های بدون خطای مراحل قبل،
-  `(*Translator, error)` برمی‌گرداند؛ پیش از مصرف درخواست، Config را با
-  ValidateConfig و قالب‌ها را با قواعد زیر بررسی و به نگاشت داخلی مستقل تبدیل می‌کند.
-  این تفاوت فقط در ساخت مرحله است؛ interface موجود `agent.Translator` تغییر نمی‌کند.
-- توکن فاقد آکولاد، literal است. توکن دارای آکولاد فقط وقتی پذیرفته می‌شود
-  که تمام آن دقیقاً `{name}` باشد و name نام یک پارامتر تعریف‌شده و غیرتکراری باشد.
-  قالب ترکیبی مانند `--host={host}`، escape آکولاد، شرط، wildcard و زبان shell نداریم.
-- هر توکن دقیقاً یک آرگومان می‌سازد؛ تکرار placeholder مجاز است. مقدار ورودی
-  فقط کپی می‌شود و دوباره به‌عنوان قالب تفسیر، split، join یا quote نمی‌شود.
-- Command عین مقدار config است و هیچ بخشی از آن از Arguments یا Metadata نمی‌آید.
-- قالب خالی به لیست خالی آرگومان منجر می‌شود. نبود مقدار placeholder، حتی
-  برای پارامتر اختیاری، خطاست؛ حذف توکن یا مقدار پیش‌فرض ضمنی نداریم. پارامتر
-  اختیاری فقط وقتی می‌تواند غایب باشد که در قالب استفاده نشده باشد.
-- Translate تنها بعد از Validation و Policy فراخوانی می‌شود. بررسی نوع، بازه،
-  pattern و مجوز در آن تکرار نمی‌شود. با این حال درخواست nil، عملیات ناموجود
-  و نبود مقدار placeholder دفاعی بررسی می‌شوند و هیچ خروجی ناقصی برنمی‌گردد.
-- snapshot داخلی به config و خروجی‌های قابل‌تغییر فراخواننده وابسته نیست.
-  Core تغییر نمی‌کند؛ تست‌های ایزوله‌ی M2/M4/M5 placeholderهای خود را نگه می‌دارند.
+- Unlike earlier constructors that cannot fail, `translation.New(cfg)` returns
+  `(*Translator, error)`. Before serving requests, it checks the Config with
+  `ValidateConfig`, validates templates using the following rules, and compiles
+  an independent internal map. This affects stage construction only; the
+  existing `agent.Translator` interface does not change.
+- A token without braces is a literal. A token containing braces is accepted
+  only when the entire token is exactly `{name}` and `name` identifies a
+  defined, non-duplicate parameter. Combined templates such as
+  `--host={host}`, brace escaping, conditions, wildcards, and shell syntax are unsupported.
+- Every token produces exactly one argument. Repeated placeholders are allowed.
+  An input value is copied only; it is not reinterpreted as a template, split,
+  joined, or quoted.
+- Command is copied exactly from config. No part of it comes from Arguments or Metadata.
+- An empty template produces an empty argument list. A missing placeholder
+  value, including for an optional parameter, is an error. Tokens are not
+  omitted and no implicit default exists. An optional parameter may be absent
+  only when the template does not reference it.
+- Translate runs only after Validation and Policy. It does not repeat type,
+  range, pattern, or authorization checks. It still defensively rejects nil
+  requests, unknown operations, and missing placeholder values without
+  returning partial output.
+- The internal snapshot does not depend on mutable config or caller-owned
+  outputs. Core remains unchanged, and isolated M2/M4/M5 tests keep their placeholders.
 
 ## Alternatives Considered
-1. **ساخت یک رشته‌ی shell و جایگزینی متنی** — رد شد، چون مرز آرگومان‌ها را
-   از بین می‌برد و مسیر تزریق دستور ایجاد می‌کند.
-2. **جایگزینی placeholder در هر قسمت توکن** — برای M6 رد شد، چون نیاز فعلی
-   با توکن کامل برطرف می‌شود و قواعد escape و ترکیب بیشتری لازم ندارد.
-3. **بررسی قالب فقط هنگام هر درخواست** — رد شد، چون اشتباه config را می‌توان
-   پیش از سرویس‌دهی آشکار کرد. نبود مقدار ورودی همچنان در Translate بررسی می‌شود.
-4. **حذف خودکار توکن پارامتر اختیاریِ غایب** — رد شد، چون ممکن است معنی آرگومان
-   کناری یا flag را تغییر دهد. رفتار شرطی به نیازمندی و تصمیم مستقل در آینده نیاز دارد.
+1. **Build a shell string and perform textual replacement** — Rejected because
+   it destroys argument boundaries and creates a command-injection path.
+2. **Replace placeholders within any part of a token** — Rejected for M6 because
+   whole tokens meet the current need without requiring more escaping and composition rules.
+3. **Validate templates only for each request** — Rejected because config errors
+   can be detected before serving traffic. Missing request values are still checked by Translate.
+4. **Automatically remove the token for an absent optional parameter** —
+   Rejected because it may change the meaning of an adjacent argument or flag.
+   Conditional behavior needs a separate requirement and decision.
 
 ## Consequences
-- مسیر راه‌اندازی باید خطای ساخت Translator را بررسی کند و بدون آن Core نسازد.
-- ArgsTemplate در LoadConfig هنوز داده است؛ اعتبارسنجی دستور زبان آن در
-  translation.New انجام می‌شود و به config وابستگی معکوس اضافه نمی‌شود.
-- Config منبع مورد اعتماد تعریف فرمان است؛ این مرحله امن‌بودن هر executable
-  یا معنی گزینه‌های اختصاصی آن را تضمین نمی‌کند. اجرای process مربوط به M7 است.
-- ورودی باید پیش‌تر validate شده باشد و نقش‌ها همچنان طبق ADR-006 تأییدنشده‌اند.
+- Startup wiring must check Translator construction errors and must not build
+  Core without a valid Translator.
+- `ArgsTemplate` remains inert data in `LoadConfig`. Grammar validation occurs
+  in `translation.New`, avoiding a reverse dependency from config.
+- Config is the trusted source of command definitions. This stage does not
+  establish that an executable or its tool-specific options are safe. Process
+  execution belongs to M7.
+- Input must already be validated, and roles remain unauthenticated under ADR-006.

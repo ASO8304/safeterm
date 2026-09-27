@@ -1,17 +1,17 @@
-# ADR-XXX: <عنوان تصمیم>
+# ADR-XXX: <Decision Title>
 
 ## Status
 Proposed / Accepted / Superseded by ADR-YYY
 
 ## Context
-چه مسئله‌ای باعث شد این تصمیم لازم شود؟
+What problem made this decision necessary?
 
 ## Decision
-دقیقاً چه چیزی تصمیم‌گیری شد؟
+What exactly was decided?
 
 ## Alternatives Considered
-1. گزینه اول — چرا رد شد
-2. گزینه دوم — چرا رد شد
+1. First option — why it was rejected
+2. Second option — why it was rejected
 
 ## Consequences
-این تصمیم چه پیامدهایی (مثبت و منفی) دارد؟
+What positive and negative consequences does this decision have?

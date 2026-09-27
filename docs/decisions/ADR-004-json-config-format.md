@@ -1,44 +1,42 @@
-# ADR-004: استفاده از JSON به‌جای YAML برای فایل‌های Configuration (M3)
+# ADR-004: Use JSON Instead of YAML for Configuration Files (M3)
 
 ## Status
 Accepted
 
 ## Context
-سند پروژه صراحتاً "YAML / JSON" را به‌عنوان فرمت‌های قابل‌قبول برای
-Declarative Command Config ذکر کرده است. YAML معمولاً برای فایل‌های
-پیکربندی دست‌نویس خواناتر است (کامنت‌پذیر، کم‌حجم‌تر)، اما کتابخانه‌ی
-استاندارد Go از YAML پشتیبانی نمی‌کند و نیاز به یک وابستگی خارجی
-(مثلاً `gopkg.in/yaml.v3`) دارد.
+The project specification explicitly lists YAML and JSON as acceptable formats
+for Declarative Command Config. YAML is often more readable for hand-written
+configuration because it supports comments and is less verbose, but the Go
+standard library does not support YAML and therefore requires an external
+dependency such as `gopkg.in/yaml.v3`.
 
-هنگام تلاش برای افزودن این وابستگی در محیط توسعه/تست فعلی، دسترسی به
-`proxy.golang.org` مسدود بود (خطای `403 Forbidden: Host not in allowlist`).
-این یعنی امکان `go get`/`go mod tidy` برای این کتابخانه در همین محیط وجود
-نداشت.
+When that dependency was evaluated in the current development/test environment,
+access to `proxy.golang.org` was blocked with `403 Forbidden: Host not in
+allowlist`. Consequently, `go get` and `go mod tidy` could not retrieve it in
+this environment.
 
 ## Decision
-برای M3 از **JSON** با پکیج استاندارد `encoding/json` استفاده می‌شود، نه YAML.
+M3 uses **JSON** through the standard `encoding/json` package rather than YAML.
 
 ## Alternatives Considered
-1. **استفاده از YAML با `gopkg.in/yaml.v3`** — رد شد برای M3، به دو دلیل:
-   - دلیل عملیاتی: در محیط فعلی، امکان دانلود و تایید (verify) این کتابخانه
-     قبل از تحویل کد وجود نداشت؛ اصل کاری این پروژه این بوده که هیچ کدی
-     بدون `make verify` سبز تحویل داده نشود.
-   - دلیل معماری: مطابق ADR-002، این پروژه عمداً از افزودن وابستگی خارجی
-     بدون نیاز واقعی پرهیز می‌کند. JSON با کتابخانه‌ی استاندارد این نیاز را
-     کاملاً برطرف می‌کند.
-2. **پیاده‌سازی یک YAML parser داخلی و ساده** — رد شد، چون overengineering
-   غیرضروری برای این مرحله است و ریسک باگ در خود parser را اضافه می‌کند.
+1. **Use YAML with `gopkg.in/yaml.v3`** — Rejected for M3 for two reasons:
+   - Operationally, the dependency could not be downloaded and verified in the
+     current environment before delivery. The project requires `make verify`
+     to pass before any code is delivered.
+   - Architecturally, ADR-002 establishes deliberate avoidance of unnecessary
+     external dependencies. The standard library's JSON support fully meets
+     the current need.
+2. **Implement a small internal YAML parser** — Rejected as unnecessary
+   overengineering that would add parser defects and maintenance risk.
 
 ## Consequences
-- فایل‌های `configs/operations/*.json`, `configs/roles/*.json`,
-  `configs/policies/*.json` باید JSON معتبر باشند (بدون کامنت، با کوتیشن
-  دوتایی برای کلیدها).
-- این تصمیم **قابل بازبینی** است: اگر تیم توسعه در محیطی با دسترسی کامل به
-  `proxy.golang.org` کار می‌کند (مثلاً GitHub Actions، که چنین محدودیتی
-  ندارد) و خوانایی YAML برای اپراتورهای نهایی مهم‌تر از این هزینه تشخیص داده
-  شود، می‌توان در یک ADR جدید (مثلاً ADR-010) این تصمیم را با افزودن یک لایه‌ی
-  ترجمه‌ی YAML→struct جایگزین کرد، بدون تغییر در ساختار `OperationDefinition`,
-  `RoleDefinition`, `PolicyDefinition` یا منطق `ValidateConfig`.
-- `LoadConfig` به‌گونه‌ای طراحی شده که پارس کردن فایل (`loadJSONArrayFiles`)
-  از منطق اعتبارسنجی (`ValidateConfig`) کاملاً جدا است؛ این جداسازی دقیقاً
-  همین تغییر فرمت در آینده را کم‌هزینه می‌کند.
+- Files under `configs/operations/*.json`, `configs/roles/*.json`, and
+  `configs/policies/*.json` must be valid JSON, without comments and with
+  double-quoted keys.
+- This decision can be revisited. If the team later works in an environment
+  with full access to `proxy.golang.org` and YAML readability is more valuable,
+  a new ADR (for example, ADR-010) can add a YAML-to-struct translation layer
+  without changing `OperationDefinition`, `RoleDefinition`, `PolicyDefinition`,
+  or `ValidateConfig`.
+- `LoadConfig` separates file parsing (`loadJSONArrayFiles`) from validation
+  (`ValidateConfig`), reducing the cost of a future format change.

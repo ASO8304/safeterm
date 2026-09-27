@@ -1,47 +1,53 @@
-# ADR-006: مجوزهای جمع‌شونده و مرز احراز هویت در Policy Engine
+# ADR-006: Additive Authorization and the Authentication Boundary in Policy Engine
 
 ## Status
 Accepted
 
-این ADR برداشت مربوط به تأیید هویت در بخش Consequences از ADR-002 را
-جایگزین می‌کند؛ سایر تصمیم‌های ADR-002 بدون تغییر باقی می‌مانند.
+This ADR supersedes the interpretation of identity verification in the
+Consequences section of ADR-002. All other ADR-002 decisions remain unchanged.
 
 ## Context
-M3 نقش‌ها و مجوزها را از config بارگذاری می‌کند و M2 محل اجرای Policy را
-مشخص کرده است، اما هیچ‌کدام هویت کاربر را تأیید نمی‌کنند. عبارت قبلی ADR-002
-ممکن بود این برداشت را ایجاد کند که با رسیدن M5، ClaimedRoles قابل اعتماد
-می‌شود. این برداشت نادرست است: بررسی مجوز، اثبات هویت نیست.
+M3 loads roles and permissions from configuration, and M2 establishes where
+Policy runs, but neither authenticates the user. Earlier ADR-002 wording could
+be read to mean that `ClaimedRoles` becomes trustworthy when M5 arrives. That
+interpretation is incorrect: checking authorization is not proving identity.
 
-برای چند نقش و چند policy برای یک نقش نیز باید رفتار صریح و قابل آزمون داشت.
+Behavior for multiple roles and multiple policies for one role must also be
+explicit and testable.
 
 ## Decision
-- `internal/policy.Enforcer` همان interface موجود `agent.PolicyEnforcer` را
-  پیاده‌سازی می‌کند؛ Core و ترتیب مراحل آن تغییر نمی‌کند.
-- سازنده Config معتبر حاصل از `config.LoadConfig` یا `config.ValidateConfig`
-  را دریافت می‌کند و نگاشت مستقل نقش به مجموعه‌ی عملیات مجاز می‌سازد.
-  بررسی مجدد یکپارچگی ارجاعی در Policy تکرار نمی‌شود.
-- دسترسی فقط با مجوز صریح داده می‌شود. نبود نقش، نبود policy یا نبود عملیات
-  در مجوزهای نقش به رد درخواست می‌انجامد.
-- نقش‌ها و policyهای تکرارشده برای یک نقش، مجوز جمع‌شونده دارند: وجود یک
-  مجوز کافی است. نقش ناشناخته هیچ مجوزی نمی‌دهد، اما مجوز نقش معتبر دیگر
-  را لغو نمی‌کند. ترتیب نقش‌ها اثری ندارد و wildcard یا نقش ویژه‌ی ضمنی نداریم.
-- درخواست nil با خطا رد می‌شود؛ Config nil و مقدار صفر Enforcer هیچ مجوزی ندارند.
-- Policy صرفاً این پرسش را پاسخ می‌دهد: «اگر نقش‌های ادعاشده درست باشند، آیا
-  این عملیات مجاز است؟». ساخت احراز هویت یا اعتماد به نقش ارسالی Broker در M5 انجام نمی‌شود.
-- تست یکپارچه‌ی M5 از Validator و Policy واقعی استفاده می‌کند؛ Translation
-  و Execution هنوز test double هستند و هیچ دستور سیستم‌عامل اجرا نمی‌شود.
+- `internal/policy.Enforcer` implements the existing `agent.PolicyEnforcer`
+  interface; Core and its stage order remain unchanged.
+- The constructor receives a valid Config produced by `config.LoadConfig` or
+  checked by `config.ValidateConfig`, then builds an independent role-to-
+  allowed-operations map. Policy does not repeat referential integrity checks.
+- Access is granted only through an explicit permission. A missing role,
+  missing policy, or operation absent from the role's permissions causes denial.
+- Roles and repeated policies for a role use additive permissions: one grant is
+  sufficient. An unknown role grants nothing but does not revoke another valid
+  role's explicit permission. Role order has no effect, and there are no
+  implicit wildcards or special roles.
+- A nil request returns an error. A nil Config and zero-value Enforcer grant no access.
+- Policy answers only this question: "If the claimed roles are true, may they
+  run this operation?" M5 does not authenticate users or trust roles supplied
+  by a Broker.
+- M5 integration tests use the real Validator and Policy. Translation and
+  Execution remain test doubles and execute no operating-system command.
 
 ## Alternatives Considered
-1. **اعطای دسترسی پیش‌فرض در نبود policy** — رد شد، چون fail-open است.
-2. **لزوم مجوز در همه‌ی نقش‌ها یا رد کل درخواست به‌علت یک نقش ناشناخته** —
-   رد شد، چون با مدل جمع‌شونده‌ی نقش‌ها ناسازگار است؛ نقش بدون مجوز نباید
-   مجوز صریح نقش دیگر را لغو کند.
-3. **احراز هویت داخل Policy** — رد شد، چون قرارداد این مرحله فقط بررسی مجوز
-   است و هنوز نیازمندی و طراحی سازوکار احراز هویت وجود ندارد.
+1. **Grant access by default when no policy exists** — Rejected because it fails open.
+2. **Require every role to grant permission, or reject the entire request for
+   one unknown role** — Rejected because it conflicts with additive roles. A
+   role without permission should not revoke another role's explicit grant.
+3. **Implement authentication inside Policy** — Rejected because this stage's
+   contract covers authorization only, and no authentication mechanism has yet
+   been specified or designed.
 
 ## Consequences
-- تست‌ها باید هم رد دسترسی و هم توقف واقعی مراحل بعد از Policy را ثابت کنند.
-- عبور از Policy به‌معنای تأیید هویت نیست؛ اتصال به Broker واقعی در آینده نیازمند
-  طراحی مستقل احراز هویت است و نباید به ادعای نقش کاربر اعتماد کند.
-- placeholder برای آزمون مستقل مراحل حفظ می‌شود؛ مسیر یکپارچه‌ی M5 از آن استفاده نمی‌کند.
-- بارگذاری و اعتبارسنجی config پیش‌شرط ساخت Policy در مسیر واقعی است.
+- Tests must prove both access denial and actual termination of stages after Policy.
+- Passing Policy does not prove identity. Wiring a real Broker later requires a
+  separately designed authentication mechanism and must not trust a user's role claim.
+- Placeholders remain available for isolated stage tests; the M5 integration
+  path does not use the Policy placeholder.
+- Loading and validating configuration is a prerequisite for constructing
+  Policy in a real runtime path.

@@ -1,7 +1,7 @@
 # Test Matrix
 
-این جدول نگاشت بین Requirement، کامپوننت، نوع تست و نتیجه را نگه می‌دارد.
-هدف: از روی این یک فایل بتوان فهمید هر نیازمندی با کدام تست‌ها پوشش داده شده.
+This table maintains the mapping between requirements, components, test types, and results.
+Its purpose is to show which tests cover every requirement from a single file.
 
 | ID | Requirement | Component | Type | Status |
 |---|---|---|---|---|
@@ -52,9 +52,8 @@
 | TEST-INTEG-008 | REQ-006 (AC-11) + REQ-004 (AC-1, AC-2, AC-4, AC-6, AC-7) + REQ-005 (AC-1, AC-2, AC-4) | tests/integration | Integration | PASS |
 | TEST-INTEG-009 | REQ-006 (AC-6, AC-11) + REQ-002 (AC-3) | tests/integration | Integration | PASS |
 
-شواهد اجرای محلی M5: [خروجی کامل make verify](../../evidence/M5/make-verify.log).
-شواهد اجرای محلی M6: [خروجی کامل make verify](../../evidence/M6/make-verify.log).
+Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
+Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
 
-> این جدول باید با هر Milestone به‌روزرسانی شود. در آینده می‌توان یک اسکریپت
-> نوشت که این جدول را مستقیم از خروجی `go test -json` تولید کند تا دستی
-> از هم‌گام نیفتد.
+> Update this table with every milestone. In the future, a script could generate
+> it directly from `go test -json` output to prevent manual drift.

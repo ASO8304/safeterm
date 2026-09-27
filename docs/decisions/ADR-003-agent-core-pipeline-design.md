@@ -1,54 +1,54 @@
-# ADR-003: طراحی Interface-based Pipeline برای Agent Core
+# ADR-003: Interface-Based Pipeline Design for Agent Core
 
 ## Status
 Accepted
 
 ## Context
-در زمان ساخت Agent Core (M2)، پیاده‌سازی واقعی Validation (M4)، Policy (M5)،
-Translation (M6) و Execution (M7) هنوز وجود ندارد. دو گزینه وجود داشت:
+When Agent Core was created in M2, the real implementations of Validation
+(M4), Policy (M5), Translation (M6), and Execution (M7) did not yet exist.
+Two options were available:
 
-1. صبر کردن تا همه‌ی این چهار Milestone آماده شوند، بعد Agent Core را بسازیم.
-2. تعریف قرارداد (interface) هر مرحله همین حالا، و ساخت Agent Core بر مبنای
-   این قراردادها، به‌طوری که هر Milestone بعداً فقط یک پیاده‌سازی واقعی از
-   همان interface تحویل بدهد.
+1. Wait until all four milestones are ready, then build Agent Core.
+2. Define each stage contract as an interface immediately and build Agent Core
+   around those contracts, allowing later milestones to supply one real
+   implementation of each interface.
 
-گزینه‌ی اول با فلسفه‌ی Vertical Slice که برای پروژه انتخاب کردیم (ساخت یک
-مسیر end-to-end کوچک و کامل، پیش از تکمیل تمام قابلیت‌ها) در تضاد است.
+The first option conflicts with the project's Vertical Slice approach: build a
+small but complete end-to-end path before completing every capability.
 
 ## Decision
-- چهار interface مستقل تعریف شد: `Validator`, `PolicyEnforcer`, `Translator`,
-  `Executor`. `Core` هیچ‌کدام از این‌ها را پیاده‌سازی نمی‌کند؛ فقط آن‌ها را
-  به ترتیب ثابت (Validate → Authorize → Translate → Execute) فراخوانی می‌کند.
-- `Core.HandleRequest` بلافاصله بعد از اولین شکست متوقف می‌شود و یک
-  `ExecutionResponse` با `Result = rejected` برمی‌گرداند؛ به مرحله بعدی
-  هرگز نمی‌رسد.
-- خطاها با نوع `StageError{Stage, Err}` بسته‌بندی می‌شوند تا مشخص باشد دقیقاً
-  کدام مرحله باعث رد شدن درخواست شده — این برای Audit (M8) حیاتی است.
-- برای اثبات صحت pipeline در همین M2، پیاده‌سازی‌های placeholder
-  (`PassThroughValidator`, `AllowAllPolicy`, `IdentityTranslator`, `NoOpExecutor`)
-  در فایل جدا (`placeholders.go`) قرار گرفتند، با هشدار صریح در همان فایل که
-  این‌ها **هیچ اعتبار امنیتی ندارند** و صرفاً برای تست pipeline هستند.
+- Define four independent interfaces: `Validator`, `PolicyEnforcer`,
+  `Translator`, and `Executor`. `Core` implements none of them; it only invokes
+  them in the fixed order Validate → Authorize → Translate → Execute.
+- `Core.HandleRequest` stops immediately after the first failure and returns an
+  `ExecutionResponse` with `Result = rejected`; it never calls the next stage.
+- Errors are wrapped in `StageError{Stage, Err}` so the exact rejection stage is
+  identifiable. This is essential for Audit (M8).
+- To prove pipeline correctness in M2, placeholder implementations
+  (`PassThroughValidator`, `AllowAllPolicy`, `IdentityTranslator`, and
+  `NoOpExecutor`) live in a separate file (`placeholders.go`) with an explicit
+  warning that they provide **no security guarantees** and exist only for
+  pipeline testing.
 
 ## Alternatives Considered
-1. **پیاده‌سازی مستقیم منطق داخل Core (بدون interface)** — رد شد، چون یعنی
-   Core باید بعداً در M4/M5/M6 بازنویسی می‌شد، دقیقاً همان backtracking ای
-   که می‌خواستیم از آن پرهیز کنیم.
-2. **یک interface واحد و عمومی (`Stage`) به‌جای چهار interface مجزا** —
-   رد شد، چون امضای تابع هر مرحله (ورودی/خروجی) کاملاً متفاوت است
-   (مثلاً Translator یک command+args برمی‌گرداند، Executor یک stdout/stderr/exitCode)؛
-   یک interface عمومی این تفاوت‌ها را پنهان می‌کرد و type-safety را از بین می‌برد.
-3. **قرار دادن placeholderها مستقیم داخل تست‌ها (نه یک فایل جدا)** — رد شد،
-   چون خوانایی کمتری دارد و امکان استفاده‌ی تصادفی از آن‌ها در جای دیگر
-   (مثلاً یک دموی زودهنگام) را افزایش می‌دهد؛ فایل جدا با هشدار صریح در بالای
-   آن، ریسک سوءاستفاده را کاهش می‌دهد.
+1. **Implement stage logic directly inside Core without interfaces** — Rejected
+   because Core would need rewrites in M4, M5, and M6, exactly the backtracking
+   the design is meant to avoid.
+2. **Use one generic `Stage` interface instead of four distinct interfaces** —
+   Rejected because each stage has a different function signature. Translator
+   returns command+args, while Executor returns stdout/stderr/exitCode. A
+   generic interface would hide these differences and remove type safety.
+3. **Put placeholders directly in tests rather than a separate file** —
+   Rejected because it reduces readability and increases the chance of
+   accidental reuse elsewhere, such as in an early demo. A separate file with
+   an explicit warning reduces that risk.
 
 ## Consequences
-- M4، M5، M6 و M7 هرکدام صرفاً باید یک پیاده‌سازی واقعی از interface مربوطه
-  بنویسند و آن را به‌جای placeholder به `NewCore(...)` بدهند؛ خود `Core`
-  دست‌نخورده می‌ماند.
-- تست‌های `core_test.go` از mock‌هایی استفاده می‌کنند که فراخوانی هر مرحله را
-  ثبت می‌کنند؛ این تضمین می‌کند «توقف زودهنگام» صرفاً از روی نتیجه نهایی
-  فرض نشود، بلکه واقعاً بررسی شود که مراحل بعدی هرگز فراخوانی نشده‌اند.
-- تا وقتی M4/M5/M6 کامل نشده‌اند، **هیچ Executor واقعی نباید به Core متصل شود**؛
-  این یک قاعده‌ی عملیاتی است، نه یک محدودیت فنی — باید در کد ریویو هر Milestone
-  بعدی رعایت شود.
+- M4, M5, M6, and M7 only need to implement their corresponding interfaces and
+  supply them to `NewCore(...)` in place of placeholders; `Core` itself remains unchanged.
+- Tests in `core_test.go` use mocks that record every stage call. This proves
+  early termination by verifying that later stages were never called, rather
+  than inferring it only from the final result.
+- No real Executor may be connected to Core until M4, M5, and M6 are complete.
+  This is an operational rule, not a technical restriction, and must be
+  enforced during review of subsequent milestones.

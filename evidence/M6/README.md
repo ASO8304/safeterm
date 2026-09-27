@@ -1,43 +1,49 @@
-# شواهد M6 — Translation Layer
+# M6 Evidence — Translation Layer
 
-تاریخ: ۲۰۲۶-۰۹-۲۷. محیط: WSL، Go 1.22.2 روی Linux/amd64.
+Date: 2026-09-27. Environment: WSL, Go 1.22.2 on Linux/amd64.
 
-## پایه و محدوده
-پایه‌ی شاخه، commit ادغام‌شده‌ی M5 یعنی `03b1fae` از `origin/main` است.
-[بررسی پایه پیش از تغییر](baseline-verify.log) با `SafeTerm Verification: PASS`
-تمام شد. نسخه‌ی جداگانه‌ی `/home/abolfazl/safeterm` و stash پشتیبان آن تغییر نکردند.
+## Baseline and Scope
+The branch starts from merged M5 commit `03b1fae` on `origin/main`.
+[Pre-change baseline verification](baseline-verify.log) completed with
+`SafeTerm Verification: PASS`. The separate `/home/abolfazl/safeterm`
+checkout and its backup stash were not modified.
 
-بررسی مخزن نشان داد برخلاف متن پرامپت، system_info دارای `args_template: ["-a"]`
-است. همین تعریف حفظ شد و قالب خالی با fixture مستقل تست شد. همچنین تگ M5
-هنوز در تگ‌های دریافت‌شده وجود نداشت؛ README وضعیت ادغام و تگ را جدا گزارش می‌کند.
+Repository inspection showed that, contrary to the continuation prompt,
+`system_info` has `args_template: ["-a"]`. That definition was preserved, and
+an empty template was tested through an independent fixture. The M5 tag was
+also absent from the fetched tag list; README therefore reports merge and tag
+status separately.
 
-## نیازمندی و تصمیم
-- REQ-006: یازده معیار پذیرش برای ترجمه، رد ورودی ناقص، استقلال داده‌ها و توقف pipeline.
-- ADR-007: placeholder فقط یک توکن کامل است؛ قالب خراب هنگام ساخت رد می‌شود؛
-  نبود مقدار حتی برای placeholder اختیاری خطاست؛ آرگومان‌ها join یا split نمی‌شوند.
-- `translation.New` به‌دلیل خطاهای قالب، خروجی error دارد؛ interface مراحل و رفتار
-  Core تغییر نکرده‌اند. literalها و فرمان از config مورد اعتماد گرفته می‌شوند.
-- IdentityTranslator در تست‌های مستقل قبلی حفظ شده و مسیر یکپارچه‌ی M6
-  از Validator، Policy و Translator واقعی و Executor صرفاً آزمایشی استفاده می‌کند.
+## Requirement and Decision
+- REQ-006 defines eleven acceptance criteria for translation, incomplete-input
+  rejection, data independence, and pipeline termination.
+- ADR-007 restricts placeholders to complete tokens. Malformed templates fail
+  during construction; a missing value is an error even for an optional
+  placeholder; arguments are never joined or split.
+- `translation.New` returns an error because template construction can fail.
+  Stage interfaces and Core behavior remain unchanged. Literals and the command
+  come from trusted configuration.
+- IdentityTranslator remains in earlier isolated tests. The M6 integration path
+  uses the real Validator, Policy, and Translator with a test-only Executor.
 
-## تست و نتیجه
-[خروجی کامل make verify](make-verify.log) بدون خلاصه‌سازی ذخیره شده است.
+## Tests and Result
+[Complete make verify output](make-verify.log) is stored without abbreviation.
 
 ```text
 SafeTerm Verification: PASS
 ```
 
-- TEST-TRANS-001 تا TEST-TRANS-009، به‌ترتیب AC-1 تا AC-9 را پوشش می‌دهند.
-- TEST-INTEG-007: دریافت دقیق فرمان و argv توسط Executor آزمایشی (AC-10).
-- TEST-INTEG-008: توقف ورودی نامعتبر و نقش غیرمجاز پیش از Translation (AC-11).
-- TEST-INTEG-009: عبور پارامتر اختیاریِ غایب از Validation و رد آن در Translation
-  بدون فراخوانی Executor (AC-6 و AC-11).
-- ۹ تست واحد و ۳ تست یکپارچه‌ی جدید موفق شدند؛ تست‌های قبلی نیز موفق بودند.
-  پوشش statementهای پکیج translation برابر ۱۰۰٪ است.
+- TEST-TRANS-001 through TEST-TRANS-009 cover AC-1 through AC-9 respectively.
+- TEST-INTEG-007 verifies the exact command and argv received by the test Executor (AC-10).
+- TEST-INTEG-008 verifies that invalid input and unauthorized roles stop before Translation (AC-11).
+- TEST-INTEG-009 verifies that an absent optional parameter passes Validation
+  but fails Translation without calling Executor (AC-6 and AC-11).
+- Nine new unit tests and three new integration tests passed, as did all earlier
+  tests. Statement coverage for the translation package is 100%.
 
-## بازتولید اجرا
-در checkout ویندوز که از WSL اجرا می‌شود، اعتماد Git فقط برای همان فراخوانی
-و همان مسیر تنظیم شد؛ هیچ تنظیم global یا وابستگی خارجی اضافه نشد:
+## Reproduction
+When running the Windows checkout from WSL, Git trust was configured only for
+that command and exact path. No global setting or external dependency was added:
 
 ```sh
 cd /mnt/c/Users/abolf/OneDrive/Documents/safeterm
@@ -47,15 +53,15 @@ GIT_CONFIG_VALUE_0=/mnt/c/Users/abolf/OneDrive/Documents/safeterm \
 make verify
 ```
 
-شاخه با دستور زیر از پایه‌ی M5 ساخته شد:
+The branch was created from the M5 baseline with:
 
 ```sh
 git switch -c codex/m6-translation origin/main
 ```
 
-## محدودیت و بازبینی
-Translate فرض می‌کند Validation و Policy با همان config اجرا شده‌اند و بررسی
-نوع یا مجوز را تکرار نمی‌کند. Config منبع مورد اعتماد است؛ تفسیر گزینه‌های
-اختصاصی هر executable و اجرای واقعی process جزو این milestone نیست.
-احراز هویت، M7 و مراحل بعدی شروع نشده‌اند. نتیجه‌ی CI در PR بررسی می‌شود؛
-ادغام و تگ M6 پس از بازبینی مالک انجام می‌شوند.
+## Limitations and Review
+Translate assumes Validation and Policy used the same Config and does not
+repeat type or authorization checks. Config is a trusted source; interpreting
+tool-specific executable options and actually starting a process are outside
+this milestone. Authentication, M7, and later milestones have not started.
+CI is checked in the PR; merge and the M6 tag occur after owner review.
