@@ -167,7 +167,7 @@ func TestHandleRequest_TranslationFails_StopsBeforeExecution(t *testing.T) {
 // Requirement: REQ-002 (AC-4)
 // Scenario: if Execution itself fails (the command ran but errored),
 // the result must be ResultExecutionError, not ResultRejected — this
-// distinction matters for audit (M8): "rejected" means SafeTerm refused
+// distinction matters for audit (M9): "rejected" means SafeTerm refused
 // to run it; "execution_error" means it ran and the underlying tool failed.
 func TestHandleRequest_ExecutionFails_ReturnsExecutionError(t *testing.T) {
 	v := &mockValidator{}
@@ -189,7 +189,7 @@ func TestHandleRequest_ExecutionFails_ReturnsExecutionError(t *testing.T) {
 // TEST-AGENT-006
 // Requirement: REQ-002 (AC-6)
 // Scenario: StartedAt/EndedAt must always be populated, on both success
-// and rejection paths, since Audit (M8) will need duration for every
+// and rejection paths, since Audit (M9) will need duration for every
 // outcome, not just successful ones.
 func TestHandleRequest_AlwaysPopulatesTimestamps(t *testing.T) {
 	v := &mockValidator{failure: errors.New("reject early")}

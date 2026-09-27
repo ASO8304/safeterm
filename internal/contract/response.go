@@ -14,7 +14,7 @@ const (
 // ExecutionResponse is what Agent Core returns for a given ExecutionRequest.
 // It is intentionally symmetric to ExecutionRequest (same RequestID) so the
 // pair can be correlated and logged together for audit purposes in the
-// Audit milestone (M8).
+// Audit milestone (M9).
 type ExecutionResponse struct {
 	RequestID string          `json:"request_id"`
 	Result    ExecutionResult `json:"result"`
@@ -26,7 +26,7 @@ type ExecutionResponse struct {
 	EndedAt   time.Time       `json:"ended_at"`
 }
 
-// Duration is a convenience helper, mainly useful once Audit logging (M8)
+// Duration is a convenience helper, mainly useful once Audit logging (M9)
 // needs to record how long an operation took.
 func (r ExecutionResponse) Duration() time.Duration {
 	return r.EndedAt.Sub(r.StartedAt)

@@ -23,7 +23,7 @@ small but complete end-to-end path before completing every capability.
 - `Core.HandleRequest` stops immediately after the first failure and returns an
   `ExecutionResponse` with `Result = rejected`; it never calls the next stage.
 - Errors are wrapped in `StageError{Stage, Err}` so the exact rejection stage is
-  identifiable. This is essential for Audit (M8).
+  identifiable. This is essential for Audit (M9).
 - To prove pipeline correctness in M2, placeholder implementations
   (`PassThroughValidator`, `AllowAllPolicy`, `IdentityTranslator`, and
   `NoOpExecutor`) live in a separate file (`placeholders.go`) with an explicit

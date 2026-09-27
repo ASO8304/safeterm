@@ -38,8 +38,8 @@ type Translator interface {
 	Translate(req *contract.ExecutionRequest) (command string, args []string, err error)
 }
 
-// Executor actually runs the translated command. Real implementation
-// arrives in M7 (Command Runner) and later M10 (Streaming).
+// Executor actually runs the translated command. The real bounded-process
+// implementation is in internal/execution (M7); streaming arrives in M11.
 type Executor interface {
 	Execute(ctx context.Context, command string, args []string) (stdout, stderr string, exitCode int, err error)
 }
