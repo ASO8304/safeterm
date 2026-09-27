@@ -52,7 +52,8 @@ func (IdentityTranslator) Translate(req *contract.ExecutionRequest) (string, []s
 }
 
 // NoOpExecutor implements Executor without ever invoking the operating
-// system. It returns a canned success so Core's full lifecycle
+// system. Replaced by internal/execution.Runner in the M7 integration path;
+// retained for isolated tests of earlier stages. It returns a canned success so Core's full lifecycle
 // (Validate -> Authorize -> Translate -> Execute -> Respond) can be
 // exercised safely in M2, with zero risk of running an arbitrary command
 // on the developer's or CI machine.

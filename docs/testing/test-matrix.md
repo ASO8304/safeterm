@@ -51,9 +51,21 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-INTEG-007 | REQ-006 (AC-1, AC-3, AC-10) + REQ-002 (AC-5, AC-6) | tests/integration | Integration | PASS |
 | TEST-INTEG-008 | REQ-006 (AC-11) + REQ-004 (AC-1, AC-2, AC-4, AC-6, AC-7) + REQ-005 (AC-1, AC-2, AC-4) | tests/integration | Integration | PASS |
 | TEST-INTEG-009 | REQ-006 (AC-6, AC-11) + REQ-002 (AC-3) | tests/integration | Integration | PASS |
+| TEST-EXEC-001 | REQ-007 (AC-1) | internal/execution | Unit | PASS |
+| TEST-EXEC-002 | REQ-007 (AC-2) | internal/execution | Unit | PASS |
+| TEST-EXEC-003 | REQ-007 (AC-3) | internal/execution | Unit | PASS |
+| TEST-EXEC-004 | REQ-007 (AC-4) | internal/execution | Unit | PASS |
+| TEST-EXEC-005 | REQ-007 (AC-5) | internal/execution | Unit | PASS |
+| TEST-EXEC-006 | REQ-007 (AC-6) | internal/execution | Unit | PASS |
+| TEST-EXEC-007 | REQ-007 (AC-7) | internal/execution | Unit | PASS |
+| TEST-INTEG-010 | REQ-007 (AC-8) | tests/integration | Integration | PASS |
+| TEST-INTEG-011 | REQ-007 (AC-2, AC-10) + REQ-002 (AC-4) | tests/integration | Integration | PASS |
+| TEST-INTEG-012 | REQ-007 (AC-4, AC-10) + REQ-002 (AC-4) | tests/integration | Integration | PASS |
+| TEST-INTEG-013 | REQ-007 (AC-9) + REQ-004 (AC-1, AC-4, AC-6) + REQ-005 (AC-1, AC-4) | tests/integration | Integration | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
+Local M7 evidence: [complete make verify output](../../evidence/M7/make-verify.log).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

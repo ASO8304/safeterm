@@ -1,0 +1,326 @@
+==> Checking formatting...
+==> Running go vet...
+go vet ./...
+==> Building...
+go build ./...
+==> Running unit tests...
+go test ./... -v -cover
+	safeterm/cmd/agent		coverage: 0.0% of statements
+=== RUN   TestHandleRequest_AllStagesPass_ReturnsSuccess
+--- PASS: TestHandleRequest_AllStagesPass_ReturnsSuccess (0.00s)
+=== RUN   TestHandleRequest_ValidationFails_StopsPipelineImmediately
+--- PASS: TestHandleRequest_ValidationFails_StopsPipelineImmediately (0.00s)
+=== RUN   TestHandleRequest_PolicyFails_StopsBeforeTranslation
+--- PASS: TestHandleRequest_PolicyFails_StopsBeforeTranslation (0.00s)
+=== RUN   TestHandleRequest_TranslationFails_StopsBeforeExecution
+--- PASS: TestHandleRequest_TranslationFails_StopsBeforeExecution (0.00s)
+=== RUN   TestHandleRequest_ExecutionFails_ReturnsExecutionError
+--- PASS: TestHandleRequest_ExecutionFails_ReturnsExecutionError (0.00s)
+=== RUN   TestHandleRequest_AlwaysPopulatesTimestamps
+--- PASS: TestHandleRequest_AlwaysPopulatesTimestamps (0.00s)
+=== RUN   TestHandleRequest_WithM2Placeholders_EndToEndSucceeds
+--- PASS: TestHandleRequest_WithM2Placeholders_EndToEndSucceeds (0.00s)
+PASS
+coverage: 96.7% of statements
+ok  	safeterm/internal/agent	(cached)	coverage: 96.7% of statements
+=== RUN   TestStatus_ReturnsNonEmptyString
+--- PASS: TestStatus_ReturnsNonEmptyString (0.00s)
+=== RUN   TestLoadConfig_WellFormedFiles_Succeeds
+--- PASS: TestLoadConfig_WellFormedFiles_Succeeds (0.00s)
+=== RUN   TestLoadConfig_MissingDirectory_ReturnsError
+--- PASS: TestLoadConfig_MissingDirectory_ReturnsError (0.00s)
+=== RUN   TestLoadConfig_MalformedJSON_ReturnsError
+--- PASS: TestLoadConfig_MalformedJSON_ReturnsError (0.00s)
+=== RUN   TestLoadConfig_InconsistentConfig_ReturnsErrorNotPartialConfig
+--- PASS: TestLoadConfig_InconsistentConfig_ReturnsErrorNotPartialConfig (0.00s)
+=== RUN   TestLoadConfig_MultipleFilesInSameFolder_AreMerged
+--- PASS: TestLoadConfig_MultipleFilesInSameFolder_AreMerged (0.00s)
+=== RUN   TestLoadConfig_ShippedRepositoryConfig_IsValid
+--- PASS: TestLoadConfig_ShippedRepositoryConfig_IsValid (0.01s)
+=== RUN   TestValidateConfig_ValidMinimalConfig_Passes
+--- PASS: TestValidateConfig_ValidMinimalConfig_Passes (0.00s)
+=== RUN   TestValidateConfig_DuplicateOperationName_Rejected
+--- PASS: TestValidateConfig_DuplicateOperationName_Rejected (0.00s)
+=== RUN   TestValidateConfig_OperationWithEmptyCommand_Rejected
+--- PASS: TestValidateConfig_OperationWithEmptyCommand_Rejected (0.00s)
+=== RUN   TestValidateConfig_DuplicateRoleName_Rejected
+--- PASS: TestValidateConfig_DuplicateRoleName_Rejected (0.00s)
+=== RUN   TestValidateConfig_PolicyReferencesUnknownRole_Rejected
+--- PASS: TestValidateConfig_PolicyReferencesUnknownRole_Rejected (0.00s)
+=== RUN   TestValidateConfig_PolicyReferencesUnknownOperation_Rejected
+--- PASS: TestValidateConfig_PolicyReferencesUnknownOperation_Rejected (0.00s)
+=== RUN   TestValidateConfig_IntParameterWithPattern_Rejected
+--- PASS: TestValidateConfig_IntParameterWithPattern_Rejected (0.00s)
+=== RUN   TestValidateConfig_MinGreaterThanMax_Rejected
+--- PASS: TestValidateConfig_MinGreaterThanMax_Rejected (0.00s)
+=== RUN   TestValidateConfig_StringParameterWithMinMax_Rejected
+--- PASS: TestValidateConfig_StringParameterWithMinMax_Rejected (0.00s)
+=== RUN   TestValidateConfig_UnknownParameterType_Rejected
+--- PASS: TestValidateConfig_UnknownParameterType_Rejected (0.00s)
+PASS
+coverage: 90.8% of statements
+ok  	safeterm/internal/config	(cached)	coverage: 90.8% of statements
+=== RUN   TestNewExecutionRequest_RejectsEmptyCommand
+--- PASS: TestNewExecutionRequest_RejectsEmptyCommand (0.00s)
+=== RUN   TestNewExecutionRequest_GeneratesUniqueRequestID
+--- PASS: TestNewExecutionRequest_GeneratesUniqueRequestID (0.00s)
+=== RUN   TestNewExecutionRequest_NormalizesNilArguments
+--- PASS: TestNewExecutionRequest_NormalizesNilArguments (0.00s)
+=== RUN   TestNewExecutionRequest_AutoPopulatesReceivedAt
+--- PASS: TestNewExecutionRequest_AutoPopulatesReceivedAt (0.00s)
+=== RUN   TestExecutionRequest_JSONRoundTrip
+--- PASS: TestExecutionRequest_JSONRoundTrip (0.00s)
+=== RUN   TestExecutionResponse_Duration
+--- PASS: TestExecutionResponse_Duration (0.00s)
+PASS
+coverage: 91.7% of statements
+ok  	safeterm/internal/contract	(cached)	coverage: 91.7% of statements
+=== RUN   TestRunnerHelperProcess
+--- PASS: TestRunnerHelperProcess (0.00s)
+=== RUN   TestExecute_SuccessCapturesSeparateStreams
+--- PASS: TestExecute_SuccessCapturesSeparateStreams (0.00s)
+=== RUN   TestExecute_NonZeroExitPreservesOutputAndCode
+--- PASS: TestExecute_NonZeroExitPreservesOutputAndCode (0.00s)
+=== RUN   TestExecute_CommandCannotStartReturnsUnavailableExitCode
+--- PASS: TestExecute_CommandCannotStartReturnsUnavailableExitCode (0.08s)
+=== RUN   TestExecute_TimeoutTerminatesAndPreservesOutput
+--- PASS: TestExecute_TimeoutTerminatesAndPreservesOutput (0.10s)
+=== RUN   TestExecute_ParentCancellationTerminatesProcess
+--- PASS: TestExecute_ParentCancellationTerminatesProcess (0.00s)
+=== RUN   TestExecute_ArgumentsRemainExactArgvElements
+--- PASS: TestExecute_ArgumentsRemainExactArgvElements (0.00s)
+=== RUN   TestRunner_InvalidConstructionAndCallsFailSafely
+=== RUN   TestRunner_InvalidConstructionAndCallsFailSafely/nil_context
+=== RUN   TestRunner_InvalidConstructionAndCallsFailSafely/empty_command
+=== RUN   TestRunner_InvalidConstructionAndCallsFailSafely/nil_runner
+=== RUN   TestRunner_InvalidConstructionAndCallsFailSafely/zero_runner
+--- PASS: TestRunner_InvalidConstructionAndCallsFailSafely (0.00s)
+    --- PASS: TestRunner_InvalidConstructionAndCallsFailSafely/nil_context (0.00s)
+    --- PASS: TestRunner_InvalidConstructionAndCallsFailSafely/empty_command (0.00s)
+    --- PASS: TestRunner_InvalidConstructionAndCallsFailSafely/nil_runner (0.00s)
+    --- PASS: TestRunner_InvalidConstructionAndCallsFailSafely/zero_runner (0.00s)
+PASS
+coverage: 100.0% of statements
+ok  	safeterm/internal/execution	(cached)	coverage: 100.0% of statements
+=== RUN   TestAuthorize_NoClaimedRoles_Denied
+--- PASS: TestAuthorize_NoClaimedRoles_Denied (0.00s)
+=== RUN   TestAuthorize_RoleWithPermission_Allowed
+--- PASS: TestAuthorize_RoleWithPermission_Allowed (0.00s)
+=== RUN   TestAuthorize_ViewerCannotRunTrace
+--- PASS: TestAuthorize_ViewerCannotRunTrace (0.00s)
+=== RUN   TestAuthorize_UnknownRole_Denied
+--- PASS: TestAuthorize_UnknownRole_Denied (0.00s)
+=== RUN   TestAuthorize_MultipleRoles_OneGrantsAccess_Allowed
+--- PASS: TestAuthorize_MultipleRoles_OneGrantsAccess_Allowed (0.00s)
+=== RUN   TestAuthorize_MultipleRoles_NoneGrantAccess_Denied
+--- PASS: TestAuthorize_MultipleRoles_NoneGrantAccess_Denied (0.00s)
+=== RUN   TestAuthorize_ViewerCanRunSystemInfo
+--- PASS: TestAuthorize_ViewerCanRunSystemInfo (0.00s)
+=== RUN   TestAuthorize_RoleOrderAndDuplicates
+--- PASS: TestAuthorize_RoleOrderAndDuplicates (0.00s)
+=== RUN   TestAuthorize_NoPolicyOrEmptyPolicy_Denied
+=== RUN   TestAuthorize_NoPolicyOrEmptyPolicy_Denied/missing_policy
+=== RUN   TestAuthorize_NoPolicyOrEmptyPolicy_Denied/empty_policy
+=== RUN   TestAuthorize_NoPolicyOrEmptyPolicy_Denied/no_policies
+--- PASS: TestAuthorize_NoPolicyOrEmptyPolicy_Denied (0.00s)
+    --- PASS: TestAuthorize_NoPolicyOrEmptyPolicy_Denied/missing_policy (0.00s)
+    --- PASS: TestAuthorize_NoPolicyOrEmptyPolicy_Denied/empty_policy (0.00s)
+    --- PASS: TestAuthorize_NoPolicyOrEmptyPolicy_Denied/no_policies (0.00s)
+=== RUN   TestAuthorize_MultiplePoliciesForRole_AreMerged
+--- PASS: TestAuthorize_MultiplePoliciesForRole_AreMerged (0.00s)
+=== RUN   TestAuthorize_UnknownOperation_Denied
+--- PASS: TestAuthorize_UnknownOperation_Denied (0.00s)
+=== RUN   TestAuthorize_NilInputsAndZeroValue_Denied
+--- PASS: TestAuthorize_NilInputsAndZeroValue_Denied (0.00s)
+=== RUN   TestAuthorize_ShippedConfig
+--- PASS: TestAuthorize_ShippedConfig (0.01s)
+=== RUN   TestAuthorize_GrantTableIsIndependentOfSourceConfig
+--- PASS: TestAuthorize_GrantTableIsIndependentOfSourceConfig (0.00s)
+PASS
+coverage: 100.0% of statements
+ok  	safeterm/internal/policy	(cached)	coverage: 100.0% of statements
+=== RUN   TestTranslate_ExactTraceExample
+--- PASS: TestTranslate_ExactTraceExample (0.01s)
+=== RUN   TestTranslate_PreservesCommandAndArgumentBoundaries
+=== RUN   TestTranslate_PreservesCommandAndArgumentBoundaries/two_words
+=== RUN   TestTranslate_PreservesCommandAndArgumentBoundaries/#00
+=== RUN   TestTranslate_PreservesCommandAndArgumentBoundaries/a_b
+=== RUN   TestTranslate_PreservesCommandAndArgumentBoundaries/--flag_other
+--- PASS: TestTranslate_PreservesCommandAndArgumentBoundaries (0.00s)
+    --- PASS: TestTranslate_PreservesCommandAndArgumentBoundaries/two_words (0.00s)
+    --- PASS: TestTranslate_PreservesCommandAndArgumentBoundaries/#00 (0.00s)
+    --- PASS: TestTranslate_PreservesCommandAndArgumentBoundaries/a_b (0.00s)
+    --- PASS: TestTranslate_PreservesCommandAndArgumentBoundaries/--flag_other (0.00s)
+=== RUN   TestTranslate_EmptyTemplatesAndSystemInfo
+--- PASS: TestTranslate_EmptyTemplatesAndSystemInfo (0.01s)
+=== RUN   TestNew_RejectsInvalidConfig
+=== RUN   TestNew_RejectsInvalidConfig/nil
+=== RUN   TestNew_RejectsInvalidConfig/empty_command
+=== RUN   TestNew_RejectsInvalidConfig/duplicate_parameter
+--- PASS: TestNew_RejectsInvalidConfig (0.00s)
+    --- PASS: TestNew_RejectsInvalidConfig/nil (0.00s)
+    --- PASS: TestNew_RejectsInvalidConfig/empty_command (0.00s)
+    --- PASS: TestNew_RejectsInvalidConfig/duplicate_parameter (0.00s)
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/}
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{}
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{value
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/value}
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{{value}}
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{value}{value}
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/--host={value}
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{value}/suffix
+=== RUN   TestNew_RejectsMalformedAndUndefinedPlaceholders/{unknown}
+--- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{ (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/} (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{} (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{value (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/value} (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{{value}} (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{value}{value} (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/--host={value} (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{value}/suffix (0.00s)
+    --- PASS: TestNew_RejectsMalformedAndUndefinedPlaceholders/{unknown} (0.00s)
+=== RUN   TestTranslate_MissingSubstitutionReturnsNoPartialOutput
+--- PASS: TestTranslate_MissingSubstitutionReturnsNoPartialOutput (0.00s)
+=== RUN   TestTranslate_RejectsNilOrUnknownOperation
+--- PASS: TestTranslate_RejectsNilOrUnknownOperation (0.01s)
+=== RUN   TestTranslate_SnapshotAndOutputsAreIndependent
+--- PASS: TestTranslate_SnapshotAndOutputsAreIndependent (0.00s)
+=== RUN   TestTranslate_UnusedParameterDoesNotBecomeAnArgument
+--- PASS: TestTranslate_UnusedParameterDoesNotBecomeAnArgument (0.00s)
+PASS
+coverage: 100.0% of statements
+ok  	safeterm/internal/translation	(cached)	coverage: 100.0% of statements
+=== RUN   TestValidate_UnknownOperation_Rejected
+--- PASS: TestValidate_UnknownOperation_Rejected (0.00s)
+=== RUN   TestValidate_MissingRequiredArgument_Rejected
+--- PASS: TestValidate_MissingRequiredArgument_Rejected (0.00s)
+=== RUN   TestValidate_UnknownArgument_Rejected
+--- PASS: TestValidate_UnknownArgument_Rejected (0.00s)
+=== RUN   TestValidate_PortBoundaries
+=== RUN   TestValidate_PortBoundaries/port=80_within_range
+=== RUN   TestValidate_PortBoundaries/port=0_below_minimum
+=== RUN   TestValidate_PortBoundaries/port=65535_at_upper_boundary
+=== RUN   TestValidate_PortBoundaries/port=65536_above_maximum
+=== RUN   TestValidate_PortBoundaries/port=abc_not_an_integer
+--- PASS: TestValidate_PortBoundaries (0.00s)
+    --- PASS: TestValidate_PortBoundaries/port=80_within_range (0.00s)
+    --- PASS: TestValidate_PortBoundaries/port=0_below_minimum (0.00s)
+    --- PASS: TestValidate_PortBoundaries/port=65535_at_upper_boundary (0.00s)
+    --- PASS: TestValidate_PortBoundaries/port=65536_above_maximum (0.00s)
+    --- PASS: TestValidate_PortBoundaries/port=abc_not_an_integer (0.00s)
+=== RUN   TestValidate_PortWithInjectionAttempt_Rejected
+--- PASS: TestValidate_PortWithInjectionAttempt_Rejected (0.00s)
+=== RUN   TestValidate_HostNotMatchingPattern_Rejected
+--- PASS: TestValidate_HostNotMatchingPattern_Rejected (0.00s)
+=== RUN   TestValidate_HostWithShellMetacharacters_Rejected
+--- PASS: TestValidate_HostWithShellMetacharacters_Rejected (0.00s)
+=== RUN   TestValidate_HostPatternMustMatchFullString_NotJustPrefix
+--- PASS: TestValidate_HostPatternMustMatchFullString_NotJustPrefix (0.00s)
+=== RUN   TestValidate_ValidTraceRequest_Passes
+--- PASS: TestValidate_ValidTraceRequest_Passes (0.00s)
+=== RUN   TestValidate_OperationWithNoParameters_Passes
+--- PASS: TestValidate_OperationWithNoParameters_Passes (0.00s)
+PASS
+coverage: 89.8% of statements
+ok  	safeterm/internal/validation	(cached)	coverage: 89.8% of statements
+=== RUN   TestExecutionIntegrationHelper
+--- PASS: TestExecutionIntegrationHelper (0.00s)
+=== RUN   TestCore_WithRealExecutor_RunsConfiguredProcess
+--- PASS: TestCore_WithRealExecutor_RunsConfiguredProcess (0.00s)
+=== RUN   TestCore_WithRealExecutor_NonZeroExitIsExecutionError
+--- PASS: TestCore_WithRealExecutor_NonZeroExitIsExecutionError (0.00s)
+=== RUN   TestCore_WithRealExecutor_TimeoutIsExecutionError
+--- PASS: TestCore_WithRealExecutor_TimeoutIsExecutionError (0.10s)
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unknown_operation
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/raw_executable
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unexpected_argument
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/injection_argument
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/missing_roles
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unknown_role
+=== RUN   TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unauthorized_role
+--- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unknown_operation (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/raw_executable (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unexpected_argument (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/injection_argument (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/missing_roles (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unknown_role (0.00s)
+    --- PASS: TestCore_WithRealExecutor_UntrustedRequestsNeverReachExecution/unauthorized_role (0.00s)
+=== RUN   TestCore_WithRealPolicy_AcceptsAuthorizedRequests
+=== RUN   TestCore_WithRealPolicy_AcceptsAuthorizedRequests/viewer_system_info
+=== RUN   TestCore_WithRealPolicy_AcceptsAuthorizedRequests/netops_system_info
+=== RUN   TestCore_WithRealPolicy_AcceptsAuthorizedRequests/netops_trace
+=== RUN   TestCore_WithRealPolicy_AcceptsAuthorizedRequests/multiple_roles
+--- PASS: TestCore_WithRealPolicy_AcceptsAuthorizedRequests (0.03s)
+    --- PASS: TestCore_WithRealPolicy_AcceptsAuthorizedRequests/viewer_system_info (0.01s)
+    --- PASS: TestCore_WithRealPolicy_AcceptsAuthorizedRequests/netops_system_info (0.01s)
+    --- PASS: TestCore_WithRealPolicy_AcceptsAuthorizedRequests/netops_trace (0.01s)
+    --- PASS: TestCore_WithRealPolicy_AcceptsAuthorizedRequests/multiple_roles (0.01s)
+=== RUN   TestCore_WithRealPolicy_DenialStopsDownstreamStages
+=== RUN   TestCore_WithRealPolicy_DenialStopsDownstreamStages/missing
+=== RUN   TestCore_WithRealPolicy_DenialStopsDownstreamStages/empty
+=== RUN   TestCore_WithRealPolicy_DenialStopsDownstreamStages/unknown
+=== RUN   TestCore_WithRealPolicy_DenialStopsDownstreamStages/viewer
+=== RUN   TestCore_WithRealPolicy_DenialStopsDownstreamStages/none_permitted
+--- PASS: TestCore_WithRealPolicy_DenialStopsDownstreamStages (0.03s)
+    --- PASS: TestCore_WithRealPolicy_DenialStopsDownstreamStages/missing (0.01s)
+    --- PASS: TestCore_WithRealPolicy_DenialStopsDownstreamStages/empty (0.01s)
+    --- PASS: TestCore_WithRealPolicy_DenialStopsDownstreamStages/unknown (0.01s)
+    --- PASS: TestCore_WithRealPolicy_DenialStopsDownstreamStages/viewer (0.01s)
+    --- PASS: TestCore_WithRealPolicy_DenialStopsDownstreamStages/none_permitted (0.01s)
+=== RUN   TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy
+=== RUN   TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/unknown_operation
+=== RUN   TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/raw_command
+=== RUN   TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/port_range
+=== RUN   TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/injection
+=== RUN   TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/extra_argument
+--- PASS: TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy (0.05s)
+    --- PASS: TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/unknown_operation (0.01s)
+    --- PASS: TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/raw_command (0.02s)
+    --- PASS: TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/port_range (0.01s)
+    --- PASS: TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/injection (0.01s)
+    --- PASS: TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy/extra_argument (0.01s)
+=== RUN   TestCore_WithRealTranslator_CapturesConfiguredCommands
+=== RUN   TestCore_WithRealTranslator_CapturesConfiguredCommands/trace
+=== RUN   TestCore_WithRealTranslator_CapturesConfiguredCommands/system_info
+--- PASS: TestCore_WithRealTranslator_CapturesConfiguredCommands (0.02s)
+    --- PASS: TestCore_WithRealTranslator_CapturesConfiguredCommands/trace (0.01s)
+    --- PASS: TestCore_WithRealTranslator_CapturesConfiguredCommands/system_info (0.01s)
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/unknown_operation
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/raw_command
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/missing_argument
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/port_injection
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/host_injection
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/extra_argument
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/viewer
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/missing_roles
+=== RUN   TestCore_WithRealTranslator_EarlierStagesStopTranslation/unknown_role
+--- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation (0.10s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/unknown_operation (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/raw_command (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/missing_argument (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/port_injection (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/host_injection (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/extra_argument (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/viewer (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/missing_roles (0.01s)
+    --- PASS: TestCore_WithRealTranslator_EarlierStagesStopTranslation/unknown_role (0.01s)
+=== RUN   TestCore_WithRealTranslator_MissingSubstitutionStopsExecution
+--- PASS: TestCore_WithRealTranslator_MissingSubstitutionStopsExecution (0.01s)
+=== RUN   TestCore_WithRealValidator_AcceptsValidTraceRequest
+--- PASS: TestCore_WithRealValidator_AcceptsValidTraceRequest (0.01s)
+=== RUN   TestCore_WithRealValidator_RejectsOutOfRangePort
+--- PASS: TestCore_WithRealValidator_RejectsOutOfRangePort (0.01s)
+=== RUN   TestCore_WithRealValidator_RejectsInjectionAttempt
+--- PASS: TestCore_WithRealValidator_RejectsInjectionAttempt (0.01s)
+PASS
+coverage: [no statements]
+ok  	safeterm/tests/integration	0.385s	coverage: [no statements]
+
+SafeTerm Verification: PASS

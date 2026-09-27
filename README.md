@@ -4,19 +4,21 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M6 — Translation Layer (implemented and verified locally; pending review and release)**
+**Milestone: M7 — Command Runner (implemented and verified locally; pending review and release)**
 
-This version does not execute real operating-system commands yet. Available capabilities:
+Available capabilities:
 
 - Request/response contracts and a Core with the fixed Validation → Policy → Translation → Execution sequence
 - JSON configuration loading and config-driven argument validation
 - Authorization of claimed roles with the real Policy implementation and M5 integration tests
 - Translation of operations into fixed config commands and separate arguments, without constructing shell strings
+- Bounded process execution with separate argv elements, independent stdout/stderr capture, and exit-code reporting
 
 Policy does not authenticate users; `ClaimedRoles` remains an unverified claim (ADR-006).
-The real Translation layer was implemented in M6; real Execution belongs to M7. The
-`cmd/agent` entry point remains a bootstrap program. Integration tests currently prove
-the wiring of the real stages. M6 evidence is recorded in [evidence/M6](evidence/M6/README.md).
+The real Translation and Execution stages are implemented through M7. The
+`cmd/agent` entry point remains a bootstrap program because no real Broker exists yet;
+integration tests prove the full M3–M7 pipeline using a controlled subprocess.
+M7 evidence is recorded in [evidence/M7](evidence/M7/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -29,6 +31,11 @@ The `translation.New(cfg)` constructor returns an error that must be checked bef
 wiring the Translator into Core. A template accepts only a literal token or a complete
 `{name}` placeholder, and every placeholder value must be present even when the
 parameter is optional during Validation (ADR-007).
+
+`execution.New(timeout)` requires a positive timeout. Runner invokes
+`exec.CommandContext(ctx, command, args...)` directly, never through a shell,
+and returns `execution.ExitCodeUnavailable` (`-1`) when no portable process
+exit status exists (ADR-008).
 
 ## Local Verification
 
@@ -76,9 +83,9 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M2 | Agent Core | ✅ Tagged: v0.3.0-m2 |
 | M3 | Configuration Loading | ✅ Tagged: v0.4.0-m3 |
 | M4 | Validation Engine | ✅ Tagged: v0.5.0-m4 |
-| M5 | Policy Engine | ✅ Merged: PR #5; tag pending |
-| M6 | Translation Layer | 🔄 Verified locally; pending review/release |
-| M7 | Command Runner | ⏳ Planned |
+| M5 | Policy Engine | ✅ Tagged: v0.6.0-m5 |
+| M6 | Translation Layer | ✅ Tagged: v0.7.0-m6 |
+| M7 | Command Runner | 🔄 Verified locally; pending review/release |
 | M8 | Audit Logging | ⏳ Planned |
 | M9 | Integrity Verification | ⏳ Planned |
 | M10 | Streaming | ⏳ Planned |
