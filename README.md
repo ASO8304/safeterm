@@ -5,13 +5,18 @@
 
 ## وضعیت فعلی
 
-**Milestone: M0 — Project Foundation**
+**Milestone: M5 — Policy Engine (پیاده‌سازی و تست محلی تکمیل؛ در انتظار بازبینی و انتشار)**
 
-این نسخه هنوز هیچ عملیات واقعی اجرا نمی‌کند. هدف M0 صرفاً این است که:
+این نسخه هنوز هیچ عملیات واقعی سیستم‌عامل اجرا نمی‌کند. قابلیت‌های موجود:
 
-- ساختار پروژه مشخص باشد
-- `make verify` از روز اول سبز باشد
-- CI/CD (GitHub Actions) از همان اولین commit فعال باشد
+- قرارداد درخواست/پاسخ و Core با ترتیب ثابت Validation → Policy → Translation → Execution
+- بارگذاری JSON و اعتبارسنجی آرگومان‌ها بر اساس config
+- بررسی مجوز نقش‌های ادعاشده با Policy واقعی و تست یکپارچه‌ی M5
+
+Policy احراز هویت نمی‌کند؛ `ClaimedRoles` همچنان ادعای تأییدنشده است (ADR-006).
+Translation و Execution واقعی مربوط به M6 و M7 هستند. نقطه‌ی ورود
+`cmd/agent` هنوز برنامه‌ی bootstrap است؛ اتصال مراحل واقعی فعلاً در تست‌های
+یکپارچه اثبات می‌شود. شواهد M5 در [evidence/M5](evidence/M5/README.md) ثبت شده‌اند.
 
 ## اجرای محلی
 
@@ -19,7 +24,7 @@
 make verify
 ```
 
-این دستور به‌ترتیب اجرا می‌کند: بررسی فرمت کد → `go vet` → build → تست‌های واحد.
+این دستور به‌ترتیب اجرا می‌کند: بررسی فرمت کد → `go vet` → build → تست‌های واحد و یکپارچه.
 اگر همه‌چیز سبز بود، خروجی نهایی این است:
 
 ```
@@ -53,12 +58,12 @@ Integration Test → Security Test → Evidence → Documentation → Git Tag
 
 | # | عنوان | وضعیت |
 |---|---|---|
-| M0 | Project Foundation | 🔄 In Progress |
-| M1 | ExecutionRequest Contract | ⏳ Planned |
-| M2 | Agent Core | ⏳ Planned |
-| M3 | Configuration Loading | ⏳ Planned |
-| M4 | Validation Engine | ⏳ Planned |
-| M5 | Policy Engine | ⏳ Planned |
+| M0 | Project Foundation | ✅ Tagged: v0.1.0-m0 |
+| M1 | ExecutionRequest Contract | ✅ Tagged: v0.2.0-m1 |
+| M2 | Agent Core | ✅ Tagged: v0.3.0-m2 |
+| M3 | Configuration Loading | ✅ Tagged: v0.4.0-m3 |
+| M4 | Validation Engine | ✅ Tagged: v0.5.0-m4 |
+| M5 | Policy Engine | 🔄 Verified locally; pending review/release |
 | M6 | Translation Layer | ⏳ Planned |
 | M7 | Command Runner | ⏳ Planned |
 | M8 | Audit Logging | ⏳ Planned |

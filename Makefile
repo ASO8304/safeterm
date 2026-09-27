@@ -17,7 +17,12 @@ fmt:
 
 fmt-check:
 	@echo "==> Checking formatting..."
-	@test -z "$$(gofmt -l .)" || (echo "Formatting issues found. Run 'make fmt'." && gofmt -l . && exit 1)
+	@unformatted="$$(gofmt -l .)" || exit 1; \
+	if [ -n "$$unformatted" ]; then \
+		echo "Formatting issues found. Run 'make fmt'."; \
+		printf '%s\n' "$$unformatted"; \
+		exit 1; \
+	fi
 
 # The single command that must always stay green.
 # Every new feature must keep 'make verify' passing before merge.
