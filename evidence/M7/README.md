@@ -63,11 +63,12 @@ go test -race ./internal/execution ./tests/integration -count=1
 ```
 
 ## Limitations
-- The production `cmd/agent` entry point remains a bootstrap because Brokers
-  begin in M11. The real M7 stage is wired through integration tests.
+- The production `cmd/agent` entry point remains a bootstrap because the
+  capability-isolated runtime and Broker are later milestones. The real M7
+  stage is wired through integration tests.
 - Runner inherits the parent process environment and resolves bare commands
-  through normal `os/exec` behavior. Executable path/hash integrity belongs to M9.
+  through normal `os/exec` behavior. Executable path/hash integrity belongs to M10.
 - Output is captured in memory. Bounded output or streaming must be designed
-  before M10 long-running operations are enabled.
+  before M11 long-running operations are enabled.
 - Authentication, audit logging, process-group management, privilege dropping,
   and adversarial resource testing are outside M7 and require later milestones.

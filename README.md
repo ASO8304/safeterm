@@ -37,6 +37,31 @@ parameter is optional during Validation (ADR-007).
 and returns `execution.ExitCodeUnavailable` (`-1`) when no portable process
 exit status exists (ADR-008).
 
+## Target Service Architecture
+
+SafeTerm will not deploy one universally privileged Agent. The M7 Runner is an
+execution backend that will run inside capability-isolated service profiles.
+A central Broker authenticates and routes requests to an unprivileged Node
+Gateway; the Gateway performs no execution and forwards each operation over
+host-local IPC to exactly one Runner profile.
+
+```text
+Client -> Broker -> Node Gateway -> diagnostics Runner
+                                -> network-observer Runner
+                                -> service-manager Runner
+```
+
+Profiles share a codebase but run as separate processes with separate service
+identities, configuration subsets, sockets, OS capabilities, filesystem access,
+and resource limits. New profiles follow privilege boundaries rather than
+individual commands. ADR-009 and REQ-008 define this target and its acceptance
+criteria.
+
+Users invoke approved operations, not raw command lines. Authorized catalog
+editors may propose declarative operations that reference an approved executor,
+profile, and tokenized argument template. Activation is a separate authorized
+step. New executables or wider privileges require stronger security approval.
+
 ## Local Verification
 
 ```bash
@@ -86,9 +111,10 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M5 | Policy Engine | ✅ Tagged: v0.6.0-m5 |
 | M6 | Translation Layer | ✅ Tagged: v0.7.0-m6 |
 | M7 | Command Runner | 🔄 Verified locally; pending review/release |
-| M8 | Audit Logging | ⏳ Planned |
-| M9 | Integrity Verification | ⏳ Planned |
-| M10 | Streaming | ⏳ Planned |
-| M11 | Brokers (CLI/SSH/Web) | ⏳ Planned |
-| M12 | Security Testing | ⏳ Planned |
-| M13 | End-to-End Demo | ⏳ Planned |
+| M8 | Capability-Isolated Runtime | ⏳ Planned: REQ-008 / ADR-009 |
+| M9 | Audit Service | ⏳ Planned |
+| M10 | Integrity Verification | ⏳ Planned |
+| M11 | Streaming | ⏳ Planned |
+| M12 | Broker, Authentication, Catalog Workflow, and Client Adapters | ⏳ Planned |
+| M13 | Security Testing | ⏳ Planned |
+| M14 | End-to-End Deployment and Demo | ⏳ Planned |

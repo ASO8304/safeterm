@@ -27,7 +27,7 @@ implementations replace them in the M4, M5, M6, and M7 integration paths.
 - [x] **AC-5:** When all stages succeed, the result is `success` and the response
   `RequestID` exactly matches the request `RequestID`
 - [x] **AC-6:** `StartedAt` and `EndedAt` are populated for every path, successful
-  or unsuccessful, because Audit (M8) requires duration for every operation
+  or unsuccessful, because Audit (M9) requires duration for every operation
 
 ## Related Tests
 - TEST-AGENT-001 through TEST-AGENT-007 (`internal/agent/core_test.go`)

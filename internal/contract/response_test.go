@@ -9,7 +9,7 @@ import (
 // Requirement: REQ-001 (AC-6)
 // Scenario: Duration() must correctly compute the elapsed time between
 // StartedAt and EndedAt, since this value will be written into the
-// structured audit log in M8.
+// structured audit log in M9.
 func TestExecutionResponse_Duration(t *testing.T) {
 	start := time.Now()
 	end := start.Add(2 * time.Second)

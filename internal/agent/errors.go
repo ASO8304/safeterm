@@ -4,7 +4,7 @@ import "fmt"
 
 // Stage identifies which point in the request lifecycle produced an error.
 // This is intentionally a typed string (not a plain error message) so that
-// the future Audit milestone (M8) can log *which* stage rejected a request
+// the future Audit milestone (M9) can log *which* stage rejected a request
 // without parsing error text.
 type Stage string
 

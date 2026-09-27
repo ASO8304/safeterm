@@ -30,9 +30,11 @@ context cancellation, process-start failure, non-zero exit, and captured output.
   Error messages include the command but not arguments, which may contain
   sensitive values.
 - Empty commands and nil contexts are rejected before process construction.
-- M7 does not restrict executable paths, resolve symlinks, verify hashes,
-  authenticate roles, stream output, or cap captured output size. Executable
-  integrity belongs to M9, streaming to M10, and adversarial resource testing to M12.
+- M7 does not define the deployment privilege boundary, restrict executable
+  paths, resolve symlinks, verify hashes, authenticate roles, stream output, or
+  cap captured output size. Capability-isolated services belong to M8,
+  executable integrity to M10, streaming to M11, and adversarial resource
+  testing to M13.
 
 ## Alternatives Considered
 1. **Build a command string and execute it through a shell** — Rejected because
@@ -48,12 +50,14 @@ context cancellation, process-start failure, non-zero exit, and captured output.
 5. **Enforce an executable allowlist again inside Runner** — Rejected because
    the real pipeline already derives the command from validated configuration
    through Translation. Integration tests prove earlier stages block untrusted
-   operations before Runner. Path and binary integrity require M9's design.
+   operations before Runner. Path and binary integrity require M10's design.
 
 ## Consequences
 - Runtime wiring must choose and document a timeout when constructing Runner.
 - Callers can use `errors.Is` to distinguish deadline and cancellation errors.
 - Capturing output in memory is acceptable for M7's bounded commands but must
-  be revisited with explicit limits or streaming before long-running M10 workloads.
+  be revisited with explicit limits or streaming before long-running M11 workloads.
+- `Runner` is a process-execution backend, not a license to deploy one
+  all-powerful Agent. ADR-009 places it inside capability-isolated profiles.
 - Tests use the Go test binary itself as a subprocess, avoiding shell commands
   and dependencies on host-specific utilities while exercising real process execution.
