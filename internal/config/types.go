@@ -45,8 +45,8 @@ type RoleDefinition struct {
 }
 
 // PolicyDefinition maps a role to the set of operation names it may
-// invoke. Real enforcement of this mapping arrives in the Policy Engine
-// (M5); this package only guarantees the mapping itself is internally
+// invoke. Real enforcement is provided by internal/policy (M5);
+// this package only guarantees the mapping itself is internally
 // consistent (every referenced role and operation actually exists).
 type PolicyDefinition struct {
 	Role       string   `json:"role"`

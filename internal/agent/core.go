@@ -18,16 +18,15 @@ import (
 	"safeterm/internal/contract"
 )
 
-// Validator checks that a request's arguments are well-formed. Real
-// implementation arrives in M4 (Validation Engine).
+// Validator checks that a request's arguments are well-formed.
+// The real implementation is in internal/validation (M4).
 type Validator interface {
 	Validate(req *contract.ExecutionRequest) error
 }
 
-// PolicyEnforcer decides whether the requesting user/role is allowed to run
-// this operation. Real implementation arrives in M5 (Policy Engine). Note:
-// until M5 exists, nothing in this codebase may treat a request as
-// authorized based on Metadata.ClaimedRoles alone (see REQ-001).
+// PolicyEnforcer checks whether claimed roles permit this operation.
+// The real implementation is in internal/policy (M5). It does not
+// authenticate the user or verify the role claims (see ADR-006).
 type PolicyEnforcer interface {
 	Authorize(req *contract.ExecutionRequest) error
 }

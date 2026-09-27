@@ -15,8 +15,8 @@ import (
 
 // buildCoreWithRealValidator loads the actual shipped repository config
 // and wires the real Validator (M4) into Agent Core (M2), while Policy,
-// Translation and Execution remain the M2 placeholders (still correct,
-// since M5/M6/M7 do not exist yet).
+// Translation and Execution remain placeholders to isolate M4 behavior.
+// The M5 pipeline with real Policy is tested in agent_policy_test.go.
 func buildCoreWithRealValidator(t *testing.T) *agent.Core {
 	t.Helper()
 	cfg, err := config.LoadConfig("../../configs")

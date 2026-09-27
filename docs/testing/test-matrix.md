@@ -24,6 +24,23 @@
 | TEST-CONFIG-016 | REQ-003 (shipped config regression) | internal/config | Integration | PASS |
 | TEST-VAL-001..013 | REQ-004 (AC-1..AC-8) | internal/validation | Unit | PASS |
 | TEST-INTEG-001..003 | REQ-002 + REQ-004 (end-to-end) | tests/integration | Integration | PASS |
+| TEST-POLICY-001 | REQ-005 (AC-1) | internal/policy | Unit | PASS |
+| TEST-POLICY-002..003 | REQ-005 (AC-2) | internal/policy | Unit | PASS |
+| TEST-POLICY-004 | REQ-005 (AC-4) | internal/policy | Unit | PASS |
+| TEST-POLICY-005..006 | REQ-005 (AC-3) | internal/policy | Unit | PASS |
+| TEST-POLICY-007 | REQ-005 (AC-2) | internal/policy | Unit | PASS |
+| TEST-POLICY-008 | REQ-005 (AC-3, AC-4) | internal/policy | Unit | PASS |
+| TEST-POLICY-009 | REQ-005 (AC-5) | internal/policy | Unit | PASS |
+| TEST-POLICY-010 | REQ-005 (AC-6) | internal/policy | Unit | PASS |
+| TEST-POLICY-011 | REQ-005 (AC-7) | internal/policy | Unit | PASS |
+| TEST-POLICY-012 | REQ-005 (AC-8) | internal/policy | Unit | PASS |
+| TEST-POLICY-013 | REQ-005 (AC-2) | internal/policy | Unit | PASS |
+| TEST-POLICY-014 | REQ-005 (AC-6) | internal/policy | Unit | PASS |
+| TEST-INTEG-004 | REQ-005 (AC-2, AC-3, AC-9) + REQ-002 (AC-5, AC-6) | tests/integration | Integration | PASS |
+| TEST-INTEG-005 | REQ-005 (AC-1..AC-4, AC-9) + REQ-002 (AC-2, AC-6) | tests/integration | Integration | PASS |
+| TEST-INTEG-006 | REQ-005 (AC-9) + REQ-002 (AC-1) + REQ-004 (AC-1, AC-3, AC-4, AC-6) | tests/integration | Integration | PASS |
+
+شواهد اجرای محلی M5: [خروجی کامل make verify](../../evidence/M5/make-verify.log).
 
 > این جدول باید با هر Milestone به‌روزرسانی شود. در آینده می‌توان یک اسکریپت
 > نوشت که این جدول را مستقیم از خروجی `go test -json` تولید کند تا دستی

@@ -6,8 +6,9 @@
 // ExecutionRequest before handing it to Agent Core. Agent Core never
 // accepts anything outside of this contract, and never trusts the claims
 // inside Metadata (especially ClaimedRoles) without independent
-// verification — that verification is added in a later milestone
-// (Policy Engine, M5). For M1 this package only defines the shape of
+// verification. Policy Engine (M5) checks permissions, not identity;
+// authentication remains a separate future concern (see ADR-006).
+// For M1 this package only defines the shape of
 // the contract and the minimal invariants it must always satisfy.
 package contract
 

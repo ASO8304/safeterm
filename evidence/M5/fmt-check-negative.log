@@ -1,0 +1,3 @@
+==> Checking formatting...
+make: *** [/mnt/c/Users/abolf/OneDrive/Documents/safeterm/Makefile:20: fmt-check] Error 1
+PASS: fmt-check rejected a failing gofmt with no stdout (make exit 2).

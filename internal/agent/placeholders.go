@@ -33,6 +33,8 @@ type PassThroughValidator struct{}
 func (PassThroughValidator) Validate(_ *contract.ExecutionRequest) error { return nil }
 
 // AllowAllPolicy implements PolicyEnforcer by authorizing everything.
+// Replaced by internal/policy.Enforcer in the M5 integration pipeline;
+// retained only for isolated stage tests, including the M4 validation tests.
 type AllowAllPolicy struct{}
 
 func (AllowAllPolicy) Authorize(_ *contract.ExecutionRequest) error { return nil }
