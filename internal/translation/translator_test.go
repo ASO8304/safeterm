@@ -14,13 +14,17 @@ import (
 var _ agent.Translator = (*Translator)(nil)
 
 func tokenConfig(tokens ...string) *config.Config {
-	return &config.Config{Operations: []config.OperationDefinition{{
-		Name: "example", Command: "/usr/bin/example",
-		ArgsTemplate: tokens,
-		Parameters: []config.ParameterDefinition{
-			{Name: "value", Type: config.ParamTypeString},
-		},
-	}}}
+	return &config.Config{
+		Version:     "test-v1",
+		Profiles:    []config.ProfileDefinition{{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/test.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8}},
+		Executables: []config.ExecutableDefinition{{ID: "example", Path: "/usr/bin/example", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}}},
+		Operations: []config.OperationDefinition{{
+			Name: "example", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "example",
+			ArgsTemplate: tokens,
+			Parameters: []config.ParameterDefinition{
+				{Name: "value", Type: config.ParamTypeString},
+			},
+		}}}
 }
 
 func mustTranslator(t *testing.T, cfg *config.Config) *Translator {
@@ -66,7 +70,7 @@ func TestTranslate_ExactTraceExample(t *testing.T) {
 	if err := validation.New(cfg).Validate(req); err != nil {
 		t.Fatal(err)
 	}
-	assertTranslation(t, mustTranslator(t, cfg), req, "tcpdump", []string{"-i", "any", "port", "999", "and", "host", "192.168.10.20"})
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/tcpdump", []string{"-i", "any", "port", "999", "and", "host", "192.168.10.20"})
 }
 
 // TEST-TRANS-002
@@ -74,7 +78,7 @@ func TestTranslate_ExactTraceExample(t *testing.T) {
 // A complete value remains one argument, including whitespace or an empty value.
 func TestTranslate_PreservesCommandAndArgumentBoundaries(t *testing.T) {
 	cfg := tokenConfig("literal with spaces", "{value}", "", "{value}", "--")
-	cfg.Operations[0].Command = "/opt/tools/example tool"
+	cfg.Executables[0].Path = "/opt/tools/example tool"
 	tr := mustTranslator(t, cfg)
 	for _, value := range []string{"two words", "", "a\tb", "--flag other"} {
 		t.Run(value, func(t *testing.T) {
@@ -95,23 +99,23 @@ func TestTranslate_EmptyTemplatesAndSystemInfo(t *testing.T) {
 		cfg := tokenConfig(tokens...)
 		assertTranslation(t, mustTranslator(t, cfg), &contract.ExecutionRequest{Command: "example"}, "/usr/bin/example", []string{})
 	}
-	assertTranslation(t, mustTranslator(t, shippedConfig(t)), &contract.ExecutionRequest{Command: "system_info"}, "uname", []string{"-a"})
+	assertTranslation(t, mustTranslator(t, shippedConfig(t)), &contract.ExecutionRequest{Command: "system_info"}, "/usr/bin/uname", []string{"-a"})
 }
 
 // TEST-TRANS-004
 // Requirement: REQ-006 (AC-4)
 // Invalid configuration never yields a partially usable Translator.
 func TestNew_RejectsInvalidConfig(t *testing.T) {
-	for _, name := range []string{"nil", "empty command", "duplicate parameter"} {
+	for _, name := range []string{"nil", "empty executable", "duplicate parameter"} {
 		t.Run(name, func(t *testing.T) {
 			cfg := tokenConfig("{value}")
 			want := ""
 			switch name {
 			case "nil":
 				cfg, want = nil, "nil configuration"
-			case "empty command":
-				cfg.Operations[0].Command = ""
-				want = "command must not be empty"
+			case "empty executable":
+				cfg.Operations[0].ExecutableRef = ""
+				want = "requires executable_ref"
 			case "duplicate parameter":
 				cfg.Operations[0].Parameters = append(cfg.Operations[0].Parameters, cfg.Operations[0].Parameters[0])
 				want = "duplicate parameter"
@@ -162,7 +166,9 @@ func TestTranslate_RejectsNilOrUnknownOperation(t *testing.T) {
 		assertRejected(t, tr, &contract.ExecutionRequest{Command: name}, "unknown operation")
 	}
 	assertRejected(t, &Translator{}, &contract.ExecutionRequest{Command: "trace"}, "unknown operation")
-	assertRejected(t, mustTranslator(t, &config.Config{}), &contract.ExecutionRequest{Command: "trace"}, "unknown operation")
+	emptyConfig := tokenConfig()
+	emptyConfig.Operations = nil
+	assertRejected(t, mustTranslator(t, emptyConfig), &contract.ExecutionRequest{Command: "trace"}, "unknown operation")
 }
 
 // TEST-TRANS-008
@@ -174,7 +180,7 @@ func TestTranslate_SnapshotAndOutputsAreIndependent(t *testing.T) {
 	if !reflect.DeepEqual(cfg, tokenConfig("literal", "{value}")) {
 		t.Fatal("New mutated the source config")
 	}
-	cfg.Operations[0].Command = "changed"
+	cfg.Executables[0].Path = "/changed"
 	cfg.Operations[0].ArgsTemplate[0] = "changed"
 	cfg.Operations[0].Parameters[0].Name = "changed"
 	req := &contract.ExecutionRequest{Command: "example", Arguments: map[string]string{"value": "original"}}

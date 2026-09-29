@@ -1,0 +1,27 @@
+[Unit]
+Description=SafeTerm network observer runner
+After=network.target
+
+[Service]
+Type=simple
+User=safeterm-network
+Group=safeterm-gateway
+RuntimeDirectory=safeterm-network
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile network-observer
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_NET_RAW
+AmbientCapabilities=CAP_NET_RAW
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_PACKET
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=256M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

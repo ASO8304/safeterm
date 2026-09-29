@@ -14,9 +14,18 @@ var _ agent.PolicyEnforcer = (*Enforcer)(nil)
 // viewer -> [system_info], netops -> [system_info, trace].
 func testPolicyConfig() *config.Config {
 	return &config.Config{
+		Version: "test-v1",
+		Profiles: []config.ProfileDefinition{
+			{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/diagnostics.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8},
+			{Name: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/network.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8},
+		},
+		Executables: []config.ExecutableDefinition{
+			{ID: "uname", Path: "/usr/bin/uname", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}},
+			{ID: "tcpdump", Path: "/usr/bin/tcpdump", AllowedProfiles: []config.RunnerProfile{config.ProfileNetworkObserver}},
+		},
 		Operations: []config.OperationDefinition{
-			{Name: "system_info", Command: "uname"},
-			{Name: "trace", Command: "tcpdump"},
+			{Name: "system_info", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname"},
+			{Name: "trace", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump"},
 		},
 		Roles: []config.RoleDefinition{{Name: "viewer"}, {Name: "netops"}, {Name: "unassigned"}},
 		Policies: []config.PolicyDefinition{

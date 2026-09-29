@@ -1,0 +1,27 @@
+[Unit]
+Description=SafeTerm service manager runner
+After=dbus.service
+
+[Service]
+Type=simple
+User=safeterm-service-manager
+Group=safeterm-gateway
+RuntimeDirectory=safeterm-service-manager
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile service-manager
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=128M
+TasksMax=16
+
+[Install]
+WantedBy=multi-user.target

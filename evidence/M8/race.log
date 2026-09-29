@@ -1,0 +1,4 @@
+ok  	safeterm/internal/config	1.046s
+ok  	safeterm/internal/execution	3.203s
+ok  	safeterm/internal/isolation	1.144s
+ok  	safeterm/tests/integration	2.530s

@@ -1,0 +1,27 @@
+[Unit]
+Description=SafeTerm diagnostics runner
+After=local-fs.target
+
+[Service]
+Type=simple
+User=safeterm-diagnostics
+Group=safeterm-gateway
+RuntimeDirectory=safeterm-diagnostics
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile diagnostics
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target

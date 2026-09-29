@@ -29,8 +29,13 @@ func writeConfigDir(t *testing.T, operationsJSON, rolesJSON, policiesJSON string
 	}
 
 	write("operations", "operations.json", operationsJSON)
+	write("executables", "executables.json", `[{"id":"uname","path":"/usr/bin/uname","allowed_profiles":["diagnostics"]},{"id":"tcpdump","path":"/usr/bin/tcpdump","allowed_profiles":["network-observer"]}]`)
+	write("profiles", "profiles.json", `[{"name":"diagnostics","executor_kind":"process","socket_path":"/run/safeterm/diagnostics.sock","run_as_user":"safeterm-diagnostics","capabilities":[],"memory_limit_mib":128,"process_limit":32},{"name":"network-observer","executor_kind":"process","socket_path":"/run/safeterm/network.sock","run_as_user":"safeterm-network","capabilities":["CAP_NET_RAW"],"memory_limit_mib":256,"process_limit":32}]`)
 	write("roles", "roles.json", rolesJSON)
 	write("policies", "policies.json", policiesJSON)
+	if err := os.WriteFile(filepath.Join(base, "catalog.json"), []byte(`{"version":"test-v1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	return base
 }
@@ -41,7 +46,7 @@ func writeConfigDir(t *testing.T, operationsJSON, rolesJSON, policiesJSON string
 // files from disk and return a Config that passes validation.
 func TestLoadConfig_WellFormedFiles_Succeeds(t *testing.T) {
 	dir := writeConfigDir(t,
-		`[{"name":"system_info","command":"uname"}]`,
+		`[{"name":"system_info","runner_profile":"diagnostics","executor_kind":"process","executable_ref":"uname"}]`,
 		`[{"name":"viewer"}]`,
 		`[{"role":"viewer","operations":["system_info"]}]`,
 	)
@@ -85,7 +90,7 @@ func TestLoadConfig_MalformedJSON_ReturnsError(t *testing.T) {
 // inconsistent Config to the caller.
 func TestLoadConfig_InconsistentConfig_ReturnsErrorNotPartialConfig(t *testing.T) {
 	dir := writeConfigDir(t,
-		`[{"name":"system_info","command":"uname"}]`,
+		`[{"name":"system_info","runner_profile":"diagnostics","executor_kind":"process","executable_ref":"uname"}]`,
 		`[{"name":"viewer"}]`,
 		`[{"role":"viewer","operations":["ghost_operation"]}]`,
 	)
@@ -110,10 +115,10 @@ func TestLoadConfig_MultipleFilesInSameFolder_AreMerged(t *testing.T) {
 	if err := os.MkdirAll(opsDir, 0o755); err != nil {
 		t.Fatalf("failed to create operations dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(opsDir, "core.json"), []byte(`[{"name":"system_info","command":"uname"}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(opsDir, "core.json"), []byte(`[{"name":"system_info","runner_profile":"diagnostics","executor_kind":"process","executable_ref":"uname"}]`), 0o644); err != nil {
 		t.Fatalf("failed to write core.json: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(opsDir, "network.json"), []byte(`[{"name":"trace","command":"tcpdump"}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(opsDir, "network.json"), []byte(`[{"name":"trace","runner_profile":"network-observer","executor_kind":"process","executable_ref":"tcpdump"}]`), 0o644); err != nil {
 		t.Fatalf("failed to write network.json: %v", err)
 	}
 	for _, sub := range []string{"roles", "policies"} {
@@ -123,6 +128,19 @@ func TestLoadConfig_MultipleFilesInSameFolder_AreMerged(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(base, sub, "empty.json"), []byte("[]"), 0o644); err != nil {
 			t.Fatalf("failed to write empty %s file: %v", sub, err)
 		}
+	}
+	writeArray := func(sub, content string) {
+		if err := os.MkdirAll(filepath.Join(base, sub), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(base, sub, sub+".json"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeArray("executables", `[{"id":"uname","path":"/usr/bin/uname","allowed_profiles":["diagnostics"]},{"id":"tcpdump","path":"/usr/bin/tcpdump","allowed_profiles":["network-observer"]}]`)
+	writeArray("profiles", `[{"name":"diagnostics","executor_kind":"process","socket_path":"/run/safeterm/diagnostics.sock","run_as_user":"safeterm-diagnostics","memory_limit_mib":128,"process_limit":32},{"name":"network-observer","executor_kind":"process","socket_path":"/run/safeterm/network.sock","run_as_user":"safeterm-network","memory_limit_mib":128,"process_limit":32}]`)
+	if err := os.WriteFile(filepath.Join(base, "catalog.json"), []byte(`{"version":"test-v1"}`), 0o644); err != nil {
+		t.Fatal(err)
 	}
 
 	cfg, err := LoadConfig(base)

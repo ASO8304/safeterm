@@ -6,8 +6,10 @@ operations, roles, and policies through configuration files without changing Cor
 **Status:** Done
 
 ## Description
-The Agent must load allowed operations (`operations`), roles (`roles`), and
-role-to-operation mappings (`policies`) from config files. Loading must:
+The runtime loads catalog metadata, allowed operations, executable bindings,
+Runner profiles, roles, and role-to-operation policies from JSON files. M8
+extends the original M3 format with `catalog.json`, `executables/`, and
+`profiles/` while retaining the same fail-fast loading contract. Loading must:
 
 1. Support multiple files in each directory, so adding an operation means
    adding a file rather than editing one large existing file
@@ -21,7 +23,8 @@ role-to-operation mappings (`policies`) from config files. Loading must:
 ## Acceptance Criteria
 - [x] **AC-1:** A complete, consistent config loads and validates successfully
 - [x] **AC-2:** Duplicate operation names are rejected
-- [x] **AC-3:** An operation with an empty command is rejected
+- [x] **AC-3:** An operation without a valid profile, executor kind, and typed
+  backend definition is rejected
 - [x] **AC-4:** A policy referencing an unknown role is rejected
 - [x] **AC-5:** A policy referencing an unknown operation is rejected
 - [x] **AC-6:** An int parameter may not have a pattern, and a string parameter
@@ -32,8 +35,8 @@ role-to-operation mappings (`policies`) from config files. Loading must:
 - [x] **AC-10:** When `ValidateConfig` rejects the final result, `LoadConfig`
   returns `nil, error` rather than an incomplete Config
 - [x] **AC-11:** Multiple JSON files in one directory are merged
-- [x] The shipped files in `configs/operations`, `configs/roles`, and
-  `configs/policies` load and validate successfully as a permanent regression test
+- [x] The complete shipped catalog under `configs/` loads and validates
+  successfully as a permanent regression test
 
 ## Related Tests
 - TEST-CONFIG-001 through TEST-CONFIG-016
@@ -41,3 +44,4 @@ role-to-operation mappings (`policies`) from config files. Loading must:
 
 ## Related ADRs
 - ADR-004 (JSON instead of YAML for M3)
+- ADR-009 (M8 profile and executable catalog extension)

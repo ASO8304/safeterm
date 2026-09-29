@@ -62,10 +62,22 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-INTEG-011 | REQ-007 (AC-2, AC-10) + REQ-002 (AC-4) | tests/integration | Integration | PASS |
 | TEST-INTEG-012 | REQ-007 (AC-4, AC-10) + REQ-002 (AC-4) | tests/integration | Integration | PASS |
 | TEST-INTEG-013 | REQ-007 (AC-9) + REQ-004 (AC-1, AC-4, AC-6) + REQ-005 (AC-1, AC-4) | tests/integration | Integration | PASS |
+| TEST-ISOLATION-001 | REQ-008 (AC-1) | internal/config | Unit | PASS |
+| TEST-ISOLATION-002 | REQ-008 (AC-2) | internal/config, internal/isolation | Unit | PASS |
+| TEST-ISOLATION-003 | REQ-008 (AC-3) | deploy/systemd, tests/integration | Integration | PASS |
+| TEST-ISOLATION-004 | REQ-008 (AC-4) | internal/isolation, tests/integration | Unit + Integration | PASS |
+| TEST-ISOLATION-005 | REQ-008 (AC-5) | internal/config, deploy/systemd | Unit + Integration | PASS |
+| TEST-ISOLATION-006 | REQ-008 (AC-6) | internal/isolation, tests/integration | Unit + Integration | PASS |
+| TEST-ISOLATION-007 | REQ-008 (AC-7) | internal/execution | Unit | PASS |
+| TEST-ISOLATION-008 | REQ-008 (AC-8) | internal/config, internal/translation | Unit | PASS |
+| TEST-ISOLATION-009 | REQ-008 (AC-9) | internal/isolation | Unit | PASS |
+| TEST-ISOLATION-010 | REQ-008 (AC-10) | internal/isolation, tests/integration | Unit + Integration | PASS |
+| TEST-ISOLATION-011 | REQ-008 (AC-11) | internal/execution, tests/integration | Unit + Integration | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
 Local M7 evidence: [complete make verify output](../../evidence/M7/make-verify.log).
+Local M8 evidence: [complete make verify output](../../evidence/M8/make-verify.log).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

@@ -11,6 +11,24 @@ const (
 	ParamTypeString ParameterType = "string"
 )
 
+// RunnerProfile identifies an OS-level execution boundary. Profiles may share
+// one binary, but each is deployed as a separate process and service identity.
+type RunnerProfile string
+
+const (
+	ProfileDiagnostics     RunnerProfile = "diagnostics"
+	ProfileNetworkObserver RunnerProfile = "network-observer"
+	ProfileServiceManager  RunnerProfile = "service-manager"
+)
+
+// ExecutorKind selects a typed backend. It is configuration, never caller input.
+type ExecutorKind string
+
+const (
+	ExecutorProcess ExecutorKind = "process"
+	ExecutorSystemd ExecutorKind = "systemd"
+)
+
 // ParameterDefinition describes one argument an Operation accepts.
 // Min/Max only apply when Type is ParamTypeInt; Pattern only applies
 // when Type is ParamTypeString. ValidateConfig enforces this so an
@@ -30,12 +48,36 @@ type ParameterDefinition struct {
 // (M6). ArgsTemplate remains inert data in this package; translation.New
 // validates and compiles its whole-token placeholders (ADR-007).
 type OperationDefinition struct {
-	Name         string                `json:"name"`
-	Description  string                `json:"description"`
-	Command      string                `json:"command"`
-	ArgsTemplate []string              `json:"args_template"`
-	Parameters   []ParameterDefinition `json:"parameters"`
-	LongRunning  bool                  `json:"long_running"`
+	Name          string                      `json:"name"`
+	Description   string                      `json:"description"`
+	RunnerProfile RunnerProfile               `json:"runner_profile"`
+	ExecutorKind  ExecutorKind                `json:"executor_kind"`
+	ExecutableRef string                      `json:"executable_ref,omitempty"`
+	ArgsTemplate  []string                    `json:"args_template,omitempty"`
+	Systemd       *SystemdOperationDefinition `json:"systemd,omitempty"`
+	Parameters    []ParameterDefinition       `json:"parameters"`
+	LongRunning   bool                        `json:"long_running"`
+}
+
+type SystemdOperationDefinition struct {
+	Unit   string `json:"unit"`
+	Action string `json:"action"`
+}
+
+type ExecutableDefinition struct {
+	ID              string          `json:"id"`
+	Path            string          `json:"path"`
+	AllowedProfiles []RunnerProfile `json:"allowed_profiles"`
+}
+
+type ProfileDefinition struct {
+	Name           RunnerProfile `json:"name"`
+	ExecutorKind   ExecutorKind  `json:"executor_kind"`
+	SocketPath     string        `json:"socket_path"`
+	RunAsUser      string        `json:"run_as_user"`
+	Capabilities   []string      `json:"capabilities"`
+	MemoryLimitMiB int           `json:"memory_limit_mib"`
+	ProcessLimit   int           `json:"process_limit"`
 }
 
 // RoleDefinition describes one role that can be granted to a user.
@@ -56,7 +98,10 @@ type PolicyDefinition struct {
 // Config is the fully loaded and structurally-validated configuration for
 // a SafeTerm deployment.
 type Config struct {
-	Operations []OperationDefinition
-	Roles      []RoleDefinition
-	Policies   []PolicyDefinition
+	Version     string
+	Operations  []OperationDefinition
+	Executables []ExecutableDefinition
+	Profiles    []ProfileDefinition
+	Roles       []RoleDefinition
+	Policies    []PolicyDefinition
 }

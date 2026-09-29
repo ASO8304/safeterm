@@ -1,0 +1,12 @@
+[
+  {
+    "id": "uname",
+    "path": "/usr/bin/uname",
+    "allowed_profiles": ["diagnostics"]
+  },
+  {
+    "id": "tcpdump",
+    "path": "/usr/bin/tcpdump",
+    "allowed_profiles": ["network-observer"]
+  }
+]

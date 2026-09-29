@@ -73,14 +73,19 @@ func executionIntegrationConfig() *config.Config {
 	operations := make([]config.OperationDefinition, 0, 3)
 	for _, action := range []string{"success", "exit", "wait"} {
 		operations = append(operations, config.OperationDefinition{
-			Name:         "probe_" + action,
-			Command:      os.Args[0],
-			ArgsTemplate: []string{"-test.run=^TestExecutionIntegrationHelper$", "--", action},
+			Name:          "probe_" + action,
+			RunnerProfile: config.ProfileDiagnostics,
+			ExecutorKind:  config.ExecutorProcess,
+			ExecutableRef: "test-helper",
+			ArgsTemplate:  []string{"-test.run=^TestExecutionIntegrationHelper$", "--", action},
 		})
 	}
 	return &config.Config{
-		Operations: operations,
-		Roles:      []config.RoleDefinition{{Name: "operator"}, {Name: "viewer"}},
+		Version:     "test-v1",
+		Profiles:    []config.ProfileDefinition{{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/test.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8}},
+		Executables: []config.ExecutableDefinition{{ID: "test-helper", Path: os.Args[0], AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}}},
+		Operations:  operations,
+		Roles:       []config.RoleDefinition{{Name: "operator"}, {Name: "viewer"}},
 		Policies: []config.PolicyDefinition{
 			{Role: "operator", Operations: []string{"probe_success", "probe_exit", "probe_wait"}},
 			{Role: "viewer", Operations: []string{}},
