@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"safeterm/internal/audit"
 	"safeterm/internal/config"
 	"safeterm/internal/contract"
 )
@@ -21,17 +22,8 @@ type Gateway struct {
 	sink    EventSink
 }
 
-type LifecycleEvent struct {
-	RequestID      string
-	CatalogVersion string
-	Component      string
-	Profile        config.RunnerProfile
-	Operation      string
-	Outcome        string
-	Timestamp      time.Time
-}
-
-type EventSink interface{ Record(LifecycleEvent) }
+type LifecycleEvent = audit.Event
+type EventSink = audit.Sink
 
 func NewGateway(catalog *Store, clients map[config.RunnerProfile]Client) (*Gateway, error) {
 	return NewGatewayWithSink(catalog, clients, nil)
@@ -64,23 +56,42 @@ func (g *Gateway) Dispatch(ctx context.Context, req *contract.ExecutionRequest) 
 	snapshot := g.catalog.Current()
 	profile, ok := snapshot.Route(req.Command)
 	if !ok {
-		g.record(req, "", "unknown-operation", snapshot.Version())
+		if err := g.record(ctx, req, "", "unknown-operation", snapshot.Version(), nil); err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("isolation: unknown operation %q", req.Command)
 	}
 	client, ok := g.clients[profile]
 	if !ok {
-		g.record(req, profile, "profile-unavailable", snapshot.Version())
+		if err := g.record(ctx, req, profile, "profile-unavailable", snapshot.Version(), nil); err != nil {
+			return nil, err
+		}
 		return nil, fmt.Errorf("isolation: profile %q is unavailable", profile)
 	}
-	g.record(req, profile, "routed", snapshot.Version())
-	return client.Handle(ctx, req)
+	if err := g.record(ctx, req, profile, "routed", snapshot.Version(), nil); err != nil {
+		return nil, err
+	}
+	response, err := client.Handle(ctx, req)
+	if err != nil {
+		if recordErr := g.record(ctx, req, profile, "runner-error", snapshot.Version(), nil); recordErr != nil {
+			return nil, recordErr
+		}
+		return nil, err
+	}
+	if err := g.record(ctx, req, profile, "returned", snapshot.Version(), response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
-func (g *Gateway) record(req *contract.ExecutionRequest, profile config.RunnerProfile, outcome, version string) {
+func (g *Gateway) record(ctx context.Context, req *contract.ExecutionRequest, profile config.RunnerProfile, outcome, version string, response *contract.ExecutionResponse) error {
 	if g.sink == nil {
-		return
+		return nil
 	}
-	g.sink.Record(LifecycleEvent{RequestID: req.RequestID, CatalogVersion: version, Component: "gateway", Profile: profile, Operation: req.Command, Outcome: outcome, Timestamp: time.Now().UTC()})
+	if err := g.sink.Record(ctx, audit.NewEvent(req, version, audit.ComponentGateway, string(profile), outcome, response)); err != nil {
+		return fmt.Errorf("isolation: audit gateway event: %w", err)
+	}
+	return nil
 }
 
 // Handle lets Gateway serve the same bounded IPC protocol as a Runner while
@@ -121,17 +132,29 @@ func (h *ProfileHandler) Handle(ctx context.Context, req *contract.ExecutionRequ
 	}
 	snapshot := h.catalog.Current()
 	if !snapshot.Allows(h.profile, req.Command) {
-		h.record(req, "profile-rejected", snapshot.Version())
 		now := time.Now().UTC()
-		return &contract.ExecutionResponse{RequestID: req.RequestID, Result: contract.ResultRejected, Message: fmt.Sprintf("isolation: operation %q is not assigned to profile %q", req.Command, h.profile), StartedAt: now, EndedAt: now}, nil
+		response := &contract.ExecutionResponse{RequestID: req.RequestID, Result: contract.ResultRejected, FailureStage: "profile", Message: fmt.Sprintf("isolation: operation %q is not assigned to profile %q", req.Command, h.profile), StartedAt: now, EndedAt: now}
+		if err := h.record(ctx, req, "profile-rejected", snapshot.Version(), response); err != nil {
+			return nil, err
+		}
+		return response, nil
 	}
-	h.record(req, "accepted", snapshot.Version())
-	return h.core.HandleRequest(ctx, req), nil
+	if err := h.record(ctx, req, "accepted", snapshot.Version(), nil); err != nil {
+		return nil, err
+	}
+	response := h.core.HandleRequest(ctx, req)
+	if err := h.record(ctx, req, "completed", snapshot.Version(), response); err != nil {
+		return nil, err
+	}
+	return response, nil
 }
 
-func (h *ProfileHandler) record(req *contract.ExecutionRequest, outcome, version string) {
+func (h *ProfileHandler) record(ctx context.Context, req *contract.ExecutionRequest, outcome, version string, response *contract.ExecutionResponse) error {
 	if h.sink == nil {
-		return
+		return nil
 	}
-	h.sink.Record(LifecycleEvent{RequestID: req.RequestID, CatalogVersion: version, Component: "runner", Profile: h.profile, Operation: req.Command, Outcome: outcome, Timestamp: time.Now().UTC()})
+	if err := h.sink.Record(ctx, audit.NewEvent(req, version, audit.ComponentRunner, string(h.profile), outcome, response)); err != nil {
+		return fmt.Errorf("isolation: audit runner event: %w", err)
+	}
+	return nil
 }

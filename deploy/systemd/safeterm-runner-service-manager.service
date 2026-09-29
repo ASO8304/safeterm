@@ -1,11 +1,13 @@
 [Unit]
 Description=SafeTerm service manager runner
-After=dbus.service
+Requires=safeterm-audit.service
+After=dbus.service safeterm-audit.service
 
 [Service]
 Type=simple
 User=safeterm-service-manager
 Group=safeterm-gateway
+SupplementaryGroups=safeterm-audit
 RuntimeDirectory=safeterm-service-manager
 RuntimeDirectoryMode=0750
 ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile service-manager

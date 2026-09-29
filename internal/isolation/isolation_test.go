@@ -2,9 +2,11 @@ package isolation
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
+	"safeterm/internal/audit"
 	"safeterm/internal/config"
 	"safeterm/internal/contract"
 )
@@ -79,7 +81,24 @@ type fakeClient struct {
 
 type eventRecorder struct{ events []LifecycleEvent }
 
-func (r *eventRecorder) Record(event LifecycleEvent) { r.events = append(r.events, event) }
+func (r *eventRecorder) Record(_ context.Context, event audit.Event) error {
+	r.events = append(r.events, event)
+	return nil
+}
+
+type failingEventSink struct{}
+
+func (failingEventSink) Record(context.Context, audit.Event) error { return errors.New("offline") }
+
+type failOnCallSink struct{ calls int }
+
+func (s *failOnCallSink) Record(context.Context, audit.Event) error {
+	s.calls++
+	if s.calls == 2 {
+		return errors.New("completion offline")
+	}
+	return nil
+}
 
 func (c *fakeClient) Handle(_ context.Context, _ *contract.ExecutionRequest) (*contract.ExecutionResponse, error) {
 	c.calls++
@@ -158,13 +177,47 @@ func TestLifecycleEventsExposeCorrelationWithoutArguments(t *testing.T) {
 	if _, err := handler.Handle(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
-	if len(recorder.events) != 2 {
+	if len(recorder.events) != 4 {
 		t.Fatalf("events=%d", len(recorder.events))
 	}
 	for _, event := range recorder.events {
-		if event.RequestID != request.RequestID || event.CatalogVersion != "1.0.0" || event.Profile != config.ProfileDiagnostics || event.Operation != "system_info" || event.Timestamp.IsZero() {
+		if event.RequestID != request.RequestID || event.CatalogVersion != "1.0.0" || event.Profile != string(config.ProfileDiagnostics) || event.Operation != "system_info" || event.OccurredAt.IsZero() {
 			t.Fatalf("incomplete event: %+v", event)
 		}
+	}
+	if len(recorder.events[0].ArgumentNames) != 1 || recorder.events[0].ArgumentNames[0] != "secret" {
+		t.Fatalf("argument names not sanitized: %+v", recorder.events[0])
+	}
+}
+
+// TEST-AUDIT-006
+func TestAuditFailureStopsBeforeRoutingOrExecution(t *testing.T) {
+	store, _ := NewStore(testCatalog(t))
+	client := &fakeClient{response: &contract.ExecutionResponse{Result: contract.ResultSuccess}}
+	gateway, err := NewGatewayWithSink(store, map[config.RunnerProfile]Client{config.ProfileDiagnostics: client}, failingEventSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, _ := contract.NewExecutionRequest("system_info", nil, contract.Metadata{})
+	if _, err := gateway.Dispatch(context.Background(), request); err == nil || client.calls != 0 {
+		t.Fatalf("gateway audit failure did not fail closed: err=%v calls=%d", err, client.calls)
+	}
+	core := &fakeCore{}
+	handler, err := NewProfileHandlerWithSink(config.ProfileDiagnostics, store, core, failingEventSink{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handler.Handle(context.Background(), request); err == nil || core.calls != 0 {
+		t.Fatalf("runner audit failure did not fail closed: err=%v calls=%d", err, core.calls)
+	}
+	completionSink := &failOnCallSink{}
+	completionCore := &fakeCore{}
+	completionHandler, err := NewProfileHandlerWithSink(config.ProfileDiagnostics, store, completionCore, completionSink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := completionHandler.Handle(context.Background(), request); err == nil || completionCore.calls != 1 {
+		t.Fatalf("completion audit failure was hidden: err=%v calls=%d", err, completionCore.calls)
 	}
 }
 

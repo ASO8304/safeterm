@@ -24,9 +24,11 @@ authentication is the responsibility of a separate future layer (ADR-006).
 - [x] **AC-4:** `Metadata.ReceivedAt` is populated automatically when empty
 - [x] **AC-5:** `ExecutionRequest` survives a JSON round trip without data loss
 - [x] **AC-6:** `ExecutionResponse.Duration()` correctly calculates the interval between start and end
+- [x] **AC-7:** `ExecutionResponse.FailureStage` survives JSON transport so
+  Audit can identify the rejecting stage without parsing a message
 
 ## Related Tests
-- TEST-CONTRACT-001 through TEST-CONTRACT-006
+- TEST-CONTRACT-001 through TEST-CONTRACT-007
   (`internal/contract/request_test.go`, `internal/contract/response_test.go`)
 
 ## Related ADRs

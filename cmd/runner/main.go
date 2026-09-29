@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"safeterm/internal/agent"
+	"safeterm/internal/audit"
 	"safeterm/internal/config"
 	"safeterm/internal/execution"
 	"safeterm/internal/isolation"
@@ -26,14 +27,16 @@ func main() {
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "allowed local Gateway user")
 	timeout := flag.Duration("timeout", 30*time.Second, "maximum operation runtime")
 	systemctlPath := flag.String("systemctl", "/usr/bin/systemctl", "absolute systemctl path")
+	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
+	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
 	flag.Parse()
-	if err := run(*configDir, config.RunnerProfile(*profileName), *gatewayUser, *timeout, *systemctlPath); err != nil {
+	if err := run(*configDir, config.RunnerProfile(*profileName), *gatewayUser, *timeout, *systemctlPath, *auditSocket, *auditUser); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir string, profileName config.RunnerProfile, gatewayUser string, timeout time.Duration, systemctlPath string) error {
+func run(configDir string, profileName config.RunnerProfile, gatewayUser string, timeout time.Duration, systemctlPath, auditSocket, auditUser string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
@@ -79,7 +82,19 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 		return fmt.Errorf("runner: unsupported executor kind %q", profile.ExecutorKind)
 	}
 	core := agent.NewCore(validation.New(profileConfig), policy.New(profileConfig), translator, executor)
-	handler, err := isolation.NewProfileHandler(profileName, store, core)
+	auditAccount, err := user.Lookup(auditUser)
+	if err != nil {
+		return fmt.Errorf("runner: resolve Audit Service user: %w", err)
+	}
+	auditUID, err := strconv.ParseUint(auditAccount.Uid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("runner: parse Audit Service UID: %w", err)
+	}
+	auditClient, err := audit.NewUnixClient(auditSocket, []uint32{uint32(auditUID)})
+	if err != nil {
+		return err
+	}
+	handler, err := isolation.NewProfileHandlerWithSink(profileName, store, core, auditClient)
 	if err != nil {
 		return err
 	}

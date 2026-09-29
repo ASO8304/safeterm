@@ -28,6 +28,8 @@ implementations replace them in the M4, M5, M6, and M7 integration paths.
   `RequestID` exactly matches the request `RequestID`
 - [x] **AC-6:** `StartedAt` and `EndedAt` are populated for every path, successful
   or unsuccessful, because Audit (M9) requires duration for every operation
+- [x] **AC-7:** Rejection and execution-error responses expose the typed failure
+  stage as structured response data for Audit without changing pipeline order
 
 ## Related Tests
 - TEST-AGENT-001 through TEST-AGENT-007 (`internal/agent/core_test.go`)

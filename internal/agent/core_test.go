@@ -113,6 +113,9 @@ func TestHandleRequest_ValidationFails_StopsPipelineImmediately(t *testing.T) {
 	if resp.Result != contract.ResultRejected {
 		t.Fatalf("expected ResultRejected, got %s", resp.Result)
 	}
+	if resp.FailureStage != string(StageValidation) {
+		t.Fatalf("failure stage = %q", resp.FailureStage)
+	}
 	if p.called || tr.called || ex.called {
 		t.Fatal("expected Policy/Translator/Executor to be skipped after Validation failure")
 	}
@@ -133,6 +136,9 @@ func TestHandleRequest_PolicyFails_StopsBeforeTranslation(t *testing.T) {
 
 	if resp.Result != contract.ResultRejected {
 		t.Fatalf("expected ResultRejected, got %s", resp.Result)
+	}
+	if resp.FailureStage != string(StagePolicy) {
+		t.Fatalf("failure stage = %q", resp.FailureStage)
 	}
 	if !v.called {
 		t.Fatal("expected Validator to have been called")
@@ -157,6 +163,9 @@ func TestHandleRequest_TranslationFails_StopsBeforeExecution(t *testing.T) {
 
 	if resp.Result != contract.ResultRejected {
 		t.Fatalf("expected ResultRejected, got %s", resp.Result)
+	}
+	if resp.FailureStage != string(StageTranslation) {
+		t.Fatalf("failure stage = %q", resp.FailureStage)
 	}
 	if ex.called {
 		t.Fatal("expected Executor to be skipped after Translation failure")
@@ -183,6 +192,9 @@ func TestHandleRequest_ExecutionFails_ReturnsExecutionError(t *testing.T) {
 	}
 	if resp.ExitCode != 127 {
 		t.Fatalf("expected exit code 127 to be preserved, got %d", resp.ExitCode)
+	}
+	if resp.FailureStage != string(StageExecution) {
+		t.Fatalf("failure stage = %q", resp.FailureStage)
 	}
 }
 

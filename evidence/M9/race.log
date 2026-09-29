@@ -1,0 +1,3 @@
+ok  	safeterm/internal/audit	1.111s
+ok  	safeterm/internal/isolation	1.324s
+ok  	safeterm/tests/integration	2.800s
