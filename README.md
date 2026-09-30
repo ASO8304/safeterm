@@ -58,7 +58,11 @@ host-local IPC to exactly one Runner profile.
 Client -> Broker -> Node Gateway -> diagnostics Runner
                                 -> network-observer Runner
                                 -> service-manager Runner
+                                -> web-config Manager
+                                -> database-config Manager
+                                -> network-config Manager
                   Audit Service <- Gateway and every Runner
+                                <- every Config Manager
 ```
 
 Profiles share a codebase but run as separate processes with separate service
@@ -107,11 +111,14 @@ cleanup and signal escalation; M11 does not expose a PTY or general shell. See
 [REQ-011](docs/requirements/REQ-011-bounded-streaming-and-control.md) and
 [ADR-013](docs/decisions/ADR-013-bounded-streaming-and-semantic-termination.md).
 
-A structured configuration service is proposed in
+A structured configuration service is planned for M13 in
 [ADR-014](docs/decisions/ADR-014-structured-configuration-management-service.md).
 It uses resource IDs, typed format adapters, validated patches, atomic writes,
-and multiple least-privilege service profiles. Broker renders the interactive
-menu or form; the service never exposes arbitrary paths or a text editor.
+optimistic concurrency, preview-bound proposal tokens, rollback, and multiple
+least-privilege service profiles. Broker renders the interactive menu or form;
+the service never exposes arbitrary paths, replacement files, or a text editor.
+Its acceptance criteria are in
+[REQ-013](docs/requirements/REQ-013-structured-configuration-management.md).
 
 ## Local Verification
 
@@ -167,5 +174,6 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
 | M11 | Bounded Streaming and Semantic Termination | ⏳ Planned |
 | M12 | Broker, Authentication, Catalog Workflow, and Client Adapters | ⏳ Planned |
-| M13 | Security Testing | ⏳ Planned |
-| M14 | End-to-End Deployment and Demo | ⏳ Planned |
+| M13 | Structured Configuration Management | ⏳ Planned |
+| M14 | Security Testing | ⏳ Planned |
+| M15 | End-to-End Deployment and Demo | ⏳ Planned |
