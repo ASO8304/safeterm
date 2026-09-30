@@ -100,6 +100,19 @@ replace example executable digests with hashes from the exact deployment host.
 The key must reside on a filesystem that enforces Unix mode 0600; the signing
 tool refuses group- or world-readable private keys.
 
+M11 adds bounded stdout/stderr sessions for approved long-running operations.
+Client-specific actions such as a web Terminate button or Ctrl+C in the SSH
+custom shell map to one semantic `terminate` message. Runner owns process-group
+cleanup and signal escalation; M11 does not expose a PTY or general shell. See
+[REQ-011](docs/requirements/REQ-011-bounded-streaming-and-control.md) and
+[ADR-013](docs/decisions/ADR-013-bounded-streaming-and-semantic-termination.md).
+
+A structured configuration service is proposed in
+[ADR-014](docs/decisions/ADR-014-structured-configuration-management-service.md).
+It uses resource IDs, typed format adapters, validated patches, atomic writes,
+and multiple least-privilege service profiles. Broker renders the interactive
+menu or form; the service never exposes arbitrary paths or a text editor.
+
 ## Local Verification
 
 ```bash
@@ -152,7 +165,7 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M8 | Capability-Isolated Runtime | ✅ Tagged: v0.9.0-m8 |
 | M9 | Audit Service | ✅ Tagged: v0.10.0-m9 |
 | M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
-| M11 | Streaming | ⏳ Planned |
+| M11 | Bounded Streaming and Semantic Termination | ⏳ Planned |
 | M12 | Broker, Authentication, Catalog Workflow, and Client Adapters | ⏳ Planned |
 | M13 | Security Testing | ⏳ Planned |
 | M14 | End-to-End Deployment and Demo | ⏳ Planned |
