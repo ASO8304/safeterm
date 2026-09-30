@@ -20,8 +20,8 @@ func traceTestConfig() *config.Config {
 			{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/diagnostics.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8},
 		},
 		Executables: []config.ExecutableDefinition{
-			{ID: "tcpdump", Path: "/usr/bin/tcpdump", AllowedProfiles: []config.RunnerProfile{config.ProfileNetworkObserver}},
-			{ID: "uname", Path: "/usr/bin/uname", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}},
+			{ID: "tcpdump", Path: "/usr/bin/tcpdump", SHA256: "0000000000000000000000000000000000000000000000000000000000000000", AllowedProfiles: []config.RunnerProfile{config.ProfileNetworkObserver}},
+			{ID: "uname", Path: "/usr/bin/uname", SHA256: "0000000000000000000000000000000000000000000000000000000000000000", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}},
 		},
 		Operations: []config.OperationDefinition{
 			{

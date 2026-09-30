@@ -4,6 +4,7 @@ package isolation
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"safeterm/internal/config"
@@ -90,6 +91,9 @@ func (s *Snapshot) ProfileConfig(profile config.RunnerProfile) (*config.Config, 
 	result := &config.Config{Version: s.config.Version, Profiles: []config.ProfileDefinition{definition}, Roles: append([]config.RoleDefinition(nil), s.config.Roles...)}
 	allowedOps := map[string]bool{}
 	executableIDs := map[string]bool{}
+	if definition.ControllerExecutableRef != "" {
+		executableIDs[definition.ControllerExecutableRef] = true
+	}
 	for _, operation := range s.config.Operations {
 		if operation.RunnerProfile == profile {
 			result.Operations = append(result.Operations, operation)
@@ -120,14 +124,39 @@ func (s *Snapshot) ProfileConfig(profile config.RunnerProfile) (*config.Config, 
 	return cloneConfig(result)
 }
 
-type Store struct{ current atomic.Pointer[Snapshot] }
+type CatalogVerifier func(*config.Config) error
+
+type Store struct {
+	current  atomic.Pointer[Snapshot]
+	mu       sync.Mutex
+	previous *Snapshot
+	verifier CatalogVerifier
+}
 
 func NewStore(initial *config.Config) (*Store, error) {
+	return newStore(initial, nil)
+}
+
+// NewVerifiedStore requires every initial and replacement snapshot to pass an
+// external integrity check, such as a detached catalog signature.
+func NewVerifiedStore(initial *config.Config, verifier CatalogVerifier) (*Store, error) {
+	if verifier == nil {
+		return nil, fmt.Errorf("isolation: catalog verifier is required")
+	}
+	return newStore(initial, verifier)
+}
+
+func newStore(initial *config.Config, verifier CatalogVerifier) (*Store, error) {
+	if verifier != nil {
+		if err := verifier(initial); err != nil {
+			return nil, fmt.Errorf("isolation: verify initial catalog: %w", err)
+		}
+	}
 	snapshot, err := NewSnapshot(initial)
 	if err != nil {
 		return nil, err
 	}
-	store := &Store{}
+	store := &Store{verifier: verifier}
 	store.current.Store(snapshot)
 	return store, nil
 }
@@ -145,10 +174,34 @@ func (s *Store) Activate(candidate *config.Config) error {
 	if s == nil {
 		return fmt.Errorf("isolation: nil catalog store")
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.verifier != nil {
+		if err := s.verifier(candidate); err != nil {
+			return fmt.Errorf("isolation: verify replacement catalog: %w", err)
+		}
+	}
 	snapshot, err := NewSnapshot(candidate)
 	if err != nil {
 		return err
 	}
+	s.previous = s.current.Load()
 	s.current.Store(snapshot)
+	return nil
+}
+
+// Rollback atomically restores the last previously active, already-verified
+// snapshot. It never parses or trusts new external input.
+func (s *Store) Rollback() error {
+	if s == nil {
+		return fmt.Errorf("isolation: nil catalog store")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.previous == nil {
+		return fmt.Errorf("isolation: no previous catalog snapshot")
+	}
+	s.current.Store(s.previous)
+	s.previous = nil
 	return nil
 }

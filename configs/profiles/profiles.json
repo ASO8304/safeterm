@@ -20,6 +20,7 @@
   {
     "name": "service-manager",
     "executor_kind": "systemd",
+    "controller_executable_ref": "systemctl",
     "socket_path": "/run/safeterm-service-manager/runner.sock",
     "run_as_user": "safeterm-service-manager",
     "capabilities": [],

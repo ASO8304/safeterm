@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"syscall"
 
 	"safeterm/internal/audit"
 	"safeterm/internal/config"
+	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
 )
 
@@ -21,23 +23,33 @@ func main() {
 	brokerUser := flag.String("broker-user", "safeterm-broker", "allowed local Broker user")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
 	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
+	catalogPublicKey := flag.String("catalog-public-key", "", "trusted catalog Ed25519 public key (defaults under config directory)")
+	catalogSignature := flag.String("catalog-signature", "", "detached catalog signature (defaults under config directory)")
 	flag.Parse()
-	if err := run(*configDir, *socketPath, *brokerUser, *auditSocket, *auditUser); err != nil {
+	if err := run(*configDir, *socketPath, *brokerUser, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir, socketPath, brokerUser, auditSocket, auditUser string) error {
+func run(configDir, socketPath, brokerUser, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
+	}
+	if catalogPublicKey == "" {
+		catalogPublicKey = filepath.Join(configDir, "trust", "catalog-ed25519.pub")
+	}
+	if catalogSignature == "" {
+		catalogSignature = filepath.Join(configDir, "catalog.sig")
 	}
 	current, err := user.Current()
 	if err != nil || current.Username != "safeterm-gateway" {
 		return fmt.Errorf("gateway: must run as OS user %q", "safeterm-gateway")
 	}
-	store, err := isolation.NewStore(cfg)
+	store, err := isolation.NewVerifiedStore(cfg, func(candidate *config.Config) error {
+		return integrity.VerifyCatalogFiles(candidate, catalogPublicKey, catalogSignature)
+	})
 	if err != nil {
 		return err
 	}

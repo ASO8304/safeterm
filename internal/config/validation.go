@@ -12,6 +12,7 @@ var (
 	profilePattern    = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 	capabilityPattern = regexp.MustCompile(`^CAP_[A-Z0-9_]+$`)
 	unitPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]*\.service$`)
+	sha256Pattern     = regexp.MustCompile(`^[a-f0-9]{64}$`)
 )
 
 // ValidateConfig rejects incomplete or cross-profile catalog snapshots before
@@ -29,6 +30,9 @@ func ValidateConfig(cfg *Config) error {
 	}
 	executables, err := validateExecutables(cfg.Executables, profiles)
 	if err != nil {
+		return err
+	}
+	if err := validateProfileExecutables(profiles, executables); err != nil {
 		return err
 	}
 	opNames, err := validateOperations(cfg.Operations, profiles, executables)
@@ -54,6 +58,12 @@ func validateProfiles(items []ProfileDefinition) (map[RunnerProfile]ProfileDefin
 		if profile.ExecutorKind != ExecutorProcess && profile.ExecutorKind != ExecutorSystemd {
 			return nil, fmt.Errorf("config: profile %q: unsupported executor kind %q", profile.Name, profile.ExecutorKind)
 		}
+		if profile.ExecutorKind == ExecutorProcess && profile.ControllerExecutableRef != "" {
+			return nil, fmt.Errorf("config: process profile %q must not define a controller executable", profile.Name)
+		}
+		if profile.ExecutorKind == ExecutorSystemd && profile.ControllerExecutableRef == "" {
+			return nil, fmt.Errorf("config: systemd profile %q requires a controller executable", profile.Name)
+		}
 		if !filepath.IsAbs(profile.SocketPath) {
 			return nil, fmt.Errorf("config: profile %q: socket_path must be absolute", profile.Name)
 		}
@@ -74,6 +84,7 @@ func validateProfiles(items []ProfileDefinition) (map[RunnerProfile]ProfileDefin
 
 func validateExecutables(items []ExecutableDefinition, profiles map[RunnerProfile]ProfileDefinition) (map[string]ExecutableDefinition, error) {
 	executables := make(map[string]ExecutableDefinition, len(items))
+	paths := make(map[string]bool, len(items))
 	for _, executable := range items {
 		if !namePattern.MatchString(executable.ID) {
 			return nil, fmt.Errorf("config: invalid executable id %q", executable.ID)
@@ -81,8 +92,15 @@ func validateExecutables(items []ExecutableDefinition, profiles map[RunnerProfil
 		if _, exists := executables[executable.ID]; exists {
 			return nil, fmt.Errorf("config: duplicate executable id %q", executable.ID)
 		}
-		if !filepath.IsAbs(executable.Path) {
-			return nil, fmt.Errorf("config: executable %q: path must be absolute", executable.ID)
+		if !filepath.IsAbs(executable.Path) || filepath.Clean(executable.Path) != executable.Path {
+			return nil, fmt.Errorf("config: executable %q: path must be absolute and clean", executable.ID)
+		}
+		if paths[executable.Path] {
+			return nil, fmt.Errorf("config: executable %q: duplicate path %q", executable.ID, executable.Path)
+		}
+		paths[executable.Path] = true
+		if !sha256Pattern.MatchString(executable.SHA256) {
+			return nil, fmt.Errorf("config: executable %q: sha256 must be 64 lowercase hexadecimal characters", executable.ID)
 		}
 		if len(executable.AllowedProfiles) == 0 {
 			return nil, fmt.Errorf("config: executable %q: at least one allowed profile is required", executable.ID)
@@ -97,6 +115,19 @@ func validateExecutables(items []ExecutableDefinition, profiles map[RunnerProfil
 		executables[executable.ID] = executable
 	}
 	return executables, nil
+}
+
+func validateProfileExecutables(profiles map[RunnerProfile]ProfileDefinition, executables map[string]ExecutableDefinition) error {
+	for _, profile := range profiles {
+		if profile.ExecutorKind != ExecutorSystemd {
+			continue
+		}
+		executable, exists := executables[profile.ControllerExecutableRef]
+		if !exists || !containsProfile(executable.AllowedProfiles, profile.Name) {
+			return fmt.Errorf("config: profile %q: controller executable %q is not approved for this profile", profile.Name, profile.ControllerExecutableRef)
+		}
+	}
+	return nil
 }
 
 func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]ProfileDefinition, executables map[string]ExecutableDefinition) (map[string]bool, error) {

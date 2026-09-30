@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"safeterm/internal/audit"
 	"safeterm/internal/config"
 	"safeterm/internal/execution"
+	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
 	"safeterm/internal/policy"
 	"safeterm/internal/translation"
@@ -26,22 +28,31 @@ func main() {
 	profileName := flag.String("profile", "", "runner profile")
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "allowed local Gateway user")
 	timeout := flag.Duration("timeout", 30*time.Second, "maximum operation runtime")
-	systemctlPath := flag.String("systemctl", "/usr/bin/systemctl", "absolute systemctl path")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
 	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
+	catalogPublicKey := flag.String("catalog-public-key", "", "trusted catalog Ed25519 public key (defaults under config directory)")
+	catalogSignature := flag.String("catalog-signature", "", "detached catalog signature (defaults under config directory)")
 	flag.Parse()
-	if err := run(*configDir, config.RunnerProfile(*profileName), *gatewayUser, *timeout, *systemctlPath, *auditSocket, *auditUser); err != nil {
+	if err := run(*configDir, config.RunnerProfile(*profileName), *gatewayUser, *timeout, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir string, profileName config.RunnerProfile, gatewayUser string, timeout time.Duration, systemctlPath, auditSocket, auditUser string) error {
+func run(configDir string, profileName config.RunnerProfile, gatewayUser string, timeout time.Duration, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
 	}
-	store, err := isolation.NewStore(cfg)
+	if catalogPublicKey == "" {
+		catalogPublicKey = filepath.Join(configDir, "trust", "catalog-ed25519.pub")
+	}
+	if catalogSignature == "" {
+		catalogSignature = filepath.Join(configDir, "catalog.sig")
+	}
+	store, err := isolation.NewVerifiedStore(cfg, func(candidate *config.Config) error {
+		return integrity.VerifyCatalogFiles(candidate, catalogPublicKey, catalogSignature)
+	})
 	if err != nil {
 		return err
 	}
@@ -65,12 +76,20 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	if err != nil {
 		return err
 	}
+	verifiedRunner, err := integrity.NewExecutor(profileConfig, profileName, processRunner)
+	if err != nil {
+		return err
+	}
 	var executor agent.Executor
 	switch profile.ExecutorKind {
 	case config.ExecutorProcess:
-		executor = processRunner
+		executor = verifiedRunner
 	case config.ExecutorSystemd:
-		controller, err := execution.NewSystemctlController(systemctlPath, processRunner)
+		controllerPath, err := executablePath(profileConfig, profile.ControllerExecutableRef)
+		if err != nil {
+			return err
+		}
+		controller, err := execution.NewSystemctlController(controllerPath, verifiedRunner)
 		if err != nil {
 			return err
 		}
@@ -114,4 +133,13 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return server.Serve(ctx)
+}
+
+func executablePath(cfg *config.Config, id string) (string, error) {
+	for _, executable := range cfg.Executables {
+		if executable.ID == id {
+			return executable.Path, nil
+		}
+	}
+	return "", fmt.Errorf("runner: executable %q is missing from profile catalog", id)
 }

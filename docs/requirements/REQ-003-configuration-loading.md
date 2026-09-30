@@ -6,8 +6,9 @@ operations, roles, and policies through configuration files without changing Cor
 **Status:** Done
 
 ## Description
-The runtime loads catalog metadata, allowed operations, executable bindings,
-Runner profiles, roles, and role-to-operation policies from JSON files. M8
+The runtime loads catalog metadata, allowed operations, executable bindings
+with SHA-256 digests, Runner profiles, roles, and role-to-operation policies
+from JSON files. M8
 extends the original M3 format with `catalog.json`, `executables/`, and
 `profiles/` while retaining the same fail-fast loading contract. Loading must:
 

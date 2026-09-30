@@ -2,11 +2,19 @@
   {
     "id": "uname",
     "path": "/usr/bin/uname",
+    "sha256": "c6e023b172383fae5318c600e6f2f3a153513df62bf06ad6c9269296d2a78e89",
     "allowed_profiles": ["diagnostics"]
   },
   {
     "id": "tcpdump",
     "path": "/usr/bin/tcpdump",
+    "sha256": "0d28d014ffd7839852a426cfde6448bda549aef90a4937f787673a6ca3152cf0",
     "allowed_profiles": ["network-observer"]
+  },
+  {
+    "id": "systemctl",
+    "path": "/usr/bin/systemctl",
+    "sha256": "e0d3d0e9444da1b2b58c792c3f5028b69f049b77d5ca17b3ec0d09f89117225b",
+    "allowed_profiles": ["service-manager"]
   }
 ]

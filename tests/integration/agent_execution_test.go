@@ -83,7 +83,7 @@ func executionIntegrationConfig() *config.Config {
 	return &config.Config{
 		Version:     "test-v1",
 		Profiles:    []config.ProfileDefinition{{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/test.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8}},
-		Executables: []config.ExecutableDefinition{{ID: "test-helper", Path: os.Args[0], AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}}},
+		Executables: []config.ExecutableDefinition{{ID: "test-helper", Path: os.Args[0], SHA256: "0000000000000000000000000000000000000000000000000000000000000000", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}}},
 		Operations:  operations,
 		Roles:       []config.RoleDefinition{{Name: "operator"}, {Name: "viewer"}},
 		Policies: []config.PolicyDefinition{
