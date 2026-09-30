@@ -1,149 +1,188 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func intPtr(v int) *int { return &v }
 
 func validOperation() OperationDefinition {
-	return OperationDefinition{
-		Name:    "system_info",
-		Command: "uname",
+	return OperationDefinition{Name: "system_info", RunnerProfile: ProfileDiagnostics, ExecutorKind: ExecutorProcess, ExecutableRef: "uname"}
+}
+
+func validConfig() *Config {
+	return &Config{
+		Version: "test-v1",
+		Profiles: []ProfileDefinition{
+			{Name: ProfileDiagnostics, ExecutorKind: ExecutorProcess, SocketPath: "/run/safeterm/diagnostics.sock", RunAsUser: "safeterm-diagnostics", MemoryLimitMiB: 128, ProcessLimit: 32},
+			{Name: ProfileNetworkObserver, ExecutorKind: ExecutorProcess, SocketPath: "/run/safeterm/network.sock", RunAsUser: "safeterm-network", Capabilities: []string{"CAP_NET_RAW"}, MemoryLimitMiB: 256, ProcessLimit: 32},
+			{Name: ProfileServiceManager, ExecutorKind: ExecutorSystemd, SocketPath: "/run/safeterm/service.sock", RunAsUser: "safeterm-service", MemoryLimitMiB: 128, ProcessLimit: 16},
+		},
+		Executables: []ExecutableDefinition{{ID: "uname", Path: "/usr/bin/uname", AllowedProfiles: []RunnerProfile{ProfileDiagnostics}}},
+		Operations:  []OperationDefinition{validOperation()},
+		Roles:       []RoleDefinition{{Name: "viewer"}},
+		Policies:    []PolicyDefinition{{Role: "viewer", Operations: []string{"system_info"}}},
 	}
 }
 
-// TEST-CONFIG-001
-// Requirement: REQ-003 (AC-1)
-// Scenario: a well-formed config with no cross-references must pass.
-func TestValidateConfig_ValidMinimalConfig_Passes(t *testing.T) {
-	cfg := &Config{
-		Operations: []OperationDefinition{validOperation()},
-		Roles:      []RoleDefinition{{Name: "viewer"}},
-		Policies:   []PolicyDefinition{{Role: "viewer", Operations: []string{"system_info"}}},
+func requireInvalid(t *testing.T, cfg *Config, contains string) {
+	t.Helper()
+	err := ValidateConfig(cfg)
+	if err == nil || !strings.Contains(err.Error(), contains) {
+		t.Fatalf("ValidateConfig() = %v, want error containing %q", err, contains)
 	}
+}
 
-	if err := ValidateConfig(cfg); err != nil {
-		t.Fatalf("expected valid config to pass, got error: %v", err)
+// TEST-CONFIG-001 / TEST-ISOLATION-001
+func TestValidateConfig_ValidProfileMappedConfigPasses(t *testing.T) {
+	if err := ValidateConfig(validConfig()); err != nil {
+		t.Fatal(err)
 	}
 }
 
 // TEST-CONFIG-002
-// Requirement: REQ-003 (AC-2)
-// Scenario: two operations with the same name must be rejected.
-func TestValidateConfig_DuplicateOperationName_Rejected(t *testing.T) {
-	cfg := &Config{
-		Operations: []OperationDefinition{validOperation(), validOperation()},
-	}
+func TestValidateConfig_DuplicateOperationNameRejected(t *testing.T) {
+	cfg := validConfig()
+	cfg.Operations = append(cfg.Operations, validOperation())
+	requireInvalid(t, cfg, "duplicate operation")
+}
 
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for duplicate operation name, got nil")
+// TEST-CONFIG-003 / TEST-ISOLATION-001
+func TestValidateConfig_MissingOrConflictingProfileMappingRejected(t *testing.T) {
+	for _, name := range []string{"missing profile", "unknown profile", "kind conflict"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			switch name {
+			case "missing profile":
+				cfg.Operations[0].RunnerProfile = ""
+			case "unknown profile":
+				cfg.Operations[0].RunnerProfile = "ghost"
+			case "kind conflict":
+				cfg.Operations[0].ExecutorKind = ExecutorSystemd
+			}
+			requireInvalid(t, cfg, "operation")
+		})
 	}
 }
 
-// TEST-CONFIG-003
-// Requirement: REQ-003 (AC-3)
-// Scenario: an operation with an empty command must be rejected, since
-// Translation (M6) would have nothing to map the operation to.
-func TestValidateConfig_OperationWithEmptyCommand_Rejected(t *testing.T) {
-	cfg := &Config{
-		Operations: []OperationDefinition{{Name: "broken"}},
-	}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for operation with empty command, got nil")
-	}
-}
-
-// TEST-CONFIG-004
-// Scenario: two roles with the same name must be rejected.
-func TestValidateConfig_DuplicateRoleName_Rejected(t *testing.T) {
-	cfg := &Config{
-		Roles: []RoleDefinition{{Name: "viewer"}, {Name: "viewer"}},
-	}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for duplicate role name, got nil")
+// TEST-CONFIG-004 through TEST-CONFIG-006
+func TestValidateConfig_ReferentialIntegrityRejected(t *testing.T) {
+	for _, name := range []string{"duplicate role", "unknown role", "unknown operation"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			switch name {
+			case "duplicate role":
+				cfg.Roles = append(cfg.Roles, cfg.Roles[0])
+			case "unknown role":
+				cfg.Policies[0].Role = "ghost"
+			case "unknown operation":
+				cfg.Policies[0].Operations[0] = "ghost"
+			}
+			requireInvalid(t, cfg, "role")
+		})
 	}
 }
 
-// TEST-CONFIG-005
-// Requirement: REQ-003 (AC-4)
-// Scenario: a policy referencing a role that does not exist must be
-// rejected, so a typo in roles.json never silently grants zero access
-// instead of failing loudly.
-func TestValidateConfig_PolicyReferencesUnknownRole_Rejected(t *testing.T) {
-	cfg := &Config{
-		Operations: []OperationDefinition{validOperation()},
-		Roles:      []RoleDefinition{{Name: "viewer"}},
-		Policies:   []PolicyDefinition{{Role: "ghost_role", Operations: []string{"system_info"}}},
-	}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for policy referencing unknown role, got nil")
-	}
-}
-
-// TEST-CONFIG-006
-// Requirement: REQ-003 (AC-5)
-// Scenario: a policy referencing an operation that does not exist must be
-// rejected.
-func TestValidateConfig_PolicyReferencesUnknownOperation_Rejected(t *testing.T) {
-	cfg := &Config{
-		Roles:    []RoleDefinition{{Name: "viewer"}},
-		Policies: []PolicyDefinition{{Role: "viewer", Operations: []string{"ghost_operation"}}},
-	}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for policy referencing unknown operation, got nil")
+// TEST-CONFIG-007 through TEST-CONFIG-010
+func TestValidateConfig_ParameterDefinitionsRejected(t *testing.T) {
+	for _, name := range []string{"int pattern", "min max", "string range", "unknown type"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			var parameter ParameterDefinition
+			switch name {
+			case "int pattern":
+				parameter = ParameterDefinition{Name: "port", Type: ParamTypeInt, Pattern: "x"}
+			case "min max":
+				parameter = ParameterDefinition{Name: "port", Type: ParamTypeInt, Min: intPtr(2), Max: intPtr(1)}
+			case "string range":
+				parameter = ParameterDefinition{Name: "host", Type: ParamTypeString, Min: intPtr(1)}
+			case "unknown type":
+				parameter = ParameterDefinition{Name: "value", Type: "float"}
+			}
+			cfg.Operations[0].Parameters = []ParameterDefinition{parameter}
+			requireInvalid(t, cfg, "parameter")
+		})
 	}
 }
 
-// TEST-CONFIG-007
-// Requirement: REQ-003 (AC-6)
-// Scenario: an int parameter must not have a regex Pattern set — mixing
-// constraints from two different types signals a config authoring mistake.
-func TestValidateConfig_IntParameterWithPattern_Rejected(t *testing.T) {
-	op := validOperation()
-	op.Parameters = []ParameterDefinition{{Name: "port", Type: ParamTypeInt, Pattern: "^[0-9]+$"}}
-	cfg := &Config{Operations: []OperationDefinition{op}}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for int parameter with pattern set, got nil")
+// TEST-ISOLATION-002, TEST-ISOLATION-005
+func TestValidateConfig_ProfileSecurityContractRejected(t *testing.T) {
+	for _, name := range []string{"duplicate", "kind", "socket", "user", "memory", "process", "capability", "sys admin"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			switch name {
+			case "duplicate":
+				cfg.Profiles = append(cfg.Profiles, cfg.Profiles[0])
+			case "kind":
+				cfg.Profiles[0].ExecutorKind = "shell"
+			case "socket":
+				cfg.Profiles[0].SocketPath = "relative.sock"
+			case "user":
+				cfg.Profiles[0].RunAsUser = ""
+			case "memory":
+				cfg.Profiles[0].MemoryLimitMiB = 0
+			case "process":
+				cfg.Profiles[0].ProcessLimit = 0
+			case "capability":
+				cfg.Profiles[0].Capabilities = []string{"CAP_NET_RAW", "CAP_NET_RAW"}
+			case "sys admin":
+				cfg.Profiles[0].Capabilities = []string{"CAP_SYS_ADMIN"}
+			}
+			requireInvalid(t, cfg, "profile")
+		})
 	}
 }
 
-// TEST-CONFIG-008
-// Scenario: min must not be greater than max for an int parameter.
-func TestValidateConfig_MinGreaterThanMax_Rejected(t *testing.T) {
-	op := validOperation()
-	op.Parameters = []ParameterDefinition{{Name: "port", Type: ParamTypeInt, Min: intPtr(100), Max: intPtr(1)}}
-	cfg := &Config{Operations: []OperationDefinition{op}}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for min > max, got nil")
+// TEST-ISOLATION-007, TEST-ISOLATION-008
+func TestValidateConfig_TypedBackendsRejectFreeFormConfiguration(t *testing.T) {
+	for _, name := range []string{"unknown executable", "cross profile executable", "systemd executable", "systemd arguments", "systemd parameters", "bad unit", "bad action"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			switch name {
+			case "unknown executable":
+				cfg.Operations[0].ExecutableRef = "shell"
+			case "cross profile executable":
+				cfg.Operations[0].RunnerProfile = ProfileNetworkObserver
+			case "systemd executable", "systemd arguments", "systemd parameters", "bad unit", "bad action":
+				cfg.Operations[0] = OperationDefinition{Name: "restart_demo", RunnerProfile: ProfileServiceManager, ExecutorKind: ExecutorSystemd, Systemd: &SystemdOperationDefinition{Unit: "demo.service", Action: "restart"}}
+				cfg.Policies[0].Operations[0] = "restart_demo"
+				if name == "systemd executable" {
+					cfg.Operations[0].ExecutableRef = "uname"
+				}
+				if name == "systemd arguments" {
+					cfg.Operations[0].ArgsTemplate = []string{"--all"}
+				}
+				if name == "systemd parameters" {
+					cfg.Operations[0].Parameters = []ParameterDefinition{{Name: "unit", Type: ParamTypeString}}
+				}
+				if name == "bad unit" {
+					cfg.Operations[0].Systemd.Unit = "../../demo"
+				}
+				if name == "bad action" {
+					cfg.Operations[0].Systemd.Action = "enable"
+				}
+			}
+			requireInvalid(t, cfg, "operation")
+		})
 	}
 }
 
-// TEST-CONFIG-009
-// Scenario: a string parameter must not have Min/Max set.
-func TestValidateConfig_StringParameterWithMinMax_Rejected(t *testing.T) {
-	op := validOperation()
-	op.Parameters = []ParameterDefinition{{Name: "host", Type: ParamTypeString, Min: intPtr(1)}}
-	cfg := &Config{Operations: []OperationDefinition{op}}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for string parameter with min/max set, got nil")
-	}
-}
-
-// TEST-CONFIG-010
-// Scenario: an unrecognized parameter type must be rejected outright,
-// rather than silently treated as unconstrained.
-func TestValidateConfig_UnknownParameterType_Rejected(t *testing.T) {
-	op := validOperation()
-	op.Parameters = []ParameterDefinition{{Name: "weird", Type: "float"}}
-	cfg := &Config{Operations: []OperationDefinition{op}}
-
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected error for unknown parameter type, got nil")
+func TestValidateConfig_ExecutableRegistryRejected(t *testing.T) {
+	for _, name := range []string{"duplicate", "relative path", "no profiles", "unknown profile"} {
+		t.Run(name, func(t *testing.T) {
+			cfg := validConfig()
+			switch name {
+			case "duplicate":
+				cfg.Executables = append(cfg.Executables, cfg.Executables[0])
+			case "relative path":
+				cfg.Executables[0].Path = "uname"
+			case "no profiles":
+				cfg.Executables[0].AllowedProfiles = nil
+			case "unknown profile":
+				cfg.Executables[0].AllowedProfiles = []RunnerProfile{"ghost"}
+			}
+			requireInvalid(t, cfg, "executable")
+		})
 	}
 }

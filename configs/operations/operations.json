@@ -2,7 +2,9 @@
   {
     "name": "system_info",
     "description": "Show basic host information (hostname, kernel, OS).",
-    "command": "uname",
+    "runner_profile": "diagnostics",
+    "executor_kind": "process",
+    "executable_ref": "uname",
     "args_template": ["-a"],
     "parameters": [],
     "long_running": false
@@ -10,7 +12,9 @@
   {
     "name": "trace",
     "description": "Capture network traffic for a specific host and port. Long-running; streamed to the caller.",
-    "command": "tcpdump",
+    "runner_profile": "network-observer",
+    "executor_kind": "process",
+    "executable_ref": "tcpdump",
     "args_template": ["-i", "any", "port", "{port}", "and", "host", "{host}"],
     "parameters": [
       { "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 },

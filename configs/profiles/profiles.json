@@ -1,0 +1,29 @@
+[
+  {
+    "name": "diagnostics",
+    "executor_kind": "process",
+    "socket_path": "/run/safeterm-diagnostics/runner.sock",
+    "run_as_user": "safeterm-diagnostics",
+    "capabilities": [],
+    "memory_limit_mib": 128,
+    "process_limit": 32
+  },
+  {
+    "name": "network-observer",
+    "executor_kind": "process",
+    "socket_path": "/run/safeterm-network/runner.sock",
+    "run_as_user": "safeterm-network",
+    "capabilities": ["CAP_NET_RAW"],
+    "memory_limit_mib": 256,
+    "process_limit": 32
+  },
+  {
+    "name": "service-manager",
+    "executor_kind": "systemd",
+    "socket_path": "/run/safeterm-service-manager/runner.sock",
+    "run_as_user": "safeterm-service-manager",
+    "capabilities": [],
+    "memory_limit_mib": 128,
+    "process_limit": 16
+  }
+]

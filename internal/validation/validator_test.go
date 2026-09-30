@@ -14,18 +14,25 @@ import (
 func traceTestConfig() *config.Config {
 	minPort, maxPort := 1, 65535
 	return &config.Config{
+		Version: "test-v1",
+		Profiles: []config.ProfileDefinition{
+			{Name: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/network.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8},
+			{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/diagnostics.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8},
+		},
+		Executables: []config.ExecutableDefinition{
+			{ID: "tcpdump", Path: "/usr/bin/tcpdump", AllowedProfiles: []config.RunnerProfile{config.ProfileNetworkObserver}},
+			{ID: "uname", Path: "/usr/bin/uname", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}},
+		},
 		Operations: []config.OperationDefinition{
 			{
-				Name:    "trace",
-				Command: "tcpdump",
+				Name: "trace", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump",
 				Parameters: []config.ParameterDefinition{
 					{Name: "port", Type: config.ParamTypeInt, Required: true, Min: &minPort, Max: &maxPort},
 					{Name: "host", Type: config.ParamTypeString, Required: true, Pattern: `^[0-9]{1,3}(\.[0-9]{1,3}){3}$`},
 				},
 			},
 			{
-				Name:    "system_info",
-				Command: "uname",
+				Name: "system_info", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname",
 			},
 		},
 	}

@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M7 — Command Runner (implemented and verified locally; pending review and release)**
+**Milestone: M8 — Capability-Isolated Runtime (implemented and verified locally; pending review and release)**
 
 Available capabilities:
 
@@ -13,17 +13,19 @@ Available capabilities:
 - Authorization of claimed roles with the real Policy implementation and M5 integration tests
 - Translation of operations into fixed config commands and separate arguments, without constructing shell strings
 - Bounded process execution with separate argv elements, independent stdout/stderr capture, and exit-code reporting
+- Independently deployable Gateway and capability-isolated Runner services with authenticated Unix IPC
+- Declarative profile/executor mappings, an executable registry, atomic catalog snapshots, and typed systemd operations
 
 Policy does not authenticate users; `ClaimedRoles` remains an unverified claim (ADR-006).
-The real Translation and Execution stages are implemented through M7. The
-`cmd/agent` entry point remains a bootstrap program because no real Broker exists yet;
-integration tests prove the full M3–M7 pipeline using a controlled subprocess.
-M7 evidence is recorded in [evidence/M7](evidence/M7/README.md).
+The Agent Core pipeline and capability-isolated host runtime are implemented
+through M8. The remote Broker and authenticated user identity arrive in M12;
+the current Node Gateway accepts only authenticated local IPC. M8 evidence is
+recorded in [evidence/M8](evidence/M8/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
 ```text
-command: tcpdump
+command: /usr/bin/tcpdump
 args: ["-i", "any", "port", "999", "and", "host", "192.168.10.20"]
 ```
 
@@ -79,7 +81,7 @@ SafeTerm Verification: PASS
 
 ```text
 safeterm/
-├── cmd/            Executable entry points (agent, broker, ...)
+├── cmd/            Executable entry points (gateway, runner, ...)
 ├── internal/       Internal logic (config, validation, policy, ...)
 ├── configs/        Configuration files (operations, roles, policies)
 ├── tests/          Integration, security, and end-to-end tests
@@ -110,8 +112,8 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M4 | Validation Engine | ✅ Tagged: v0.5.0-m4 |
 | M5 | Policy Engine | ✅ Tagged: v0.6.0-m5 |
 | M6 | Translation Layer | ✅ Tagged: v0.7.0-m6 |
-| M7 | Command Runner | 🔄 Verified locally; pending review/release |
-| M8 | Capability-Isolated Runtime | ⏳ Planned: REQ-008 / ADR-009 |
+| M7 | Command Runner | ✅ Tagged: v0.8.0-m7 |
+| M8 | Capability-Isolated Runtime | 🔄 Verified locally; pending review/release |
 | M9 | Audit Service | ⏳ Planned |
 | M10 | Integrity Verification | ⏳ Planned |
 | M11 | Streaming | ⏳ Planned |

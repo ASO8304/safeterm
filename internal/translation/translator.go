@@ -37,6 +37,10 @@ func New(cfg *config.Config) (*Translator, error) {
 		return nil, fmt.Errorf("translation: invalid configuration: %w", err)
 	}
 	ops := make(map[string]operation, len(cfg.Operations))
+	executablePaths := make(map[string]string, len(cfg.Executables))
+	for _, executable := range cfg.Executables {
+		executablePaths[executable.ID] = executable.Path
+	}
 	for _, op := range cfg.Operations {
 		defined := make(map[string]bool, len(op.Parameters))
 		for _, p := range op.Parameters {
@@ -44,6 +48,10 @@ func New(cfg *config.Config) (*Translator, error) {
 				return nil, fmt.Errorf("translation: operation %q: duplicate parameter %q", op.Name, p.Name)
 			}
 			defined[p.Name] = true
+		}
+		if op.ExecutorKind == config.ExecutorSystemd {
+			ops[op.Name] = operation{command: op.Systemd.Unit, args: []argument{{literal: op.Systemd.Action}}}
+			continue
 		}
 		args := make([]argument, len(op.ArgsTemplate))
 		for i, token := range op.ArgsTemplate {
@@ -60,7 +68,7 @@ func New(cfg *config.Config) (*Translator, error) {
 			}
 			args[i].parameter = name
 		}
-		ops[op.Name] = operation{command: op.Command, args: args}
+		ops[op.Name] = operation{command: executablePaths[op.ExecutableRef], args: args}
 	}
 	return &Translator{operations: ops}, nil
 }

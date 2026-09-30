@@ -18,9 +18,26 @@ import (
 // deliberate — adding a new operation should mean "drop a new JSON file
 // into configs/operations/", not "edit one giant file" (see REQ-003).
 func LoadConfig(baseDir string) (*Config, error) {
+	metadata, err := loadJSONObject[struct {
+		Version string `json:"version"`
+	}](filepath.Join(baseDir, "catalog.json"))
+	if err != nil {
+		return nil, fmt.Errorf("config: loading catalog metadata: %w", err)
+	}
+
 	operations, err := loadJSONArrayFiles[OperationDefinition](filepath.Join(baseDir, "operations"))
 	if err != nil {
 		return nil, fmt.Errorf("config: loading operations: %w", err)
+	}
+
+	executables, err := loadJSONArrayFiles[ExecutableDefinition](filepath.Join(baseDir, "executables"))
+	if err != nil {
+		return nil, fmt.Errorf("config: loading executables: %w", err)
+	}
+
+	profiles, err := loadJSONArrayFiles[ProfileDefinition](filepath.Join(baseDir, "profiles"))
+	if err != nil {
+		return nil, fmt.Errorf("config: loading profiles: %w", err)
 	}
 
 	roles, err := loadJSONArrayFiles[RoleDefinition](filepath.Join(baseDir, "roles"))
@@ -34,9 +51,12 @@ func LoadConfig(baseDir string) (*Config, error) {
 	}
 
 	cfg := &Config{
-		Operations: operations,
-		Roles:      roles,
-		Policies:   policies,
+		Version:     metadata.Version,
+		Operations:  operations,
+		Executables: executables,
+		Profiles:    profiles,
+		Roles:       roles,
+		Policies:    policies,
 	}
 
 	if err := ValidateConfig(cfg); err != nil {
@@ -44,6 +64,18 @@ func LoadConfig(baseDir string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func loadJSONObject[T any](path string) (T, error) {
+	var item T
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return item, fmt.Errorf("reading %s: %w", path, err)
+	}
+	if err := json.Unmarshal(data, &item); err != nil {
+		return item, fmt.Errorf("parsing %s: %w", path, err)
+	}
+	return item, nil
 }
 
 // loadJSONArrayFiles reads every *.json file in dir, unmarshals each one as

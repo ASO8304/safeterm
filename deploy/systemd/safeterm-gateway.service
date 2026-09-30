@@ -1,0 +1,27 @@
+[Unit]
+Description=SafeTerm unprivileged node gateway
+After=safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service
+
+[Service]
+Type=simple
+User=safeterm-gateway
+Group=safeterm-gateway
+RuntimeDirectory=safeterm-gateway
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/bin/safeterm-gateway --config /etc/safeterm
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target
