@@ -67,17 +67,19 @@ type SystemdOperationDefinition struct {
 type ExecutableDefinition struct {
 	ID              string          `json:"id"`
 	Path            string          `json:"path"`
+	SHA256          string          `json:"sha256"`
 	AllowedProfiles []RunnerProfile `json:"allowed_profiles"`
 }
 
 type ProfileDefinition struct {
-	Name           RunnerProfile `json:"name"`
-	ExecutorKind   ExecutorKind  `json:"executor_kind"`
-	SocketPath     string        `json:"socket_path"`
-	RunAsUser      string        `json:"run_as_user"`
-	Capabilities   []string      `json:"capabilities"`
-	MemoryLimitMiB int           `json:"memory_limit_mib"`
-	ProcessLimit   int           `json:"process_limit"`
+	Name                    RunnerProfile `json:"name"`
+	ExecutorKind            ExecutorKind  `json:"executor_kind"`
+	ControllerExecutableRef string        `json:"controller_executable_ref,omitempty"`
+	SocketPath              string        `json:"socket_path"`
+	RunAsUser               string        `json:"run_as_user"`
+	Capabilities            []string      `json:"capabilities"`
+	MemoryLimitMiB          int           `json:"memory_limit_mib"`
+	ProcessLimit            int           `json:"process_limit"`
 }
 
 // RoleDefinition describes one role that can be granted to a user.

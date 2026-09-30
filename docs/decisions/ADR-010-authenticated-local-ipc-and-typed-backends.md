@@ -23,7 +23,7 @@ without turning `systemctl` arguments into caller-controlled command input.
 - A Runner uses `ProfileHandler` as a final local allowlist before Agent Core.
   Upstream routing success is never treated as authorization for another profile.
 - Process operations resolve a catalog `executable_ref` to an absolute path.
-  M10 will verify canonical path and file hash immediately before execution.
+  ADR-012/M10 verifies its canonical path and file hash immediately before execution.
 - Service operations compile to an exact unit/action pair. `SystemdExecutor`
   checks that pair against its catalog snapshot before invoking its controller.
   The initial Linux controller executes a fixed absolute `systemctl` adapter
@@ -58,5 +58,6 @@ without turning `systemctl` arguments into caller-controlled command input.
   bounded streaming protocol.
 - Deployments must provision separate users and a narrow OS authorization rule
   before activating service-manager operations.
-- The systemctl adapter is not executable integrity. M10 must verify its path
-  and every process executable before execution.
+- ADR-012 completes executable integrity in M10: the systemctl adapter and
+  every process executable are canonicalized, hash-verified, and descriptor-
+  pinned immediately before execution.

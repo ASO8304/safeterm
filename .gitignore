@@ -15,3 +15,5 @@ Thumbs.db
 # Local env files (never commit secrets)
 .env
 *.local
+catalog-signing.key
+*.private-key

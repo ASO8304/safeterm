@@ -17,7 +17,7 @@ func tokenConfig(tokens ...string) *config.Config {
 	return &config.Config{
 		Version:     "test-v1",
 		Profiles:    []config.ProfileDefinition{{Name: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/test.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8}},
-		Executables: []config.ExecutableDefinition{{ID: "example", Path: "/usr/bin/example", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}}},
+		Executables: []config.ExecutableDefinition{{ID: "example", Path: "/usr/bin/example", SHA256: "0000000000000000000000000000000000000000000000000000000000000000", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}}},
 		Operations: []config.OperationDefinition{{
 			Name: "example", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "example",
 			ArgsTemplate: tokens,

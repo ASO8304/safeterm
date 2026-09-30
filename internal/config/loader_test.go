@@ -29,7 +29,7 @@ func writeConfigDir(t *testing.T, operationsJSON, rolesJSON, policiesJSON string
 	}
 
 	write("operations", "operations.json", operationsJSON)
-	write("executables", "executables.json", `[{"id":"uname","path":"/usr/bin/uname","allowed_profiles":["diagnostics"]},{"id":"tcpdump","path":"/usr/bin/tcpdump","allowed_profiles":["network-observer"]}]`)
+	write("executables", "executables.json", `[{"id":"uname","path":"/usr/bin/uname","sha256":"0000000000000000000000000000000000000000000000000000000000000000","allowed_profiles":["diagnostics"]},{"id":"tcpdump","path":"/usr/bin/tcpdump","sha256":"0000000000000000000000000000000000000000000000000000000000000000","allowed_profiles":["network-observer"]}]`)
 	write("profiles", "profiles.json", `[{"name":"diagnostics","executor_kind":"process","socket_path":"/run/safeterm/diagnostics.sock","run_as_user":"safeterm-diagnostics","capabilities":[],"memory_limit_mib":128,"process_limit":32},{"name":"network-observer","executor_kind":"process","socket_path":"/run/safeterm/network.sock","run_as_user":"safeterm-network","capabilities":["CAP_NET_RAW"],"memory_limit_mib":256,"process_limit":32}]`)
 	write("roles", "roles.json", rolesJSON)
 	write("policies", "policies.json", policiesJSON)
@@ -137,7 +137,7 @@ func TestLoadConfig_MultipleFilesInSameFolder_AreMerged(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	writeArray("executables", `[{"id":"uname","path":"/usr/bin/uname","allowed_profiles":["diagnostics"]},{"id":"tcpdump","path":"/usr/bin/tcpdump","allowed_profiles":["network-observer"]}]`)
+	writeArray("executables", `[{"id":"uname","path":"/usr/bin/uname","sha256":"0000000000000000000000000000000000000000000000000000000000000000","allowed_profiles":["diagnostics"]},{"id":"tcpdump","path":"/usr/bin/tcpdump","sha256":"0000000000000000000000000000000000000000000000000000000000000000","allowed_profiles":["network-observer"]}]`)
 	writeArray("profiles", `[{"name":"diagnostics","executor_kind":"process","socket_path":"/run/safeterm/diagnostics.sock","run_as_user":"safeterm-diagnostics","memory_limit_mib":128,"process_limit":32},{"name":"network-observer","executor_kind":"process","socket_path":"/run/safeterm/network.sock","run_as_user":"safeterm-network","memory_limit_mib":128,"process_limit":32}]`)
 	if err := os.WriteFile(filepath.Join(base, "catalog.json"), []byte(`{"version":"test-v1"}`), 0o644); err != nil {
 		t.Fatal(err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"safeterm/internal/agent"
 	"safeterm/internal/config"
 )
 
@@ -57,11 +58,11 @@ func (e *SystemdExecutor) Execute(ctx context.Context, unit string, args []strin
 // SystemctlController is a Linux adapter for the typed backend. The executable
 // and argv shape are fixed here; untrusted values never select flags or a shell.
 type SystemctlController struct {
-	runner *Runner
+	runner agent.Executor
 	path   string
 }
 
-func NewSystemctlController(path string, timeoutRunner *Runner) (*SystemctlController, error) {
+func NewSystemctlController(path string, timeoutRunner agent.Executor) (*SystemctlController, error) {
 	if !filepath.IsAbs(path) || timeoutRunner == nil {
 		return nil, fmt.Errorf("execution: systemctl path and runner are required")
 	}

@@ -1,6 +1,6 @@
 # Linux systemd deployment
 
-M9 ships an independent append-only Audit Service alongside one unprivileged
+M10 ships an independent append-only Audit Service alongside one unprivileged
 Node Gateway and three capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
 different users with separate runtime directories, sockets, catalogs, resource
@@ -33,8 +33,19 @@ retained chain. The hash chain is corruption evidence, not a digital signature
 or an external checkpoint against complete-file replacement or tail truncation.
 
 Install the binaries as `/usr/local/bin/safeterm-gateway`,
-`/usr/local/bin/safeterm-runner`, and `/usr/local/bin/safeterm-audit`; install the catalog read-only at
-`/etc/safeterm`, and copy the unit files to `/etc/systemd/system`.
+`/usr/local/bin/safeterm-runner`, `/usr/local/bin/safeterm-audit`, and keep
+`catalog-sign` only on an offline administration host. Install the catalog,
+`catalog.sig`, and the separately provisioned public key at
+`/etc/safeterm/trust/catalog-ed25519.pub` read-only, then copy the unit files to
+`/etc/systemd/system`.
+
+Before deployment, calculate SHA-256 for the exact target-host binaries,
+update every executable registry entry, and sign the complete catalog with the
+deployment's offline Ed25519 private key. Gateway and every Runner fail startup
+when the signature is absent or invalid. Runners also verify canonical path,
+file mode, native ELF type, and SHA-256 immediately before each process, then
+execute the held `/proc/self/fd` descriptor. Keep executable mounts read-only;
+the supplied Runner units enforce this with `ProtectSystem=strict`.
 
 The shipped service-manager catalog contains no active operation and its unit
 has no Linux capability. Before adding service operations, deployment tooling
@@ -42,5 +53,5 @@ must install an OS policy that grants `safeterm-service-manager` only the exact
 systemd units and actions present in the approved catalog. Never grant this
 account unrestricted `sudo` or general systemd management authority.
 
-M10 adds executable hash and canonical-path verification. M12 adds the remote
-Broker, authenticated identity, and catalog proposal/approval workflow.
+M11 adds bounded streaming. M12 adds the remote Broker, authenticated identity,
+and catalog proposal/approval workflow.

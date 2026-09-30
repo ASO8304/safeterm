@@ -82,12 +82,30 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-AUDIT-006 | REQ-009 (AC-8) | internal/isolation | Unit | PASS |
 | TEST-AUDIT-007 | REQ-009 (AC-4, AC-9) | deploy/systemd, tests/integration | Integration | PASS |
 | TEST-AUDIT-008 | REQ-009 (AC-5, AC-7) | internal/audit | Unit | PASS |
+| TEST-INTEGRITY-001 | REQ-010 (AC-4, AC-5) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-002 | REQ-010 (AC-3) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-003 | REQ-010 (AC-4, AC-6) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-004 | REQ-010 (AC-5) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-005 | REQ-010 (AC-5) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-006 | REQ-010 (AC-4, AC-6) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-007 | REQ-010 (AC-4, AC-6, AC-12) | tests/integration | Integration | PASS |
+| TEST-INTEGRITY-008 | REQ-010 (AC-6, AC-12) | tests/integration | Integration | PASS |
+| TEST-INTEGRITY-009 | REQ-010 (AC-2, AC-9) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-010 | REQ-010 (AC-9) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-011 | REQ-010 (AC-2) | internal/integrity | Unit | PASS |
+| TEST-INTEGRITY-012 | REQ-010 (AC-11) | internal/integrity | Integration | PASS |
+| TEST-INTEGRITY-013 | REQ-010 (AC-7) | internal/integrity, internal/execution | Unit | PASS |
+| TEST-INTEGRITY-014 | REQ-010 (AC-2, AC-13) | internal/isolation | Unit | PASS |
+| TEST-INTEGRITY-015 | REQ-010 (AC-10) | cmd/catalog-sign | Unit | PASS |
+| TEST-INTEGRITY-016 | REQ-010 (AC-1) | internal/config | Unit | PASS |
+| TEST-INTEGRITY-017 | REQ-010 (AC-8) | internal/isolation | Unit | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
 Local M7 evidence: [complete make verify output](../../evidence/M7/make-verify.log).
 Local M8 evidence: [complete make verify output](../../evidence/M8/make-verify.log).
 Local M9 evidence: [complete make verify output](../../evidence/M9/make-verify.log).
+Local M10 evidence: [complete make verify output](../../evidence/M10/make-verify.log).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

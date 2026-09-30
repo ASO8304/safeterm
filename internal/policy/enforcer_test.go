@@ -20,8 +20,8 @@ func testPolicyConfig() *config.Config {
 			{Name: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, SocketPath: "/run/safeterm/network.sock", RunAsUser: "test", MemoryLimitMiB: 64, ProcessLimit: 8},
 		},
 		Executables: []config.ExecutableDefinition{
-			{ID: "uname", Path: "/usr/bin/uname", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}},
-			{ID: "tcpdump", Path: "/usr/bin/tcpdump", AllowedProfiles: []config.RunnerProfile{config.ProfileNetworkObserver}},
+			{ID: "uname", Path: "/usr/bin/uname", SHA256: "0000000000000000000000000000000000000000000000000000000000000000", AllowedProfiles: []config.RunnerProfile{config.ProfileDiagnostics}},
+			{ID: "tcpdump", Path: "/usr/bin/tcpdump", SHA256: "0000000000000000000000000000000000000000000000000000000000000000", AllowedProfiles: []config.RunnerProfile{config.ProfileNetworkObserver}},
 		},
 		Operations: []config.OperationDefinition{
 			{Name: "system_info", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname"},

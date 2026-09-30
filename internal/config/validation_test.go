@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+const testSHA256 = "0000000000000000000000000000000000000000000000000000000000000000"
+
 func intPtr(v int) *int { return &v }
 
 func validOperation() OperationDefinition {
@@ -17,12 +19,15 @@ func validConfig() *Config {
 		Profiles: []ProfileDefinition{
 			{Name: ProfileDiagnostics, ExecutorKind: ExecutorProcess, SocketPath: "/run/safeterm/diagnostics.sock", RunAsUser: "safeterm-diagnostics", MemoryLimitMiB: 128, ProcessLimit: 32},
 			{Name: ProfileNetworkObserver, ExecutorKind: ExecutorProcess, SocketPath: "/run/safeterm/network.sock", RunAsUser: "safeterm-network", Capabilities: []string{"CAP_NET_RAW"}, MemoryLimitMiB: 256, ProcessLimit: 32},
-			{Name: ProfileServiceManager, ExecutorKind: ExecutorSystemd, SocketPath: "/run/safeterm/service.sock", RunAsUser: "safeterm-service", MemoryLimitMiB: 128, ProcessLimit: 16},
+			{Name: ProfileServiceManager, ExecutorKind: ExecutorSystemd, ControllerExecutableRef: "systemctl", SocketPath: "/run/safeterm/service.sock", RunAsUser: "safeterm-service", MemoryLimitMiB: 128, ProcessLimit: 16},
 		},
-		Executables: []ExecutableDefinition{{ID: "uname", Path: "/usr/bin/uname", AllowedProfiles: []RunnerProfile{ProfileDiagnostics}}},
-		Operations:  []OperationDefinition{validOperation()},
-		Roles:       []RoleDefinition{{Name: "viewer"}},
-		Policies:    []PolicyDefinition{{Role: "viewer", Operations: []string{"system_info"}}},
+		Executables: []ExecutableDefinition{
+			{ID: "uname", Path: "/usr/bin/uname", SHA256: testSHA256, AllowedProfiles: []RunnerProfile{ProfileDiagnostics}},
+			{ID: "systemctl", Path: "/usr/bin/systemctl", SHA256: testSHA256, AllowedProfiles: []RunnerProfile{ProfileServiceManager}},
+		},
+		Operations: []OperationDefinition{validOperation()},
+		Roles:      []RoleDefinition{{Name: "viewer"}},
+		Policies:   []PolicyDefinition{{Role: "viewer", Operations: []string{"system_info"}}},
 	}
 }
 
@@ -168,8 +173,9 @@ func TestValidateConfig_TypedBackendsRejectFreeFormConfiguration(t *testing.T) {
 	}
 }
 
+// TEST-INTEGRITY-016
 func TestValidateConfig_ExecutableRegistryRejected(t *testing.T) {
-	for _, name := range []string{"duplicate", "relative path", "no profiles", "unknown profile"} {
+	for _, name := range []string{"duplicate", "relative path", "unclean path", "duplicate path", "missing digest", "uppercase digest", "no profiles", "unknown profile", "missing controller", "cross profile controller"} {
 		t.Run(name, func(t *testing.T) {
 			cfg := validConfig()
 			switch name {
@@ -177,10 +183,22 @@ func TestValidateConfig_ExecutableRegistryRejected(t *testing.T) {
 				cfg.Executables = append(cfg.Executables, cfg.Executables[0])
 			case "relative path":
 				cfg.Executables[0].Path = "uname"
+			case "unclean path":
+				cfg.Executables[0].Path = "/usr/bin/../bin/uname"
+			case "duplicate path":
+				cfg.Executables[1].Path = cfg.Executables[0].Path
+			case "missing digest":
+				cfg.Executables[0].SHA256 = ""
+			case "uppercase digest":
+				cfg.Executables[0].SHA256 = strings.ToUpper(testSHA256[:63] + "a")
 			case "no profiles":
 				cfg.Executables[0].AllowedProfiles = nil
 			case "unknown profile":
 				cfg.Executables[0].AllowedProfiles = []RunnerProfile{"ghost"}
+			case "missing controller":
+				cfg.Profiles[2].ControllerExecutableRef = ""
+			case "cross profile controller":
+				cfg.Profiles[2].ControllerExecutableRef = "uname"
 			}
 			requireInvalid(t, cfg, "executable")
 		})

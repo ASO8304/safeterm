@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M9 — Audit Service (complete; tagged v0.10.0-m9)**
+**Milestone: M10 — Integrity Verification (complete; tagged v0.11.0-m10)**
 
 Available capabilities:
 
@@ -17,12 +17,17 @@ Available capabilities:
 - Declarative profile/executor mappings, an executable registry, atomic catalog snapshots, and typed systemd operations
 - An independent, unprivileged Audit Service with authenticated local IPC,
   synchronous durable acknowledgement, sanitized events, and hash-linked JSONL storage
+- Detached Ed25519 verification for active catalogs and profile-scoped SHA-256
+  verification of native executables immediately before every execution
+- Canonical-path and symlink-change detection with execution pinned to an open
+  Linux `/proc/self/fd` descriptor, including the typed systemctl controller
 
 Policy does not authenticate users; `ClaimedRoles` remains an unverified claim (ADR-006).
-The Agent Core pipeline, capability-isolated host runtime, and local Audit
-Service are implemented through M9. The remote Broker and authenticated user
-identity arrive in M12; the current Node Gateway accepts only authenticated
-local IPC. M9 evidence is recorded in [evidence/M9](evidence/M9/README.md).
+The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
+and runtime integrity boundary are implemented through M10. The remote Broker
+and authenticated user identity arrive in M12; the current Node Gateway accepts
+only authenticated local IPC. M10 evidence is recorded in
+[evidence/M10](evidence/M10/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -70,6 +75,30 @@ Users invoke approved operations, not raw command lines. Authorized catalog
 editors may propose declarative operations that reference an approved executor,
 profile, and tokenized argument template. Activation is a separate authorized
 step. New executables or wider privileges require stronger security approval.
+
+Gateway and Runner accept only a catalog with a valid detached Ed25519
+signature. Every registered executable includes the SHA-256 digest of the
+exact target-host binary. Runner resolves and verifies that file at startup and
+again immediately before execution, then executes the held file descriptor.
+The shipped key/signature pair is development evidence; deployments generate
+and protect their own offline signing key:
+
+```bash
+install -d -m 0700 "$HOME/.config/safeterm"
+
+go run ./cmd/catalog-sign -generate-key \
+  -private-key "$HOME/.config/safeterm/catalog-signing.key" \
+  -public-key ./configs/trust/catalog-ed25519.pub
+
+go run ./cmd/catalog-sign -config ./configs \
+  -private-key "$HOME/.config/safeterm/catalog-signing.key" \
+  -signature ./configs/catalog.sig
+```
+
+The private key must remain outside runtime hosts. Before signing, operators
+replace example executable digests with hashes from the exact deployment host.
+The key must reside on a filesystem that enforces Unix mode 0600; the signing
+tool refuses group- or world-readable private keys.
 
 ## Local Verification
 
@@ -122,7 +151,7 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M7 | Command Runner | ✅ Tagged: v0.8.0-m7 |
 | M8 | Capability-Isolated Runtime | ✅ Tagged: v0.9.0-m8 |
 | M9 | Audit Service | ✅ Tagged: v0.10.0-m9 |
-| M10 | Integrity Verification | ⏳ Planned |
+| M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
 | M11 | Streaming | ⏳ Planned |
 | M12 | Broker, Authentication, Catalog Workflow, and Client Adapters | ⏳ Planned |
 | M13 | Security Testing | ⏳ Planned |
