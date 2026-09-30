@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
+	"safeterm/internal/audit"
 	"safeterm/internal/config"
 	"safeterm/internal/isolation"
 )
@@ -18,14 +19,16 @@ func main() {
 	configDir := flag.String("config", "/etc/safeterm", "catalog directory")
 	socketPath := flag.String("socket", "/run/safeterm-gateway/gateway.sock", "Gateway socket")
 	brokerUser := flag.String("broker-user", "safeterm-broker", "allowed local Broker user")
+	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
+	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
 	flag.Parse()
-	if err := run(*configDir, *socketPath, *brokerUser); err != nil {
+	if err := run(*configDir, *socketPath, *brokerUser, *auditSocket, *auditUser); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir, socketPath, brokerUser string) error {
+func run(configDir, socketPath, brokerUser, auditSocket, auditUser string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
@@ -54,7 +57,19 @@ func run(configDir, socketPath, brokerUser string) error {
 		}
 		clients[profile.Name] = client
 	}
-	gateway, err := isolation.NewGateway(store, clients)
+	auditAccount, err := user.Lookup(auditUser)
+	if err != nil {
+		return fmt.Errorf("gateway: resolve Audit Service user: %w", err)
+	}
+	auditUID, err := strconv.ParseUint(auditAccount.Uid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("gateway: parse Audit Service UID: %w", err)
+	}
+	auditClient, err := audit.NewUnixClient(auditSocket, []uint32{uint32(auditUID)})
+	if err != nil {
+		return err
+	}
+	gateway, err := isolation.NewGatewayWithSink(store, clients, auditClient)
 	if err != nil {
 		return err
 	}

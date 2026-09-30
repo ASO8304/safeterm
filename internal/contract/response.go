@@ -16,14 +16,15 @@ const (
 // pair can be correlated and logged together for audit purposes in the
 // Audit milestone (M9).
 type ExecutionResponse struct {
-	RequestID string          `json:"request_id"`
-	Result    ExecutionResult `json:"result"`
-	Message   string          `json:"message,omitempty"`
-	Stdout    string          `json:"stdout,omitempty"`
-	Stderr    string          `json:"stderr,omitempty"`
-	ExitCode  int             `json:"exit_code"`
-	StartedAt time.Time       `json:"started_at"`
-	EndedAt   time.Time       `json:"ended_at"`
+	RequestID    string          `json:"request_id"`
+	Result       ExecutionResult `json:"result"`
+	FailureStage string          `json:"failure_stage,omitempty"`
+	Message      string          `json:"message,omitempty"`
+	Stdout       string          `json:"stdout,omitempty"`
+	Stderr       string          `json:"stderr,omitempty"`
+	ExitCode     int             `json:"exit_code"`
+	StartedAt    time.Time       `json:"started_at"`
+	EndedAt      time.Time       `json:"ended_at"`
 }
 
 // Duration is a convenience helper, mainly useful once Audit logging (M9)

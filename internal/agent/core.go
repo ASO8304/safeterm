@@ -91,6 +91,7 @@ func (c *Core) HandleRequest(ctx context.Context, req *contract.ExecutionRequest
 
 	if err != nil {
 		resp.Result = contract.ResultExecutionError
+		resp.FailureStage = string(StageExecution)
 		resp.Message = (&StageError{Stage: StageExecution, Err: err}).Error()
 		return resp
 	}
@@ -105,6 +106,7 @@ func (c *Core) HandleRequest(ctx context.Context, req *contract.ExecutionRequest
 func reject(resp *contract.ExecutionResponse, err *StageError) *contract.ExecutionResponse {
 	resp.EndedAt = time.Now().UTC()
 	resp.Result = contract.ResultRejected
+	resp.FailureStage = string(err.Stage)
 	resp.Message = err.Error()
 	return resp
 }

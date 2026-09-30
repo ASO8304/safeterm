@@ -1,11 +1,13 @@
 [Unit]
 Description=SafeTerm diagnostics runner
-After=local-fs.target
+Requires=safeterm-audit.service
+After=local-fs.target safeterm-audit.service
 
 [Service]
 Type=simple
 User=safeterm-diagnostics
 Group=safeterm-gateway
+SupplementaryGroups=safeterm-audit
 RuntimeDirectory=safeterm-diagnostics
 RuntimeDirectoryMode=0750
 ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile diagnostics

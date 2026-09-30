@@ -1,11 +1,13 @@
 [Unit]
 Description=SafeTerm network observer runner
-After=network.target
+Requires=safeterm-audit.service
+After=network.target safeterm-audit.service
 
 [Service]
 Type=simple
 User=safeterm-network
 Group=safeterm-gateway
+SupplementaryGroups=safeterm-audit
 RuntimeDirectory=safeterm-network
 RuntimeDirectoryMode=0750
 ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile network-observer

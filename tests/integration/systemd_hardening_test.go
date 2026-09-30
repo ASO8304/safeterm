@@ -9,7 +9,7 @@ import (
 	"safeterm/internal/config"
 )
 
-// TEST-ISOLATION-002, TEST-ISOLATION-003, TEST-ISOLATION-005, TEST-ISOLATION-006
+// TEST-ISOLATION-002, TEST-ISOLATION-003, TEST-ISOLATION-005, TEST-ISOLATION-006, TEST-AUDIT-007
 func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 	cfg, err := config.LoadConfig("../../configs")
 	if err != nil {
@@ -24,12 +24,13 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		unit := string(data)
+		unit := strings.ReplaceAll(string(data), "\r\n", "\n")
 		for _, required := range []string{
 			"User=" + profile.RunAsUser,
 			"ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile " + string(profile.Name),
 			"NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes",
 			"MemoryMax=", "TasksMax=", "RestrictAddressFamilies=AF_UNIX",
+			"Requires=safeterm-audit.service", "SupplementaryGroups=safeterm-audit",
 		} {
 			if !strings.Contains(unit, required) {
 				t.Errorf("%s missing %q", path, required)
@@ -47,8 +48,25 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gateway := string(gatewayData)
+	gateway := strings.ReplaceAll(string(gatewayData), "\r\n", "\n")
 	if strings.Contains(gateway, "safeterm-runner --profile") || !strings.Contains(gateway, "CapabilityBoundingSet=\nAmbientCapabilities=\n") || !strings.Contains(gateway, "RestrictAddressFamilies=AF_UNIX") {
 		t.Fatal("Gateway unit is executable-capable or insufficiently restricted")
+	}
+	if !strings.Contains(gateway, "Requires=safeterm-audit.service") || !strings.Contains(gateway, "SupplementaryGroups=safeterm-audit") {
+		t.Fatal("Gateway is not bound to Audit Service")
+	}
+	auditData, err := os.ReadFile(filepath.Join("..", "..", "deploy", "systemd", "safeterm-audit.service"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditUnit := strings.ReplaceAll(string(auditData), "\r\n", "\n")
+	for _, required := range []string{
+		"User=safeterm-audit", "StateDirectory=safeterm", "StateDirectoryMode=0700",
+		"ExecStart=/usr/local/bin/safeterm-audit --store /var/lib/safeterm/audit.jsonl",
+		"CapabilityBoundingSet=\nAmbientCapabilities=\n", "ProtectSystem=strict", "RestrictAddressFamilies=AF_UNIX",
+	} {
+		if !strings.Contains(auditUnit, required) {
+			t.Errorf("audit unit missing %q", required)
+		}
 	}
 }

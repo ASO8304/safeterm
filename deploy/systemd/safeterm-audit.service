@@ -1,0 +1,31 @@
+[Unit]
+Description=SafeTerm append-only audit service
+After=local-fs.target
+Before=safeterm-gateway.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service
+
+[Service]
+Type=simple
+User=safeterm-audit
+Group=safeterm-audit
+RuntimeDirectory=safeterm-audit
+RuntimeDirectoryMode=0750
+StateDirectory=safeterm
+StateDirectoryMode=0700
+UMask=0007
+ExecStart=/usr/local/bin/safeterm-audit --store /var/lib/safeterm/audit.jsonl
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=128M
+TasksMax=32
+
+[Install]
+WantedBy=multi-user.target
