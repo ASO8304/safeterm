@@ -1,7 +1,7 @@
 # ADR-014: Structured Configuration Management Service
 
 ## Status
-Proposed
+Accepted
 
 ## Context
 Operators need an interactive `config` workflow for a controlled set of service
@@ -15,7 +15,7 @@ service would also recreate the universally privileged Agent that ADR-009
 removed. The design therefore needs a semantic resource boundary and the same
 least-privilege deployment model used by capability-specific Runners.
 
-## Proposed Decision
+## Decision
 - Introduce one Config Manager binary that can run as multiple independently
   deployed capability profiles, for example web, database, and network
   configuration managers. Each instance has its own service identity, Unix
@@ -30,6 +30,10 @@ least-privilege deployment model used by capability-specific Runners.
   `ListResources`, `DescribeResource`, `ReadSection`, `ValidatePatch`,
   `PreviewDiff`, `ApplyPatch`, and `Rollback`. A terminal menu and a web form can
   use the same API without a PTY.
+- An edit request contains only `resource_id`, `section`, `key`, a candidate
+  value, and the base content version returned by the service. Config Manager
+  reads and parses the current file itself and changes only that registered
+  field. It never accepts a complete replacement document from the client.
 - Format support is adapter-based. Every adapter parses a document into a typed
   view, describes selectable sections and keys, validates a typed patch, and
   renders a replacement. JSON and a deliberately limited INI grammar are the
@@ -37,6 +41,15 @@ least-privilege deployment model used by capability-specific Runners.
 - Validation is layered: field type, required/optional state, enum/range/pattern,
   cross-field schema rules, then an optional typed application validator. Hooks
   refer to approved operations and cannot contain arbitrary executable text.
+- Path fields have additional canonical-path rules including allowed prefixes,
+  existence and file-type requirements, expected owner/mode, and an explicit
+  symlink policy. Numeric values are parsed before range validation even when
+  the source format represents them as quoted strings.
+- `ValidatePatch` returns normalized typed data and validation findings.
+  `PreviewDiff` returns a short-lived proposal token bound to the actor,
+  resource, base version, exact patch, and rendered diff. `ApplyPatch` accepts
+  that token rather than a second mutable patch, then rechecks authorization
+  and the base version immediately before committing.
 - A write is transactional. Config Manager checks an optimistic content version,
   stages a file in the same directory, preserves required owner and mode,
   validates the complete rendered document, fsyncs it, creates a bounded backup,
@@ -86,5 +99,5 @@ least-privilege deployment model used by capability-specific Runners.
   reviewed narrow write helper; granting broad directory write access is not
   an acceptable shortcut. The resource registry is read-only to the service.
 - Authenticated identity, approval workflow, and Broker adapters from M12 are
-  prerequisites for remote mutation. This capability should be scheduled as a
-  dedicated post-M12 milestone rather than folded into M11 streaming.
+  prerequisites for remote mutation. This capability is scheduled as M13 rather
+  than being folded into M11 streaming.

@@ -34,7 +34,7 @@ context cancellation, process-start failure, non-zero exit, and captured output.
   paths, resolve symlinks, verify hashes, authenticate roles, stream output, or
   cap captured output size. Capability-isolated services belong to M8,
   executable integrity to M10, streaming to M11, and adversarial resource
-  testing to M13.
+  testing to M14.
 
 ## Alternatives Considered
 1. **Build a command string and execute it through a shell** — Rejected because
