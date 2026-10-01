@@ -1,6 +1,5 @@
-// Package broker contains transport-neutral mappings shared by future M12
-// client adapters. M11 defines only semantic process control, not a remote
-// listener or authenticated identity provider.
+// Package broker implements authenticated remote adapters and their shared
+// transport-neutral control mappings.
 package broker
 
 import "safeterm/internal/contract"

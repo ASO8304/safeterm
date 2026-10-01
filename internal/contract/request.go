@@ -7,7 +7,7 @@
 // accepts anything outside of this contract, and never trusts the claims
 // inside Metadata (especially ClaimedRoles) without independent
 // verification. Policy Engine (M5) checks permissions, not identity;
-// authentication remains a separate future concern (see ADR-006).
+// authentication remains a separate Broker concern (see ADR-006 and ADR-015).
 // For M1 this package only defines the shape of
 // the contract and the minimal invariants it must always satisfy.
 package contract

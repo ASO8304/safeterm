@@ -9,11 +9,10 @@
 // Enforcer answers exactly one question: "IF this request's claimed roles
 // are true, are they allowed to run this operation?". It does NOT verify
 // that Metadata.ClaimedRoles are the user's real, authenticated identity.
-// That verification is the job of a future authentication layer that does
-// not exist yet in any milestone. Until that layer exists and is wired in
-// front of every Broker, ClaimedRoles must be treated as attacker-
-// controlled input in any threat model of this system — exactly the
-// concern REQ-001 flagged when this field was first introduced.
+// That verification is the job of a Broker authentication layer. M12 provides
+// it for SSH traffic, but other or direct callers must still treat
+// ClaimedRoles as attacker-controlled input. Policy deliberately remains
+// independent of the authentication mechanism.
 package policy
 
 import (

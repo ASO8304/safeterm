@@ -1,0 +1,38 @@
+[Unit]
+Description=SafeTerm restricted SSH Broker
+After=network.target safeterm-gateway.service
+Requires=safeterm-gateway.service
+
+[Service]
+Type=simple
+User=safeterm-broker
+Group=safeterm-broker
+SupplementaryGroups=safeterm-gateway
+ExecStart=/usr/local/bin/safeterm-ssh-broker -listen=:2222 -config=/etc/safeterm -identities=/etc/safeterm/ssh/users.json -host-key=/etc/safeterm/ssh/ssh_host_ed25519_key -gateway-socket=/run/safeterm-gateway/gateway.sock
+Restart=on-failure
+RestartSec=2s
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+MemoryMax=128M
+TasksMax=64
+LimitNOFILE=512
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target

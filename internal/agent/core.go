@@ -26,7 +26,8 @@ type Validator interface {
 
 // PolicyEnforcer checks whether claimed roles permit this operation.
 // The real implementation is in internal/policy (M5). It does not
-// authenticate the user or verify the role claims (see ADR-006).
+// authenticate the user or verify the role claims; Brokers own that boundary
+// (see ADR-006 and ADR-015).
 type PolicyEnforcer interface {
 	Authorize(req *contract.ExecutionRequest) error
 }

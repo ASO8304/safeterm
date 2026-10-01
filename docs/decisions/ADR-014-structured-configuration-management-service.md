@@ -60,7 +60,7 @@ least-privilege deployment model used by capability-specific Runners.
   outside the instance's resource set fail closed. OS filesystem permissions
   remain the final enforcement boundary.
 - Read, propose, apply, activate, and rollback are separate authorization
-  actions. Remote write/apply is unavailable until M12 supplies authenticated
+  actions. Remote write/apply is unavailable until an authenticated Broker supplies
   user identity and approval context; unverified `ClaimedRoles` are insufficient.
 - Secret fields are redacted in reads and diffs and are never written to audit.
   Audit records actor, resource ID, field names, version/hash changes, approval,
@@ -98,6 +98,6 @@ least-privilege deployment model used by capability-specific Runners.
   unrelated sensitive files. Legacy shared directories require a separately
   reviewed narrow write helper; granting broad directory write access is not
   an acceptable shortcut. The resource registry is read-only to the service.
-- Authenticated identity, approval workflow, and Broker adapters from M12 are
+- Authenticated identity from M12 and the later approval workflow and Broker adapters are
   prerequisites for remote mutation. This capability is scheduled as M13 rather
   than being folded into M11 streaming.

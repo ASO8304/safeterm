@@ -40,8 +40,8 @@ const (
 	ControlDenied             ControlStatus = "denied"
 )
 
-// SessionOwner is transport context until M12 replaces the claimed fields with
-// an authenticated Broker principal. It is never used as a process primitive.
+// SessionOwner is authenticated transport context when created by the M12 SSH
+// Broker. It is never used as a process primitive.
 type SessionOwner struct {
 	BrokerType string `json:"broker_type"`
 	UserID     string `json:"user_id"`
