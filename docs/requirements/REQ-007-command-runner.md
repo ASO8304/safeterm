@@ -8,8 +8,10 @@ security boundary established by ADR-003 and ADR-007
 ## Description
 The `internal/execution` package replaces `NoOpExecutor` in the M7 integration
 path. It executes only the command and separate argument list supplied by the
-Translation stage, using `exec.CommandContext(ctx, command, args...)` directly.
-It must never construct or invoke a shell command string.
+Translation stage, using the direct `os/exec` argv API. M11 replaces
+`exec.CommandContext`'s immediate kill behavior with explicit bounded
+process-group lifecycle handling. It never constructs or invokes a shell
+command string.
 
 Every Runner has a positive configured timeout. It captures stdout and stderr
 independently, reports the process exit code, and preserves output produced

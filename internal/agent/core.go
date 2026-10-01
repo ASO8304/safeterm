@@ -39,7 +39,8 @@ type Translator interface {
 }
 
 // Executor actually runs the translated command. The real bounded-process
-// implementation is in internal/execution (M7); streaming arrives in M11.
+// implementation is in internal/execution (M7). M11 attaches a bounded stream
+// sink through context without changing this interface or Core's stage order.
 type Executor interface {
 	Execute(ctx context.Context, command string, args []string) (stdout, stderr string, exitCode int, err error)
 }

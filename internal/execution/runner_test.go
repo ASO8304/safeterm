@@ -6,9 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"os/signal"
 	"reflect"
 	"runtime"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -49,6 +53,55 @@ func TestRunnerHelperProcess(t *testing.T) {
 		fmt.Fprint(os.Stderr, "stderr-before-wait")
 		time.Sleep(10 * time.Second)
 		os.Exit(0)
+	case "interrupt":
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, os.Interrupt)
+		fmt.Fprint(os.Stdout, "ready")
+		<-signals
+		fmt.Fprint(os.Stdout, "interrupted")
+		os.Exit(0)
+	case "ignore":
+		signals := make(chan os.Signal, 4)
+		signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			for range signals {
+			}
+		}()
+		fmt.Fprint(os.Stdout, "ready")
+		for {
+			time.Sleep(time.Hour)
+		}
+	case "flood":
+		for i := 0; i < 1024; i++ {
+			fmt.Fprint(os.Stdout, "0123456789abcdef")
+		}
+		os.Exit(0)
+	case "child-ignore":
+		signals := make(chan os.Signal, 4)
+		signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			for range signals {
+			}
+		}()
+		for {
+			time.Sleep(time.Hour)
+		}
+	case "spawn-child":
+		signals := make(chan os.Signal, 4)
+		signal.Notify(signals, os.Interrupt, syscall.SIGTERM)
+		go func() {
+			for range signals {
+			}
+		}()
+		child := exec.Command(os.Args[0], "-test.run=^TestRunnerHelperProcess$", "--", "child-ignore")
+		child.Env = os.Environ()
+		if err := child.Start(); err != nil {
+			os.Exit(94)
+		}
+		fmt.Fprintf(os.Stdout, "ready:%d", child.Process.Pid)
+		for {
+			time.Sleep(time.Hour)
+		}
 	case "args":
 		if err := json.NewEncoder(os.Stdout).Encode(values); err != nil {
 			os.Exit(96)
@@ -57,6 +110,10 @@ func TestRunnerHelperProcess(t *testing.T) {
 	default:
 		os.Exit(95)
 	}
+}
+
+func parseHelperPID(value string) (int, error) {
+	return strconv.Atoi(strings.TrimPrefix(value, "ready:"))
 }
 
 func helperInvocation(t *testing.T, action string, values ...string) (string, []string) {

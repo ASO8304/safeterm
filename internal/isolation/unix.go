@@ -24,10 +24,22 @@ type ipcReply struct {
 type UnixServer struct {
 	listener   *net.UnixListener
 	handler    Client
+	streaming  StreamingService
 	allowedUID map[uint32]bool
 }
 
 func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Client) (*UnixServer, error) {
+	return listenUnix(path, mode, allowedUIDs, handler, nil)
+}
+
+func ListenUnixStreaming(path string, mode os.FileMode, allowedUIDs []uint32, handler Client, streaming StreamingService) (*UnixServer, error) {
+	if streaming == nil {
+		return nil, fmt.Errorf("isolation: streaming service is required")
+	}
+	return listenUnix(path, mode, allowedUIDs, handler, streaming)
+}
+
+func listenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Client, streaming StreamingService) (*UnixServer, error) {
 	if path == "" || handler == nil || len(allowedUIDs) == 0 {
 		return nil, fmt.Errorf("isolation: socket path, handler, and allowed UIDs are required")
 	}
@@ -43,7 +55,7 @@ func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Cli
 	for _, uid := range allowedUIDs {
 		allowed[uid] = true
 	}
-	return &UnixServer{listener: listener, handler: handler, allowedUID: allowed}, nil
+	return &UnixServer{listener: listener, handler: handler, streaming: streaming, allowedUID: allowed}, nil
 }
 
 func (s *UnixServer) Serve(ctx context.Context) error {
@@ -92,6 +104,13 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 		return
 	}
 	decoder := json.NewDecoder(bytes.NewReader(frame))
+	var probe struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(frame, &probe); err == nil && probe.Type != "" {
+		s.handleStream(conn, frame)
+		return
+	}
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&request); err != nil {
 		json.NewEncoder(conn).Encode(ipcReply{Error: "invalid request"})

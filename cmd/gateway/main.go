@@ -93,7 +93,7 @@ func run(configDir, socketPath, brokerUser, auditSocket, auditUser, catalogPubli
 	if err != nil {
 		return fmt.Errorf("gateway: parse Broker UID: %w", err)
 	}
-	server, err := isolation.ListenUnix(socketPath, 0o660, []uint32{uint32(brokerUID)}, gateway)
+	server, err := isolation.ListenUnixStreaming(socketPath, 0o660, []uint32{uint32(brokerUID)}, gateway, gateway)
 	if err != nil {
 		return err
 	}

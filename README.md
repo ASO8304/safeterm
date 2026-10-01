@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M10 — Integrity Verification (complete; tagged v0.11.0-m10)**
+**Milestone: M11 — Bounded Streaming and Semantic Termination (complete; tagged v0.12.0-m11)**
 
 Available capabilities:
 
@@ -21,13 +21,20 @@ Available capabilities:
   verification of native executables immediately before every execution
 - Canonical-path and symlink-change detection with execution pinned to an open
   Linux `/proc/self/fd` descriptor, including the typed systemctl controller
+- Versioned stdout/stderr streaming for approved long-running operations with
+  ordered 16 KiB chunks, combined output budgets, bounded queues, idle and
+  execution timeouts, and a configurable concurrent-session ceiling
+- Opaque session routing and semantic termination with owner checks,
+  idempotent states, dedicated process groups, graceful interrupt/terminate
+  escalation, forced-kill fallback, and sanitized lifecycle audit events
 
 Policy does not authenticate users; `ClaimedRoles` remains an unverified claim (ADR-006).
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
-and runtime integrity boundary are implemented through M10. The remote Broker
+runtime integrity boundary, and bounded session control are implemented through
+M11. The remote Broker
 and authenticated user identity arrive in M12; the current Node Gateway accepts
-only authenticated local IPC. M10 evidence is recorded in
-[evidence/M10](evidence/M10/README.md).
+only authenticated local IPC. M11 evidence is recorded in
+[evidence/M11](evidence/M11/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -41,10 +48,12 @@ wiring the Translator into Core. A template accepts only a literal token or a co
 `{name}` placeholder, and every placeholder value must be present even when the
 parameter is optional during Validation (ADR-007).
 
-`execution.New(timeout)` requires a positive timeout. Runner invokes
-`exec.CommandContext(ctx, command, args...)` directly, never through a shell,
-and returns `execution.ExitCodeUnavailable` (`-1`) when no portable process
-exit status exists (ADR-008).
+`execution.New(timeout)` requires a positive timeout and installs bounded output
+defaults. Runner invokes `exec.Command(command, args...)` directly, never
+through a shell, and manages a dedicated Linux process group itself so timeout,
+disconnect, or semantic termination can apply the fixed escalation policy. It
+returns `execution.ExitCodeUnavailable` (`-1`) when no portable process exit
+status exists (ADR-008 and ADR-013).
 
 ## Target Service Architecture
 
@@ -104,7 +113,7 @@ replace example executable digests with hashes from the exact deployment host.
 The key must reside on a filesystem that enforces Unix mode 0600; the signing
 tool refuses group- or world-readable private keys.
 
-M11 adds bounded stdout/stderr sessions for approved long-running operations.
+M11 provides bounded stdout/stderr sessions for approved long-running operations.
 Client-specific actions such as a web Terminate button or Ctrl+C in the SSH
 custom shell map to one semantic `terminate` message. Runner owns process-group
 cleanup and signal escalation; M11 does not expose a PTY or general shell. See
@@ -172,7 +181,7 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M8 | Capability-Isolated Runtime | ✅ Tagged: v0.9.0-m8 |
 | M9 | Audit Service | ✅ Tagged: v0.10.0-m9 |
 | M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
-| M11 | Bounded Streaming and Semantic Termination | ⏳ Planned |
+| M11 | Bounded Streaming and Semantic Termination | ✅ Tagged: v0.12.0-m11 |
 | M12 | Broker, Authentication, Catalog Workflow, and Client Adapters | ⏳ Planned |
 | M13 | Structured Configuration Management | ⏳ Planned |
 | M14 | Security Testing | ⏳ Planned |

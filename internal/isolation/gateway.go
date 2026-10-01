@@ -3,6 +3,7 @@ package isolation
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"safeterm/internal/audit"
@@ -16,10 +17,23 @@ type Client interface {
 	Handle(ctx context.Context, req *contract.ExecutionRequest) (*contract.ExecutionResponse, error)
 }
 
+type StreamingClient interface {
+	StartStream(context.Context, *contract.ExecutionRequest) (*StreamSession, error)
+	Terminate(context.Context, contract.ControlRequest) (contract.ControlResult, error)
+}
+
+type sessionRoute struct {
+	client  StreamingClient
+	owner   contract.SessionOwner
+	profile config.RunnerProfile
+}
+
 type Gateway struct {
-	catalog *Store
-	clients map[config.RunnerProfile]Client
-	sink    EventSink
+	catalog   *Store
+	clients   map[config.RunnerProfile]Client
+	sink      EventSink
+	sessionMu sync.RWMutex
+	sessions  map[string]sessionRoute
 }
 
 type LifecycleEvent = audit.Event
@@ -43,7 +57,86 @@ func NewGatewayWithSink(catalog *Store, clients map[config.RunnerProfile]Client,
 		}
 		copyClients[profile] = client
 	}
-	return &Gateway{catalog: catalog, clients: copyClients, sink: sink}, nil
+	return &Gateway{catalog: catalog, clients: copyClients, sink: sink, sessions: map[string]sessionRoute{}}, nil
+}
+
+// StartStream routes an approved long-running operation to exactly one Runner
+// and records the opaque session ownership for later semantic control.
+func (g *Gateway) StartStream(ctx context.Context, req *contract.ExecutionRequest) (*StreamSession, error) {
+	if g == nil || g.catalog == nil || ctx == nil || req == nil {
+		return nil, fmt.Errorf("isolation: invalid gateway streaming request")
+	}
+	snapshot := g.catalog.Current()
+	operation, ok := snapshot.Operation(req.Command)
+	if !ok {
+		return nil, fmt.Errorf("isolation: unknown operation %q", req.Command)
+	}
+	if !operation.LongRunning {
+		return nil, fmt.Errorf("isolation: operation %q is not long-running", req.Command)
+	}
+	owner := contract.OwnerFromMetadata(req.Metadata)
+	if owner.BrokerType == "" || owner.UserID == "" {
+		return nil, fmt.Errorf("isolation: streaming session requires broker and user ownership claims")
+	}
+	client, ok := g.clients[operation.RunnerProfile]
+	if !ok {
+		return nil, fmt.Errorf("isolation: profile %q is unavailable", operation.RunnerProfile)
+	}
+	streaming, ok := client.(StreamingClient)
+	if !ok {
+		return nil, fmt.Errorf("isolation: profile %q does not support streaming", operation.RunnerProfile)
+	}
+	if err := g.record(ctx, req, operation.RunnerProfile, "routed", snapshot.Version(), nil); err != nil {
+		return nil, err
+	}
+	session, err := streaming.StartStream(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if session == nil || session.ID == "" || session.RequestID != req.RequestID || session.Events == nil {
+		return nil, fmt.Errorf("isolation: Runner returned an invalid streaming session")
+	}
+	g.sessionMu.Lock()
+	g.sessions[session.ID] = sessionRoute{client: streaming, owner: owner, profile: operation.RunnerProfile}
+	g.sessionMu.Unlock()
+	forwarded := make(chan contract.StreamFrame, 64)
+	go func() {
+		defer close(forwarded)
+		defer time.AfterFunc(5*time.Minute, func() {
+			g.sessionMu.Lock()
+			delete(g.sessions, session.ID)
+			g.sessionMu.Unlock()
+		})
+		for frame := range session.Events {
+			select {
+			case forwarded <- frame:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return &StreamSession{ID: session.ID, RequestID: session.RequestID, Events: forwarded}, nil
+}
+
+// Terminate routes only the semantic action to the Runner that created the
+// session. No PID, signal, argv, or profile selection crosses this boundary.
+func (g *Gateway) Terminate(ctx context.Context, request contract.ControlRequest) (contract.ControlResult, error) {
+	if g == nil || ctx == nil {
+		return contract.ControlResult{}, fmt.Errorf("isolation: invalid gateway control request")
+	}
+	if err := request.Validate(); err != nil {
+		return contract.ControlResult{}, err
+	}
+	g.sessionMu.RLock()
+	route, ok := g.sessions[request.SessionID]
+	g.sessionMu.RUnlock()
+	if !ok {
+		return contract.ControlResult{Version: contract.StreamProtocolVersion, SessionID: request.SessionID, Status: contract.ControlNotFound}, nil
+	}
+	if route.owner != request.Owner {
+		return contract.ControlResult{Version: contract.StreamProtocolVersion, SessionID: request.SessionID, Status: contract.ControlDenied}, nil
+	}
+	return route.client.Terminate(ctx, request)
 }
 
 func (g *Gateway) Dispatch(ctx context.Context, req *contract.ExecutionRequest) (*contract.ExecutionResponse, error) {

@@ -141,7 +141,7 @@ func TestValidateConfig_ProfileSecurityContractRejected(t *testing.T) {
 
 // TEST-ISOLATION-007, TEST-ISOLATION-008
 func TestValidateConfig_TypedBackendsRejectFreeFormConfiguration(t *testing.T) {
-	for _, name := range []string{"unknown executable", "cross profile executable", "systemd executable", "systemd arguments", "systemd parameters", "bad unit", "bad action"} {
+	for _, name := range []string{"unknown executable", "cross profile executable", "systemd executable", "systemd arguments", "systemd parameters", "long-running systemd", "bad unit", "bad action"} {
 		t.Run(name, func(t *testing.T) {
 			cfg := validConfig()
 			switch name {
@@ -149,7 +149,7 @@ func TestValidateConfig_TypedBackendsRejectFreeFormConfiguration(t *testing.T) {
 				cfg.Operations[0].ExecutableRef = "shell"
 			case "cross profile executable":
 				cfg.Operations[0].RunnerProfile = ProfileNetworkObserver
-			case "systemd executable", "systemd arguments", "systemd parameters", "bad unit", "bad action":
+			case "systemd executable", "systemd arguments", "systemd parameters", "long-running systemd", "bad unit", "bad action":
 				cfg.Operations[0] = OperationDefinition{Name: "restart_demo", RunnerProfile: ProfileServiceManager, ExecutorKind: ExecutorSystemd, Systemd: &SystemdOperationDefinition{Unit: "demo.service", Action: "restart"}}
 				cfg.Policies[0].Operations[0] = "restart_demo"
 				if name == "systemd executable" {
@@ -160,6 +160,9 @@ func TestValidateConfig_TypedBackendsRejectFreeFormConfiguration(t *testing.T) {
 				}
 				if name == "systemd parameters" {
 					cfg.Operations[0].Parameters = []ParameterDefinition{{Name: "unit", Type: ParamTypeString}}
+				}
+				if name == "long-running systemd" {
+					cfg.Operations[0].LongRunning = true
 				}
 				if name == "bad unit" {
 					cfg.Operations[0].Systemd.Unit = "../../demo"
