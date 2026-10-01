@@ -157,6 +157,9 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 				return nil, fmt.Errorf("config: operation %q: executable %q is not approved for profile %q", op.Name, op.ExecutableRef, op.RunnerProfile)
 			}
 		case ExecutorSystemd:
+			if op.LongRunning {
+				return nil, fmt.Errorf("config: systemd operation %q cannot be long-running", op.Name)
+			}
 			if op.ExecutableRef != "" || len(op.ArgsTemplate) != 0 || op.Systemd == nil {
 				return nil, fmt.Errorf("config: systemd operation %q requires only a typed systemd definition", op.Name)
 			}

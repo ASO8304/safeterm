@@ -36,9 +36,10 @@ Core pipeline, signed catalogs, executable pinning, and synchronous audit.
   Termination is idempotent. A request for an exited session returns
   `already_exited`; an unknown ID returns `not_found`.
 - Streaming has configured chunk limits, a total output budget, execution and
-  idle timeouts, and bounded queues. Backpressure cannot grow memory without a
-  limit. Overflow and disconnect policy must terminate or drain a session in a
-  defined way and cannot leave an orphaned process group.
+  idle timeouts, bounded queues, and a concurrent-session ceiling. Backpressure
+  cannot grow memory without a limit. Overflow and disconnect policy must
+  terminate or drain a session in a defined way and cannot leave an orphaned
+  process group.
 - Output content is delivered to the authorized client but is not copied into
   audit storage. Audit records lifecycle metadata including session start,
   stream open, terminate request, delivered interrupt, grace expiry, forced

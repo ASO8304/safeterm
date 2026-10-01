@@ -1,6 +1,6 @@
 # Linux systemd deployment
 
-M10 ships an independent append-only Audit Service alongside one unprivileged
+M11 ships an independent append-only Audit Service alongside one unprivileged
 Node Gateway and three capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
 different users with separate runtime directories, sockets, catalogs, resource
@@ -53,5 +53,14 @@ must install an OS policy that grants `safeterm-service-manager` only the exact
 systemd units and actions present in the approved catalog. Never grant this
 account unrestricted `sudo` or general systemd management authority.
 
-M11 adds bounded streaming. M12 adds the remote Broker, authenticated identity,
-and catalog proposal/approval workflow.
+M11 also enables bounded long-running sessions over the authenticated Unix
+socket. The network-observer unit permits at most 64 sessions, 16 KiB chunks,
+1 MiB combined output per session, a five-minute idle interval, and a 30-minute
+execution deadline. A semantic terminate first interrupts the dedicated process
+group, waits two seconds, sends terminate, waits another two seconds, and uses a
+forced kill only when necessary. Disconnection, timeout, output exhaustion, and
+backpressure all fail closed. Tune these values deliberately per deployment;
+never remove the bounds.
+
+M12 adds the remote Broker, authenticated identity, and catalog
+proposal/approval workflow.

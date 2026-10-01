@@ -12,9 +12,11 @@ context cancellation, process-start failure, non-zero exit, and captured output.
 ## Decision
 - `internal/execution.Runner` implements the existing `agent.Executor`
   interface. Core and the interface signature remain unchanged.
-- Runner invokes `exec.CommandContext(ctx, command, args...)` directly. It never
-  calls `sh`, `bash`, `cmd.exe`, PowerShell, or any equivalent shell, and never
-  joins arguments into a command string.
+- Runner invokes the direct `os/exec` argv API. M11 supersedes
+  `exec.CommandContext` lifecycle handling with an explicit dedicated process
+  group and graceful escalation. Runner never calls `sh`, `bash`, `cmd.exe`,
+  PowerShell, or an equivalent shell and never joins arguments into a command
+  string.
 - Construction requires a positive timeout. Each execution derives a child
   context with that timeout, so the earlier of the caller's cancellation/
   deadline and the Runner timeout stops the process.
@@ -55,8 +57,9 @@ context cancellation, process-start failure, non-zero exit, and captured output.
 ## Consequences
 - Runtime wiring must choose and document a timeout when constructing Runner.
 - Callers can use `errors.Is` to distinguish deadline and cancellation errors.
-- Capturing output in memory is acceptable for M7's bounded commands but must
-  be revisited with explicit limits or streaming before long-running M11 workloads.
+- M11 retains bounded capture for the final Core response while simultaneously
+  emitting limited chunks for long-running workloads. One combined output
+  budget applies to stdout and stderr.
 - `Runner` is a process-execution backend, not a license to deploy one
   all-powerful Agent. ADR-009 places it inside capability-isolated profiles.
 - Tests use the Go test binary itself as a subprocess, avoiding shell commands

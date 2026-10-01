@@ -23,6 +23,7 @@ const (
 type Event struct {
 	SchemaVersion  int                      `json:"schema_version"`
 	RequestID      string                   `json:"request_id"`
+	SessionID      string                   `json:"session_id,omitempty"`
 	CatalogVersion string                   `json:"catalog_version"`
 	Component      string                   `json:"component"`
 	Profile        string                   `json:"profile,omitempty"`
@@ -86,6 +87,14 @@ func NewEvent(req *contract.ExecutionRequest, catalogVersion, component, profile
 	return event
 }
 
+// NewSessionEvent extends the sanitized lifecycle contract with an opaque
+// streaming session identifier. Stream bytes are never accepted by this API.
+func NewSessionEvent(req *contract.ExecutionRequest, catalogVersion, component, profile, sessionID, outcome string, response *contract.ExecutionResponse) Event {
+	event := NewEvent(req, catalogVersion, component, profile, outcome, response)
+	event.SessionID = sessionID
+	return event
+}
+
 func timePointer(value time.Time) *time.Time {
 	if value.IsZero() {
 		return nil
@@ -112,15 +121,32 @@ func (e Event) Validate() error {
 			"unknown-operation": true, "profile-unavailable": true, "routed": true,
 			"runner-error": true, "returned": true,
 		},
-		ComponentRunner: {"profile-rejected": true, "accepted": true, "completed": true},
+		ComponentRunner: {
+			"profile-rejected": true, "accepted": true, "completed": true,
+			"session-started": true, "stream-opened": true,
+			"terminate-requested": true, "interrupt-delivered": true,
+			"grace-expired": true, "forced-kill": true,
+			"output-limit": true, "backpressure-overflow": true,
+			"idle-timeout": true, "client-disconnected": true,
+			"session-exited": true,
+		},
 	}
 	if !allowedOutcomes[e.Component][e.Outcome] {
 		return fmt.Errorf("audit: unsupported %s outcome %q", e.Component, e.Outcome)
 	}
+	sessionOutcome := map[string]bool{
+		"session-started": true, "stream-opened": true, "terminate-requested": true,
+		"interrupt-delivered": true, "grace-expired": true, "forced-kill": true,
+		"output-limit": true, "backpressure-overflow": true, "idle-timeout": true,
+		"client-disconnected": true, "session-exited": true,
+	}
+	if sessionOutcome[e.Outcome] && e.SessionID == "" {
+		return fmt.Errorf("audit: streaming outcome %q requires a session ID", e.Outcome)
+	}
 	if e.Result != "" && e.Result != contract.ResultSuccess && e.Result != contract.ResultRejected && e.Result != contract.ResultExecutionError {
 		return fmt.Errorf("audit: unsupported result %q", e.Result)
 	}
-	completion := e.Outcome == "returned" || e.Outcome == "completed" || e.Outcome == "profile-rejected"
+	completion := e.Outcome == "returned" || e.Outcome == "completed" || e.Outcome == "profile-rejected" || e.Outcome == "session-exited"
 	if completion {
 		if e.Result == "" || e.StartedAt == nil || e.EndedAt == nil || e.DurationMillis == nil {
 			return fmt.Errorf("audit: outcome %q requires complete response data", e.Outcome)

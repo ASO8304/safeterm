@@ -28,18 +28,27 @@ func main() {
 	profileName := flag.String("profile", "", "runner profile")
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "allowed local Gateway user")
 	timeout := flag.Duration("timeout", 30*time.Second, "maximum operation runtime")
+	outputLimit := flag.Int64("output-limit", 1<<20, "maximum combined stdout/stderr bytes per operation")
+	streamChunk := flag.Int("stream-chunk", 16<<10, "maximum bytes per stream chunk")
+	streamQueue := flag.Int("stream-queue", 64, "bounded stream frame queue depth")
+	maxSessions := flag.Int("stream-max-sessions", 64, "maximum concurrent streaming sessions")
+	idleTimeout := flag.Duration("stream-idle-timeout", 5*time.Minute, "maximum time without stream output")
+	interruptGrace := flag.Duration("interrupt-grace", 2*time.Second, "grace period after interrupt")
+	terminateGrace := flag.Duration("terminate-grace", 2*time.Second, "grace period after terminate")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
 	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
 	catalogPublicKey := flag.String("catalog-public-key", "", "trusted catalog Ed25519 public key (defaults under config directory)")
 	catalogSignature := flag.String("catalog-signature", "", "detached catalog signature (defaults under config directory)")
 	flag.Parse()
-	if err := run(*configDir, config.RunnerProfile(*profileName), *gatewayUser, *timeout, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
+	streamOptions := isolation.StreamOptions{ChunkBytes: *streamChunk, OutputBudget: *outputLimit, QueueDepth: *streamQueue, MaxSessions: *maxSessions, IdleTimeout: *idleTimeout, HistoryTTL: 5 * time.Minute}
+	executionOptions := execution.Options{Timeout: *timeout, OutputLimit: *outputLimit, ChunkBytes: *streamChunk, InterruptGrace: *interruptGrace, TerminateGrace: *terminateGrace}
+	if err := run(*configDir, config.RunnerProfile(*profileName), *gatewayUser, executionOptions, streamOptions, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir string, profileName config.RunnerProfile, gatewayUser string, timeout time.Duration, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
+func run(configDir string, profileName config.RunnerProfile, gatewayUser string, executionOptions execution.Options, streamOptions isolation.StreamOptions, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
@@ -72,7 +81,7 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	if err != nil {
 		return err
 	}
-	processRunner, err := execution.New(timeout)
+	processRunner, err := execution.NewWithOptions(executionOptions)
 	if err != nil {
 		return err
 	}
@@ -117,6 +126,10 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	if err != nil {
 		return err
 	}
+	sessions, err := isolation.NewSessionManager(profileName, store, handler, auditClient, streamOptions)
+	if err != nil {
+		return err
+	}
 	gatewayAccount, err := user.Lookup(gatewayUser)
 	if err != nil {
 		return fmt.Errorf("runner: resolve Gateway user: %w", err)
@@ -125,7 +138,7 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	if err != nil {
 		return fmt.Errorf("runner: parse Gateway UID: %w", err)
 	}
-	server, err := isolation.ListenUnix(profile.SocketPath, 0o660, []uint32{uint32(gatewayUID)}, handler)
+	server, err := isolation.ListenUnixStreaming(profile.SocketPath, 0o660, []uint32{uint32(gatewayUID)}, handler, sessions)
 	if err != nil {
 		return err
 	}

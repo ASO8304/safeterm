@@ -11,10 +11,11 @@ import (
 )
 
 type Snapshot struct {
-	config     *config.Config
-	routes     map[string]config.RunnerProfile
-	profiles   map[config.RunnerProfile]config.ProfileDefinition
-	operations map[config.RunnerProfile]map[string]bool
+	config      *config.Config
+	routes      map[string]config.RunnerProfile
+	profiles    map[config.RunnerProfile]config.ProfileDefinition
+	operations  map[config.RunnerProfile]map[string]bool
+	definitions map[string]config.OperationDefinition
 }
 
 func NewSnapshot(candidate *config.Config) (*Snapshot, error) {
@@ -27,8 +28,9 @@ func NewSnapshot(candidate *config.Config) (*Snapshot, error) {
 	}
 	snapshot := &Snapshot{
 		config: cloned, routes: map[string]config.RunnerProfile{},
-		profiles:   map[config.RunnerProfile]config.ProfileDefinition{},
-		operations: map[config.RunnerProfile]map[string]bool{},
+		profiles:    map[config.RunnerProfile]config.ProfileDefinition{},
+		operations:  map[config.RunnerProfile]map[string]bool{},
+		definitions: map[string]config.OperationDefinition{},
 	}
 	for _, profile := range cloned.Profiles {
 		snapshot.profiles[profile.Name] = profile
@@ -37,8 +39,19 @@ func NewSnapshot(candidate *config.Config) (*Snapshot, error) {
 	for _, operation := range cloned.Operations {
 		snapshot.routes[operation.Name] = operation.RunnerProfile
 		snapshot.operations[operation.RunnerProfile][operation.Name] = true
+		snapshot.definitions[operation.Name] = operation
 	}
 	return snapshot, nil
+}
+
+func (s *Snapshot) Operation(name string) (config.OperationDefinition, bool) {
+	if s == nil {
+		return config.OperationDefinition{}, false
+	}
+	operation, ok := s.definitions[name]
+	operation.ArgsTemplate = append([]string(nil), operation.ArgsTemplate...)
+	operation.Parameters = append([]config.ParameterDefinition(nil), operation.Parameters...)
+	return operation, ok
 }
 
 func cloneConfig(source *config.Config) (*config.Config, error) {
