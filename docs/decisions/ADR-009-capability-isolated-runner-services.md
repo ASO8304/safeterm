@@ -90,7 +90,7 @@ upgrades, and configuration unnecessarily complex.
 - Profile routing, local IPC authentication, service hardening, and the active
   catalog schema become explicit work in M8. Signing and executable binding
   are completed with Integrity Verification in M10. Remote proposal, approval,
-  and activation workflows are completed with the Broker in M12.
+  and activation workflows remain control-plane work after the M12 SSH Broker.
 - Audit must correlate Broker, Gateway, and Runner events under one request ID.
 - Integrity verification must bind approved executable identifiers to the file
   actually executed, including canonical-path and symlink handling.

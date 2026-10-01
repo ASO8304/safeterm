@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M11 — Bounded Streaming and Semantic Termination (complete; tagged v0.12.0-m11)**
+**Milestone: M12 — Authenticated SSH Broker and Restricted Terminal (complete; tagged v0.13.0-m12)**
 
 Available capabilities:
 
@@ -27,14 +27,19 @@ Available capabilities:
 - Opaque session routing and semantic termination with owner checks,
   idempotent states, dedicated process groups, graceful interrupt/terminate
   escalation, forced-kill fallback, and sanitized lifecycle audit events
+- A hardened SSH Broker with public-key identity, server-owned catalog roles,
+  an authorization-filtered operation menu, a fixed custom-shell grammar, PTY
+  terminal behavior, streamed output, and Ctrl+C semantic termination
 
-Policy does not authenticate users; `ClaimedRoles` remains an unverified claim (ADR-006).
+Policy does not authenticate users; it continues to authorize the roles carried
+by the contract (ADR-006). The SSH Broker now authenticates its remote user and
+is the trusted source of those roles for SSH traffic. Direct internal callers
+must still treat arbitrary `ClaimedRoles` as unverified input.
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
-runtime integrity boundary, and bounded session control are implemented through
-M11. The remote Broker
-and authenticated user identity arrive in M12; the current Node Gateway accepts
-only authenticated local IPC. M11 evidence is recorded in
-[evidence/M11](evidence/M11/README.md).
+runtime integrity boundary, bounded session control, and authenticated SSH
+Broker are implemented through M12. The Node Gateway remains local-only and
+accepts the Broker solely through authenticated Unix IPC. M12 evidence is
+recorded in [evidence/M12](evidence/M12/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -120,6 +125,21 @@ cleanup and signal escalation; M11 does not expose a PTY or general shell. See
 [REQ-011](docs/requirements/REQ-011-bounded-streaming-and-control.md) and
 [ADR-013](docs/decisions/ADR-013-bounded-streaming-and-semantic-termination.md).
 
+M12 provides a real SSH server whose session channel is the SafeTerm restricted
+terminal. It does not invoke a login shell and rejects raw SSH exec, subsystem,
+forwarding, environment, and non-session requests. Public keys map a username
+to catalog roles in a root-managed identity file. Connect through any SSH PTY
+client, including OpenSSH or an Xterm-based frontend:
+
+```bash
+ssh -t -p 2222 alice@safeterm.example
+```
+
+Inside the terminal, use `list`, `describe NAME`, and
+`run NAME KEY=VALUE`. See [REQ-012](docs/requirements/REQ-012-ssh-broker-and-authentication.md),
+[ADR-015](docs/decisions/ADR-015-restricted-ssh-broker.md), and the deployment
+instructions in [deploy/systemd](deploy/systemd/README.md).
+
 A structured configuration service is planned for M13 in
 [ADR-014](docs/decisions/ADR-014-structured-configuration-management-service.md).
 It uses resource IDs, typed format adapters, validated patches, atomic writes,
@@ -182,7 +202,7 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M9 | Audit Service | ✅ Tagged: v0.10.0-m9 |
 | M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
 | M11 | Bounded Streaming and Semantic Termination | ✅ Tagged: v0.12.0-m11 |
-| M12 | Broker, Authentication, Catalog Workflow, and Client Adapters | ⏳ Planned |
+| M12 | Authenticated SSH Broker and Restricted Terminal | ✅ Tagged: v0.13.0-m12 |
 | M13 | Structured Configuration Management | ⏳ Planned |
 | M14 | Security Testing | ⏳ Planned |
 | M15 | End-to-End Deployment and Demo | ⏳ Planned |

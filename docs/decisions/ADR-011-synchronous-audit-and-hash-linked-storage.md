@@ -66,7 +66,7 @@ database or dependency.
 - Every producer blocks briefly for durable acknowledgement at each lifecycle
   point. M11 streaming may batch non-critical progress events, but start and
   completion records remain durability boundaries.
-- M12 must replace claimed identity fields with authenticated Broker context
+- M12 replaces claimed identity fields for SSH traffic with authenticated Broker context
   while retaining the same request ID.
 - Retention, export, external checkpointing, and access-control policy for audit
   readers require deployment work beyond the local M9 store.

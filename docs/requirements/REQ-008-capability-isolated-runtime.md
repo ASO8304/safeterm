@@ -15,7 +15,7 @@ Operations remain declarative and typed so later catalog workflows can let
 authorized administrators extend the system without creating an arbitrary
 remote-shell interface. M8 establishes the enforceable runtime boundaries and
 active catalog schema. Integrity/signing is completed in M10, and remote
-proposal/approval workflows are completed with the Broker in M12. Runtime
+proposal/approval workflows remain control-plane work after the M12 SSH Broker. Runtime
 components enforce their own local allowlists and fail closed independently of
 upstream routing.
 

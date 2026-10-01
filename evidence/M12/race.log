@@ -1,0 +1,18 @@
+?   	safeterm/cmd/agent	[no test files]
+?   	safeterm/cmd/audit	[no test files]
+?   	safeterm/cmd/gateway	[no test files]
+?   	safeterm/cmd/runner	[no test files]
+?   	safeterm/cmd/ssh-broker	[no test files]
+ok  	safeterm/cmd/catalog-sign	(cached)
+ok  	safeterm/internal/agent	(cached)
+ok  	safeterm/internal/audit	(cached)
+ok  	safeterm/internal/broker	1.031s
+ok  	safeterm/internal/config	(cached)
+ok  	safeterm/internal/contract	(cached)
+ok  	safeterm/internal/execution	(cached)
+ok  	safeterm/internal/integrity	(cached)
+ok  	safeterm/internal/isolation	(cached)
+ok  	safeterm/internal/policy	(cached)
+ok  	safeterm/internal/translation	(cached)
+ok  	safeterm/internal/validation	(cached)
+ok  	safeterm/tests/integration	4.136s

@@ -104,6 +104,14 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-STREAM-014..015 | REQ-011 (AC-4, AC-9, AC-12) | internal/isolation | Integration | PASS |
 | TEST-STREAM-016..017 | REQ-011 (AC-5, AC-10, AC-13) | internal/execution, tests/integration | Integration | PASS |
 | TEST-STREAM-018..024 | REQ-011 (AC-3, AC-4, AC-7, AC-8, AC-9, AC-11, AC-12) | internal/broker, internal/isolation | Unit + Integration | PASS |
+| TEST-BROKER-001..002 | REQ-012 (AC-1, AC-2) | internal/broker | Unit | PASS |
+| TEST-BROKER-003..005 | REQ-012 (AC-2, AC-3, AC-4, AC-7) | internal/broker | Unit | PASS |
+| TEST-BROKER-006..008 | REQ-012 (AC-1, AC-5, AC-9, AC-11) | internal/broker | Live SSH integration | PASS |
+| TEST-BROKER-009 | REQ-012 (AC-8) | internal/broker | Unit | PASS |
+| TEST-BROKER-010 | REQ-012 (AC-2, AC-6, AC-10, AC-11) | tests/integration | Integration | PASS |
+| TEST-BROKER-011 | REQ-012 (AC-6, AC-10) | deploy/systemd, tests/integration | Integration | PASS |
+| TEST-BROKER-012 | REQ-012 (AC-8) | internal/broker | Unit | PASS |
+| TEST-BROKER-013 | REQ-012 (AC-12) | internal/broker | Unit | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
@@ -112,6 +120,7 @@ Local M8 evidence: [complete make verify output](../../evidence/M8/make-verify.l
 Local M9 evidence: [complete make verify output](../../evidence/M9/make-verify.log).
 Local M10 evidence: [complete make verify output](../../evidence/M10/make-verify.log).
 Local M11 evidence: [complete make verify output](../../evidence/M11/make-verify.log).
+Local M12 evidence: [complete make verify output](../../evidence/M12/make-verify.log).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

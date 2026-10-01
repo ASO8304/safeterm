@@ -51,8 +51,8 @@ Core pipeline, signed catalogs, executable pinning, and synchronous audit.
 - M11 does not provide a PTY, terminal emulation, a Bash/sh session, arbitrary
   stdin, or interactive full-screen programs such as Vim. Application-specific
   interactions use typed semantic messages.
-- Authenticated end-user ownership arrives with M12. Before that identity is
-  available, the local M11 protocol may be tested with authenticated service
+- Authenticated end-user ownership is supplied by the M12 SSH Broker. The
+  local M11 protocol can still be tested with authenticated service
   peers but must not claim secure remote per-user cancellation.
 
 ## Alternatives Considered

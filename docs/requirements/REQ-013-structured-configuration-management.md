@@ -70,7 +70,7 @@ the active file only after authorized apply.
   A configured activation or health-check failure invokes rollback and records
   both results without granting Config Manager general service-control rights.
 - [ ] **AC-13:** Read, propose, apply, activate, and rollback are independent
-  permissions derived from authenticated M12 identity and approval context.
+  permissions derived from authenticated M12 SSH identity and approval context.
   Unverified claimed roles cannot authorize remote mutation.
 - [ ] **AC-14:** Secret values are redacted from reads, diffs, errors, and audit.
   Audit records actor, resource ID, field name, version/hash transition,
@@ -85,7 +85,7 @@ the active file only after authorized apply.
 - Planned as TEST-CONFIG-MANAGER-001 and later M13 cases.
 
 ## Related ADRs
-- ADR-006 (authenticated roles are not yet available before M12)
+- ADR-006 and ADR-015 (authentication remains outside Policy; SSH identity is available from M12)
 - ADR-009 (capability-isolated services)
 - ADR-010 (authenticated local IPC and typed backends)
 - ADR-011 (synchronous sanitized audit)

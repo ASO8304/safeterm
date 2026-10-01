@@ -16,7 +16,8 @@ stage, exit code, and timing data needed to reconstruct a request lifecycle.
 Argument names are retained for diagnostic value, but raw argument values,
 stdout, stderr, and free-form error messages are excluded because they can
 contain credentials or other sensitive data. Claimed roles and user IDs remain
-unverified claims until M12 authentication is implemented.
+unverified claims unless they arrive from an authenticated Broker such as the
+M12 SSH Broker.
 
 ## Acceptance Criteria
 - [x] **AC-1:** Gateway and Runner emit a versioned structured event containing
