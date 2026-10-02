@@ -1,14 +1,14 @@
 [Unit]
 Description=SafeTerm restricted SSH Broker
-After=network.target safeterm-gateway.service
-Requires=safeterm-gateway.service
+After=network.target safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
+Requires=safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
 
 [Service]
 Type=simple
 User=safeterm-broker
 Group=safeterm-broker
 SupplementaryGroups=safeterm-gateway
-ExecStart=/usr/local/bin/safeterm-ssh-broker -listen=:2222 -config=/etc/safeterm -identities=/etc/safeterm/ssh/users.json -host-key=/etc/safeterm/ssh/ssh_host_ed25519_key -gateway-socket=/run/safeterm-gateway/gateway.sock
+ExecStart=/usr/local/bin/safeterm-ssh-broker -listen=:2222 -config=/etc/safeterm -identities=/etc/safeterm/ssh/users.json -host-key=/etc/safeterm/ssh/ssh_host_ed25519_key -gateway-socket=/run/safeterm-gateway/gateway.sock -config-managers=/run/safeterm-config-application/manager.sock:safeterm-config-application,/run/safeterm-config-database/manager.sock:safeterm-config-database,/run/safeterm-config-network/manager.sock:safeterm-config-network
 Restart=on-failure
 RestartSec=2s
 UMask=0077

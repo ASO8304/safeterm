@@ -1,0 +1,55 @@
+{
+  "version": "config-resources-v1",
+  "resources": [
+    {
+      "id": "cats-options",
+      "description": "Cat service options",
+      "profile": "application",
+      "path": "/etc/safeterm-managed/application/options.ini",
+      "format": "ini",
+      "access": "read-write",
+      "fields": [
+        { "section": "cats", "key": "Cat_Path", "type": "path", "required": true, "secret": false, "read_only": false, "path": { "allowed_prefixes": ["/etc/cat"], "must_exist": true, "file_type": "directory", "allow_symlink": false, "expected_mode": "0750" } },
+        { "section": "cats", "key": "Cat_Port", "type": "integer", "required": true, "secret": false, "read_only": false, "min": 1, "max": 65535 },
+        { "section": "cats", "key": "Api_Token", "type": "string", "required": true, "secret": true, "read_only": false, "min_length": 16, "max_length": 256 }
+      ],
+      "rollback_on_failure": false,
+      "require_separate_approval": true,
+      "backup": { "enabled": true, "keep": 5 },
+      "permissions": { "read_roles": ["config-viewer", "config-operator"], "propose_roles": ["config-operator"], "apply_roles": ["config-approver"], "activate_roles": [], "rollback_roles": ["config-operator"] }
+    },
+    {
+      "id": "postgres-listener",
+      "description": "PostgreSQL listener settings",
+      "profile": "database",
+      "path": "/etc/safeterm-managed/database/postgresql.json",
+      "format": "json",
+      "access": "read-write",
+      "fields": [
+        { "section": "listener", "key": "address", "type": "string", "required": true, "secret": false, "read_only": false, "pattern": "^[A-Za-z0-9.:-]{1,255}$" },
+        { "section": "listener", "key": "port", "type": "integer", "required": true, "secret": false, "read_only": false, "min": 1, "max": 65535 },
+        { "section": "listener", "key": "tls", "type": "boolean", "required": true, "secret": false, "read_only": false }
+      ],
+      "rollback_on_failure": false,
+      "require_separate_approval": true,
+      "backup": { "enabled": true, "keep": 5 },
+      "permissions": { "read_roles": ["config-viewer", "config-operator"], "propose_roles": ["config-operator"], "apply_roles": ["config-approver"], "activate_roles": [], "rollback_roles": ["config-operator"] }
+    },
+    {
+      "id": "network-observer-options",
+      "description": "Network observer output policy",
+      "profile": "network",
+      "path": "/etc/safeterm-managed/network/observer.json",
+      "format": "json",
+      "access": "read-write",
+      "fields": [
+        { "section": "capture", "key": "interface", "type": "enum", "required": true, "secret": false, "read_only": false, "enum": ["any", "eth0", "lo"] },
+        { "section": "capture", "key": "max_packets", "type": "integer", "required": true, "secret": false, "read_only": false, "min": 1, "max": 100000 }
+      ],
+      "rollback_on_failure": false,
+      "require_separate_approval": false,
+      "backup": { "enabled": true, "keep": 5 },
+      "permissions": { "read_roles": ["config-viewer", "netops"], "propose_roles": ["netops", "config-operator"], "apply_roles": ["netops", "config-operator"], "activate_roles": [], "rollback_roles": ["netops", "config-operator"] }
+    }
+  ]
+}

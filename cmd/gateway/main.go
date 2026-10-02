@@ -9,6 +9,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"safeterm/internal/audit"
@@ -21,18 +22,19 @@ func main() {
 	configDir := flag.String("config", "/etc/safeterm", "catalog directory")
 	socketPath := flag.String("socket", "/run/safeterm-gateway/gateway.sock", "Gateway socket")
 	brokerUser := flag.String("broker-user", "safeterm-broker", "allowed local Broker user")
+	configManagerUsers := flag.String("config-manager-users", "safeterm-config-application,safeterm-config-database,safeterm-config-network", "comma-separated Config Manager activation clients")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
 	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
 	catalogPublicKey := flag.String("catalog-public-key", "", "trusted catalog Ed25519 public key (defaults under config directory)")
 	catalogSignature := flag.String("catalog-signature", "", "detached catalog signature (defaults under config directory)")
 	flag.Parse()
-	if err := run(*configDir, *socketPath, *brokerUser, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
+	if err := run(*configDir, *socketPath, *brokerUser, *configManagerUsers, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir, socketPath, brokerUser, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
+func run(configDir, socketPath, brokerUser, configManagerUsers, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
@@ -93,7 +95,23 @@ func run(configDir, socketPath, brokerUser, auditSocket, auditUser, catalogPubli
 	if err != nil {
 		return fmt.Errorf("gateway: parse Broker UID: %w", err)
 	}
-	server, err := isolation.ListenUnixStreaming(socketPath, 0o660, []uint32{uint32(brokerUID)}, gateway, gateway)
+	allowedUIDs := []uint32{uint32(brokerUID)}
+	for _, name := range strings.Split(configManagerUsers, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		account, lookupErr := user.Lookup(name)
+		if lookupErr != nil {
+			return fmt.Errorf("gateway: resolve Config Manager user %q: %w", name, lookupErr)
+		}
+		value, parseErr := strconv.ParseUint(account.Uid, 10, 32)
+		if parseErr != nil {
+			return parseErr
+		}
+		allowedUIDs = append(allowedUIDs, uint32(value))
+	}
+	server, err := isolation.ListenUnixStreaming(socketPath, 0o660, allowedUIDs, gateway, gateway)
 	if err != nil {
 		return err
 	}

@@ -112,6 +112,18 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-BROKER-011 | REQ-012 (AC-6, AC-10) | deploy/systemd, tests/integration | Integration | PASS |
 | TEST-BROKER-012 | REQ-012 (AC-8) | internal/broker | Unit | PASS |
 | TEST-BROKER-013 | REQ-012 (AC-12) | internal/broker | Unit | PASS |
+| TEST-CONFIG-MANAGER-001 | REQ-013 (AC-5, AC-7) | internal/configmanager adapters | Unit | PASS |
+| TEST-CONFIG-MANAGER-002 | REQ-013 (AC-2, AC-4, AC-5, AC-8) | internal/configmanager registry and validation | Unit | PASS |
+| TEST-CONFIG-MANAGER-003 | REQ-013 (AC-3, AC-9, AC-10, AC-11, AC-14) | internal/configmanager lifecycle | Unit | PASS |
+| TEST-CONFIG-MANAGER-004 | REQ-013 (AC-4, AC-13) | internal/configmanager authorization | Unit | PASS |
+| TEST-CONFIG-MANAGER-005 | REQ-013 (AC-6, AC-15) | internal/configmanager path validation | Security | PASS |
+| TEST-CONFIG-MANAGER-006 | REQ-013 (AC-9, AC-13) | internal/configmanager proposal approval and expiry | Security | PASS |
+| TEST-CONFIG-MANAGER-007 | REQ-013 (AC-10, AC-14) | internal/configmanager audit fail-closed | Security | PASS |
+| TEST-CONFIG-MANAGER-008 | REQ-013 (AC-12) | internal/configmanager activation health rollback | Unit | PASS |
+| TEST-CONFIG-MANAGER-009 | REQ-013 (AC-1, AC-3, AC-13) | internal/configmanager authenticated Unix IPC | Integration | PASS |
+| TEST-CONFIG-MANAGER-010 | REQ-013 (AC-3, AC-13) | internal/broker structured config routing | Unit | PASS |
+| TEST-CONFIG-MANAGER-011 | REQ-013 (AC-1, AC-2, AC-10) | deploy/systemd and example registry | Integration | PASS |
+| TEST-CONFIG-MANAGER-012 | REQ-013 (AC-15) | repository-wide make verify plus Config Manager/Broker/Audit race detection | Regression | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
@@ -121,6 +133,7 @@ Local M9 evidence: [complete make verify output](../../evidence/M9/make-verify.l
 Local M10 evidence: [complete make verify output](../../evidence/M10/make-verify.log).
 Local M11 evidence: [complete make verify output](../../evidence/M11/make-verify.log).
 Local M12 evidence: [complete make verify output](../../evidence/M12/make-verify.log).
+Local M13 evidence: [complete make verify output](../../evidence/M13/make-verify.log).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

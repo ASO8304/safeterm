@@ -20,12 +20,18 @@ func main() {
 	diagnosticsUser := flag.String("diagnostics-user", "safeterm-diagnostics", "diagnostics Runner user")
 	networkUser := flag.String("network-user", "safeterm-network", "network-observer Runner user")
 	serviceUser := flag.String("service-user", "safeterm-service-manager", "service-manager Runner user")
+	applicationConfigUser := flag.String("application-config-user", "safeterm-config-application", "application Config Manager user")
+	databaseConfigUser := flag.String("database-config-user", "safeterm-config-database", "database Config Manager user")
+	networkConfigUser := flag.String("network-config-user", "safeterm-config-network", "network Config Manager user")
 	flag.Parse()
 	if err := run(*socketPath, *storePath, []producerUser{
 		{name: *gatewayUser, policy: audit.Producer{Component: audit.ComponentGateway}},
 		{name: *diagnosticsUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "diagnostics"}},
 		{name: *networkUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "network-observer"}},
 		{name: *serviceUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "service-manager"}},
+		{name: *applicationConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "application"}},
+		{name: *databaseConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "database"}},
+		{name: *networkConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "network"}},
 	}); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

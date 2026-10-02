@@ -98,6 +98,6 @@ least-privilege deployment model used by capability-specific Runners.
   unrelated sensitive files. Legacy shared directories require a separately
   reviewed narrow write helper; granting broad directory write access is not
   an acceptable shortcut. The resource registry is read-only to the service.
-- Authenticated identity from M12 and the later approval workflow and Broker adapters are
-  prerequisites for remote mutation. This capability is scheduled as M13 rather
-  than being folded into M11 streaming.
+- M13 implements the approval workflow and SSH Broker adapter on top of the
+  authenticated identity delivered by M12. Web presentation can reuse the same
+  semantic IPC contract without granting the web process filesystem authority.

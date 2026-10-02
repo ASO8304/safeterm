@@ -1,4 +1,7 @@
 [
   { "name": "viewer", "description": "Read-only access to safe, non-sensitive operations." },
-  { "name": "netops", "description": "Network diagnostics and traffic capture operations." }
+  { "name": "netops", "description": "Network diagnostics and traffic capture operations." },
+  { "name": "config-viewer", "description": "Read registered non-secret configuration fields." },
+  { "name": "config-operator", "description": "Validate, preview, and apply registered configuration fields." },
+  { "name": "config-approver", "description": "Independently approve protected configuration proposals." }
 ]
