@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           cache: true
       - run: make security
 
@@ -51,19 +51,22 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           cache: true
       - run: go mod verify
       - run: go list -m all
 
   codeql:
     name: CodeQL
+    permissions:
+      actions: read
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           cache: true
       - uses: github/codeql-action/init@v4
         with:
@@ -74,7 +77,10 @@ jobs:
         with:
           upload: never
           output: codeql-results
+      - name: Enforce zero CodeQL findings
+        run: jq -e 'all(.runs[]; (.results // [] | length) == 0)' codeql-results/*.sarif
       - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: codeql-sarif
           path: codeql-results

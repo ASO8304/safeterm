@@ -18,7 +18,8 @@ those services do not have a fully equivalent offline mode.
 
 The initial local verification, security, and fuzz commands ran on Linux under
 WSL with Go 1.22 before the scanner-mandated dependency upgrade. The project
-now requires Go 1.25; CI verifies the final dependency graph and code with Go
-1.25. The official govulncheck action uses Go 1.26.8 because the current
+now requires Go 1.26 because the remediated SSH dependency requires it; CI
+verifies the final dependency graph and code with Go 1.26. The official
+govulncheck action uses Go 1.26.8 because the current
 scanner requires Go 1.26 or newer. Every recorded command must exit zero; any
 scanner finding or race blocks the M14 release.
