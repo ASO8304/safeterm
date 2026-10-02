@@ -215,13 +215,10 @@ func TestHandleRequest_AlwaysPopulatesTimestamps(t *testing.T) {
 }
 
 // TEST-AGENT-007
-// Scenario: the M2 placeholder stages (PassThroughValidator, AllowAllPolicy,
-// IdentityTranslator, NoOpExecutor) must wire together into a working Core,
-// proving the pipeline itself is correct independent of any real business
-// logic. This test exists specifically to justify placeholders.go — if this
-// ever fails, the M2 vertical slice is broken.
+// Scenario: test-only permissive stages must wire together into a working Core,
+// proving the pipeline itself is correct independent of business logic.
 func TestHandleRequest_WithM2Placeholders_EndToEndSucceeds(t *testing.T) {
-	core := NewCore(PassThroughValidator{}, AllowAllPolicy{}, IdentityTranslator{}, NoOpExecutor{})
+	core := NewCore(passThroughValidator{}, allowAllPolicy{}, identityTranslator{}, noOpExecutor{})
 
 	resp := core.HandleRequest(context.Background(), newTestRequest(t))
 

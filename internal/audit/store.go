@@ -57,7 +57,7 @@ func OpenFileStore(path string) (*FileStore, error) {
 		return nil, fmt.Errorf("audit: inspect opened store: %w", err)
 	}
 	pathInfo, err := os.Lstat(path)
-	if err != nil || !pathInfo.Mode().IsRegular() || !os.SameFile(openedInfo, pathInfo) {
+	if err != nil || !pathInfo.Mode().IsRegular() || !os.SameFile(openedInfo, pathInfo) || !singleLink(openedInfo) {
 		file.Close()
 		return nil, fmt.Errorf("audit: store path changed during open")
 	}

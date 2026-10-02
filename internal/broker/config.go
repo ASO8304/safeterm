@@ -5,16 +5,24 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"safeterm/internal/configmanager"
 )
+
+const maxConfigProposalRoutes = 4096
+
+type configProposalRoute struct {
+	client    configmanager.Service
+	expiresAt time.Time
+}
 
 // ConfigBroker routes opaque resource IDs to isolated Config Manager clients.
 // The caller never supplies a socket, filesystem path, parser, or executable.
 type ConfigBroker struct {
 	clients []configmanager.Service
 	mu      sync.Mutex
-	tokens  map[string]configmanager.Service
+	tokens  map[string]configProposalRoute
 }
 
 func NewConfigBroker(clients []configmanager.Service) (*ConfigBroker, error) {
@@ -26,7 +34,7 @@ func NewConfigBroker(clients []configmanager.Service) (*ConfigBroker, error) {
 			return nil, fmt.Errorf("broker: nil Config Manager client")
 		}
 	}
-	return &ConfigBroker{clients: append([]configmanager.Service(nil), clients...), tokens: map[string]configmanager.Service{}}, nil
+	return &ConfigBroker{clients: append([]configmanager.Service(nil), clients...), tokens: map[string]configProposalRoute{}}, nil
 }
 
 func configActor(principal Principal) configmanager.Actor {
@@ -97,20 +105,29 @@ func (b *ConfigBroker) Preview(ctx context.Context, p Principal, patch configman
 	r, e := c.Preview(ctx, configActor(p), patch)
 	if e == nil {
 		b.mu.Lock()
-		b.tokens[r.Token] = c
+		for token, route := range b.tokens {
+			if !time.Now().UTC().Before(route.expiresAt) {
+				delete(b.tokens, token)
+			}
+		}
+		if r.Token == "" || r.ExpiresAt.IsZero() || len(b.tokens) >= maxConfigProposalRoutes {
+			b.mu.Unlock()
+			return configmanager.PreviewResult{}, fmt.Errorf("broker: invalid or excessive Config Manager proposals")
+		}
+		b.tokens[r.Token] = configProposalRoute{client: c, expiresAt: r.ExpiresAt}
 		b.mu.Unlock()
 	}
 	return r, e
 }
 func (b *ConfigBroker) Apply(ctx context.Context, p Principal, token string) (configmanager.ApplyResult, error) {
 	b.mu.Lock()
-	c := b.tokens[token]
+	route := b.tokens[token]
 	delete(b.tokens, token)
 	b.mu.Unlock()
-	if c == nil {
+	if route.client == nil || !time.Now().UTC().Before(route.expiresAt) {
 		return configmanager.ApplyResult{}, fmt.Errorf("proposal token is unknown to this broker")
 	}
-	return c.Apply(ctx, configActor(p), token)
+	return route.client.Apply(ctx, configActor(p), token)
 }
 func (b *ConfigBroker) Rollback(ctx context.Context, p Principal, id string) (configmanager.RollbackResult, error) {
 	c, e := b.clientFor(ctx, p, id)

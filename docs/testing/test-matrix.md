@@ -124,6 +124,16 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-CONFIG-MANAGER-010 | REQ-013 (AC-3, AC-13) | internal/broker structured config routing | Unit | PASS |
 | TEST-CONFIG-MANAGER-011 | REQ-013 (AC-1, AC-2, AC-10) | deploy/systemd and example registry | Integration | PASS |
 | TEST-CONFIG-MANAGER-012 | REQ-013 (AC-15) | repository-wide make verify plus Config Manager/Broker/Audit race detection | Regression | PASS |
+| TEST-SECURITY-001 | REQ-014 (AC-2) | injection corpus through Validation, Policy, Translation, and Execution boundary | Security | PASS |
+| TEST-SECURITY-002 | REQ-014 (AC-3) | production source invariant for direct argv execution without a shell | Security | PASS |
+| TEST-SECURITY-003 | REQ-014 (AC-8) | systemd privilege and resource-bound manifests | Security | PASS |
+| TEST-SECURITY-004 | REQ-014 (AC-3, AC-7) | signed catalog executable and placeholder constraints | Security | PASS |
+| TEST-SECURITY-005..007 | REQ-014 (AC-2, AC-5, AC-10, AC-11) | request, registry, and streaming-frame fuzz targets | Fuzz | PASS |
+| TEST-SECURITY-008..010 | REQ-014 (AC-6) | managed config, audit, and Broker hardlink rejection | Security | PASS |
+| TEST-SECURITY-011 | REQ-014 (AC-4, AC-5) | Unix peer policy authorization and streaming denial | Integration | PASS |
+| TEST-SECURITY-012 | REQ-014 (AC-8, AC-10) | bounded and expiring Broker proposal route cache | Security | PASS |
+| TEST-SECURITY-013 | REQ-014 (AC-4) | per-profile Config Manager activation authorization | Security | PASS |
+| TEST-SECURITY-014 | REQ-014 (AC-5) | strict Config Manager IPC shapes, unknown fields, and size bounds | Security | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
@@ -134,6 +144,7 @@ Local M10 evidence: [complete make verify output](../../evidence/M10/make-verify
 Local M11 evidence: [complete make verify output](../../evidence/M11/make-verify.log).
 Local M12 evidence: [complete make verify output](../../evidence/M12/make-verify.log).
 Local M13 evidence: [complete make verify output](../../evidence/M13/make-verify.log).
+Local M14 evidence: [verification, adversarial, race, fuzz, and vulnerability outputs](../../evidence/M14/README.md).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

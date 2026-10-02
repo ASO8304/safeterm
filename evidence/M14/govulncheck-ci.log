@@ -1,0 +1,16 @@
+# SafeTerm M14 hosted govulncheck evidence
+
+Workflow: Security
+Run: https://github.com/ASO8304/safeterm/actions/runs/36989342133
+Commit: b250a9c2a88f27dea1e49000e74ce9b0a0f7727c
+Go toolchain: 1.26.8
+
+=== Symbol Results ===
+
+No vulnerabilities found.
+
+Your code is affected by 0 vulnerabilities.
+The scan also reported 0 vulnerabilities in imported packages.
+
+The hosted job completed successfully. Its reachability result is the M14
+release gate; the complete machine log remains available in the linked run.

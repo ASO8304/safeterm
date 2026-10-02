@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M13 — Structured Configuration Management (complete; tagged v0.14.0-m13)**
+**Milestone: M14 — Adversarial Security Verification (complete; release candidate)**
 
 Available capabilities:
 
@@ -37,6 +37,12 @@ Available capabilities:
 - An interactive `config` workflow in the SSH restricted terminal for listing,
   describing, reading, validating, previewing, approving, applying, and rolling
   back registered fields without exposing a file editor or operating-system shell
+- A repository threat model and dedicated adversarial suite covering injection,
+  IPC confusion, privilege boundaries, hardlinks, catalog integrity, resource
+  exhaustion, fuzz seeds, race detection, and secret-safe audit behavior
+- Peer-credential policies that restrict each Config Manager UID to its own
+  activation operations and reserve streaming access for the authenticated SSH Broker
+- Continuous vulnerability, dependency, and CodeQL analysis in the security workflow
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
@@ -44,9 +50,9 @@ is the trusted source of those roles for SSH traffic. Direct internal callers
 must still treat arbitrary `ClaimedRoles` as unverified input.
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
 runtime integrity boundary, bounded session control, authenticated SSH Broker,
-and structured Config Managers are implemented through M13. The Node Gateway
+structured Config Managers, and adversarial security controls are implemented through M14. The Node Gateway
 remains local-only and accepts the Broker solely through authenticated Unix
-IPC. M13 evidence is recorded in [evidence/M13](evidence/M13/README.md).
+IPC. M14 evidence is recorded in [evidence/M14](evidence/M14/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -157,13 +163,25 @@ Its acceptance criteria are in
 with the terminal workflow and adapter grammar in
 [Structured Configuration Management](docs/configuration-management.md).
 
+M14 adds a maintained [threat model](docs/security/threat-model.md), a
+repository-wide adversarial test package, bounded fuzz campaigns, race
+detection, and hosted security analysis. It also closes the Config Manager
+activation trust gap: Gateway authorizes each authenticated manager UID against
+that manager's configured profile and accepts only argument-free typed systemd
+operations registered in both the resource registry and signed operation
+catalog. See [REQ-014](docs/requirements/REQ-014-adversarial-security-verification.md)
+and [ADR-016](docs/decisions/ADR-016-adversarial-testing-and-peer-scoped-gateway.md).
+
 ## Local Verification
 
 ```bash
 make verify
+make security
 ```
 
-This command runs the formatting check, `go vet`, build, and unit/integration tests in order.
+`make verify` runs the formatting check, `go vet`, build, and unit/integration
+tests in order. `make security` runs the dedicated adversarial suite and the
+entire repository under Go's race detector.
 When every check passes, the final output is:
 
 ```text
@@ -212,5 +230,5 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M11 | Bounded Streaming and Semantic Termination | ✅ Tagged: v0.12.0-m11 |
 | M12 | Authenticated SSH Broker and Restricted Terminal | ✅ Tagged: v0.13.0-m12 |
 | M13 | Structured Configuration Management | ✅ Tagged: v0.14.0-m13 |
-| M14 | Security Testing | ⏳ Planned |
+| M14 | Adversarial Security Verification | ✅ Complete: release candidate |
 | M15 | End-to-End Deployment and Demo | ⏳ Planned |

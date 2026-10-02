@@ -24,11 +24,10 @@ small but complete end-to-end path before completing every capability.
   `ExecutionResponse` with `Result = rejected`; it never calls the next stage.
 - Errors are wrapped in `StageError{Stage, Err}` so the exact rejection stage is
   identifiable. This is essential for Audit (M9).
-- To prove pipeline correctness in M2, placeholder implementations
-  (`PassThroughValidator`, `AllowAllPolicy`, `IdentityTranslator`, and
-  `NoOpExecutor`) live in a separate file (`placeholders.go`) with an explicit
-  warning that they provide **no security guarantees** and exist only for
-  pipeline testing.
+- M2 initially used exported placeholder implementations to prove pipeline
+  correctness. M14 removes them from production builds after all real stages
+  are available. Equivalent permissive doubles live only in `_test.go` files,
+  so another package cannot accidentally wire a bypass pipeline.
 
 ## Alternatives Considered
 1. **Implement stage logic directly inside Core without interfaces** — Rejected
@@ -38,10 +37,9 @@ small but complete end-to-end path before completing every capability.
    Rejected because each stage has a different function signature. Translator
    returns command+args, while Executor returns stdout/stderr/exitCode. A
    generic interface would hide these differences and remove type safety.
-3. **Put placeholders directly in tests rather than a separate file** —
-   Rejected because it reduces readability and increases the chance of
-   accidental reuse elsewhere, such as in an early demo. A separate file with
-   an explicit warning reduces that risk.
+3. **Keep the M2 placeholders exported after the real stages exist** — Rejected
+   in M14 because production packages no longer need them and test-only
+   implementations make accidental reuse impossible.
 
 ## Consequences
 - M4, M5, M6, and M7 only need to implement their corresponding interfaces and
@@ -49,6 +47,5 @@ small but complete end-to-end path before completing every capability.
 - Tests in `core_test.go` use mocks that record every stage call. This proves
   early termination by verifying that later stages were never called, rather
   than inferring it only from the final result.
-- No real Executor may be connected to Core until M4, M5, and M6 are complete.
-  This is an operational rule, not a technical restriction, and must be
-  enforced during review of subsequent milestones.
+- Production packages have no permissive stage implementations available from
+  `internal/agent`; they must supply concrete implementations explicitly.

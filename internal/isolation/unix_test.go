@@ -5,6 +5,7 @@ package isolation
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -67,6 +68,38 @@ func TestUnixIPCRejectsUntrustedPeer(t *testing.T) {
 	}
 	if handler.calls != 0 {
 		t.Fatal("handler reached by untrusted client")
+	}
+}
+
+// TEST-SECURITY-011: REQ-014 AC-4 and AC-5.
+func TestUnixPeerPolicyRestrictsUnaryCommandsAndStreaming(t *testing.T) {
+	uid := uint32(os.Getuid())
+	path := filepath.Join(t.TempDir(), "policy.sock")
+	options := DefaultStreamOptions()
+	options.IdleTimeout = time.Second
+	manager, _ := newTestSessionManager(t, "interrupt", options)
+	policy := PeerPolicy{Authorize: func(request *contract.ExecutionRequest) error {
+		if request.Command != "allowed" || len(request.Arguments) != 0 {
+			return fmt.Errorf("denied")
+		}
+		return nil
+	}}
+	server, err := ListenUnixStreamingWithPeerPolicies(path, 0o600, map[uint32]PeerPolicy{uid: policy}, manager.handler, manager)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go server.Serve(ctx)
+	client, _ := NewUnixClient(path, []uint32{uid})
+	if _, err := client.Handle(context.Background(), &contract.ExecutionRequest{RequestID: "denied", Command: "other"}); err == nil {
+		t.Fatal("peer policy allowed an unregistered command")
+	}
+	if _, err := client.Handle(context.Background(), &contract.ExecutionRequest{RequestID: "allowed", Command: "allowed"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.StartStream(context.Background(), &contract.ExecutionRequest{RequestID: "stream", Command: "allowed"}); err == nil {
+		t.Fatal("non-streaming peer opened a stream")
 	}
 }
 

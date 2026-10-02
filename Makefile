@@ -1,4 +1,4 @@
-.PHONY: build test vet fmt fmt-check verify clean
+.PHONY: build test security vet fmt fmt-check verify clean
 
 build:
 	@echo "==> Building..."
@@ -7,6 +7,12 @@ build:
 test:
 	@echo "==> Running unit tests..."
 	go test ./... -v -cover
+
+security:
+	@echo "==> Running adversarial security tests..."
+	go test ./tests/security -count=1 -v
+	@echo "==> Running race detector across all packages..."
+	go test -race ./...
 
 vet:
 	@echo "==> Running go vet..."
