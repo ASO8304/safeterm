@@ -35,6 +35,21 @@ func LoadRegistry(path string) (*Registry, error) {
 			return nil, fmt.Errorf("configmanager: registry must be owned by root")
 		}
 	}
+	registry, err := ParseRegistry(data)
+	if err != nil {
+		return nil, err
+	}
+	return registry, nil
+}
+
+// ParseRegistry strictly decodes and validates registry data without making
+// filesystem ownership claims. Deployment tooling uses it to validate an
+// offline bundle before root installs the registry; runtime services must use
+// LoadRegistry so ownership, link, type, mode, and size checks still apply.
+func ParseRegistry(data []byte) (*Registry, error) {
+	if len(data) == 0 || len(data) > maxRegistryBytes {
+		return nil, fmt.Errorf("configmanager: registry must be between 1 and %d bytes", maxRegistryBytes)
+	}
 	var registry Registry
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()

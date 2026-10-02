@@ -1,4 +1,4 @@
-.PHONY: build test security vet fmt fmt-check verify clean
+.PHONY: build test e2e security vet fmt fmt-check verify clean
 
 build:
 	@echo "==> Building..."
@@ -7,6 +7,10 @@ build:
 test:
 	@echo "==> Running unit tests..."
 	go test ./... -v -cover
+
+e2e:
+	@echo "==> Running deployment and public-boundary end-to-end tests..."
+	go test ./internal/deployment ./tests/e2e -count=1 -v
 
 security:
 	@echo "==> Running adversarial security tests..."

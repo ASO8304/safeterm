@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M14 — Adversarial Security Verification (complete; tagged `v0.15.1-m14`)**
+**Milestone: M15 — End-to-End Deployment and Demo (complete; tagged `v0.16.0-m15`)**
 
 Available capabilities:
 
@@ -43,6 +43,10 @@ Available capabilities:
 - Peer-credential policies that restrict each Config Manager UID to its own
   activation operations and reserve streaming access for the authenticated SSH Broker
 - Continuous vulnerability, dependency, and CodeQL analysis in the security workflow
+- A checksum-protected deployment bundle, strict preflight command, fresh-host
+  systemd installer with dry-run support, and an automated disposable-host demo
+- A public-boundary E2E test that authenticates over SSH and crosses real Unix
+  IPC, Gateway, Runner, integrity, direct execution, and durable Audit boundaries
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
@@ -50,9 +54,10 @@ is the trusted source of those roles for SSH traffic. Direct internal callers
 must still treat arbitrary `ClaimedRoles` as unverified input.
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
 runtime integrity boundary, bounded session control, authenticated SSH Broker,
-structured Config Managers, and adversarial security controls are implemented through M14. The Node Gateway
+structured Config Managers, adversarial security controls, and reproducible
+deployment are implemented through M15. The Node Gateway
 remains local-only and accepts the Broker solely through authenticated Unix
-IPC. M14 evidence is recorded in [evidence/M14](evidence/M14/README.md).
+IPC. M15 evidence is recorded in [evidence/M15](evidence/M15/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -172,16 +177,29 @@ operations registered in both the resource registry and signed operation
 catalog. See [REQ-014](docs/requirements/REQ-014-adversarial-security-verification.md)
 and [ADR-016](docs/decisions/ADR-016-adversarial-testing-and-peer-scoped-gateway.md).
 
+M15 turns the implemented services into a reproducible fresh-host deployment.
+`catalog-prepare` hashes the target host's exact executables, an offline operator
+signs the normalized catalog, and `build-bundle.sh` creates a manifest-protected
+runtime bundle. `safeterm-preflight` validates the bundle and installed host;
+`install.sh` performs a non-mutating dry run before creating isolated accounts,
+installing artifacts, and starting services in dependency order. The root-only
+demo proves the deployed SSH terminal, verified operation, and structured config
+menu. See [REQ-015](docs/requirements/REQ-015-end-to-end-deployment-and-demo.md),
+[ADR-017](docs/decisions/ADR-017-signed-bundle-and-two-level-e2e-verification.md),
+and the [deployment guide](docs/deployment.md).
+
 ## Local Verification
 
 ```bash
 make verify
+make e2e
 make security
 ```
 
 `make verify` runs the formatting check, `go vet`, build, and unit/integration
 tests in order. `make security` runs the dedicated adversarial suite and the
-entire repository under Go's race detector.
+entire repository under Go's race detector. `make e2e` runs deployment preflight
+and the real SSH-to-audit public-boundary test without requiring root or systemd.
 When every check passes, the final output is:
 
 ```text
@@ -231,4 +249,4 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M12 | Authenticated SSH Broker and Restricted Terminal | ✅ Tagged: v0.13.0-m12 |
 | M13 | Structured Configuration Management | ✅ Tagged: v0.14.0-m13 |
 | M14 | Adversarial Security Verification | ✅ Tagged: v0.15.1-m14 |
-| M15 | End-to-End Deployment and Demo | ⏳ Planned |
+| M15 | End-to-End Deployment and Demo | ✅ Tagged: v0.16.0-m15 |

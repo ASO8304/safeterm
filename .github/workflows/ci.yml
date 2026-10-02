@@ -21,3 +21,18 @@ jobs:
 
       - name: Run full verification (fmt, vet, build, test)
         run: make verify
+
+  end-to-end:
+    name: Deployment and SSH End-to-End
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.x'
+
+      - name: Run deployment and public-boundary tests
+        run: make e2e

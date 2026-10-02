@@ -140,6 +140,13 @@ Its purpose is to show which tests cover every requirement from a single file.
 | M14-RACE-GATE | REQ-014 (AC-12) | repository-wide race detector including concurrent audit, session, proposal, and IPC state | CI / Security | PASS |
 | M14-HOSTED-SECURITY | REQ-014 (AC-13) | adversarial/race, govulncheck, dependency integrity, and zero-finding CodeQL jobs | CI / Security | PASS |
 | M14-EVIDENCE-CONFORMANCE | REQ-014 (AC-14) | non-empty verification, race/security, fuzz, and hosted vulnerability evidence plus complete AC mapping | Security | PASS |
+| TEST-DEPLOY-001 | REQ-015 (AC-1, AC-2) | catalog preparation and offline signing separation | Unit | PASS |
+| TEST-DEPLOY-002 | REQ-015 (AC-3, AC-4) | signed bundle preflight and tamper rejection | Integration | PASS |
+| TEST-DEPLOY-003 | REQ-015 (AC-3, AC-5, AC-7) | executable deployment assets and complete bundle contents | Integration | PASS |
+| TEST-DEPLOY-004 | REQ-015 (AC-4..AC-7) | pre-mutation verification, dry run, installed preflight, and startup order | Integration | PASS |
+| TEST-E2E-001..004 | REQ-015 (AC-8..AC-10) | real SSH, Unix IPC, Gateway, Runner, integrity, execution, and correlated Audit path | End-to-End | PASS |
+| TEST-E2E-005..006 | REQ-015 (AC-10..AC-12) | operator demo public workflow, host-key verification, preflight, and documented scope | End-to-End | PASS |
+| M15-HOSTED-E2E | REQ-015 (AC-8..AC-12) | isolated hosted deployment and SSH end-to-end CI job | CI / End-to-End | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).
@@ -151,6 +158,7 @@ Local M11 evidence: [complete make verify output](../../evidence/M11/make-verify
 Local M12 evidence: [complete make verify output](../../evidence/M12/make-verify.log).
 Local M13 evidence: [complete make verify output](../../evidence/M13/make-verify.log).
 Local M14 evidence: [verification, adversarial, race, fuzz, and vulnerability outputs](../../evidence/M14/README.md).
+M15 evidence: [verification and hosted deployment/SSH end-to-end outputs](../../evidence/M15/README.md).
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.

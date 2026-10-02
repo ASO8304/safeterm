@@ -1,11 +1,15 @@
 # Linux systemd deployment
 
-M14 ships an authenticated restricted SSH Broker, three isolated Config
+M15 ships an authenticated restricted SSH Broker, three isolated Config
 Managers, and an independent append-only Audit Service alongside one unprivileged
 Node Gateway and three capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
 different users with separate runtime directories, sockets, catalogs, resource
 limits, and capability bounding sets.
+
+Use the automated bundle, preflight, installer, and demo procedures in the
+[deployment guide](../../docs/deployment.md). The remainder of this document
+describes the service identities and security boundaries enforced by the units.
 
 Required service accounts:
 
