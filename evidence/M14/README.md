@@ -9,6 +9,7 @@ retains the complete local command output used for the milestone decision.
 | `security.log` | dedicated adversarial suite and repository-wide race detector |
 | `fuzz.log` | bounded live campaigns for request, registry, and stream-frame fuzz targets |
 | `govulncheck-ci.log` | hosted Go vulnerability reachability analysis for all packages |
+| `completion-hardening-ci.md` | final bounded-IPC, systemd-value, traceability, and hosted CI closure |
 
 The GitHub Security workflow independently repeats the adversarial and race
 suite, verifies module checksums, runs govulncheck, and runs CodeQL while
