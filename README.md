@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M14 — Adversarial Security Verification (complete; release candidate)**
+**Milestone: M14 — Adversarial Security Verification (complete; tagged `v0.15.0-m14`)**
 
 Available capabilities:
 
@@ -230,5 +230,5 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M11 | Bounded Streaming and Semantic Termination | ✅ Tagged: v0.12.0-m11 |
 | M12 | Authenticated SSH Broker and Restricted Terminal | ✅ Tagged: v0.13.0-m12 |
 | M13 | Structured Configuration Management | ✅ Tagged: v0.14.0-m13 |
-| M14 | Adversarial Security Verification | ✅ Complete: release candidate |
+| M14 | Adversarial Security Verification | ✅ Tagged: v0.15.0-m14 |
 | M15 | End-to-End Deployment and Demo | ⏳ Planned |
