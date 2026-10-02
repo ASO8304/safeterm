@@ -21,6 +21,7 @@ type SSHServer struct {
 	config  *ssh.ServerConfig
 	client  GatewayClient
 	catalog *Catalog
+	configs *ConfigBroker
 	mu      sync.Mutex
 	active  map[net.Conn]bool
 	slots   chan struct{}
@@ -28,6 +29,10 @@ type SSHServer struct {
 }
 
 func NewSSHServer(address string, hostKey ssh.Signer, authenticator *SSHAuthenticator, client GatewayClient, catalog *Catalog) (*SSHServer, error) {
+	return NewSSHServerWithConfig(address, hostKey, authenticator, client, catalog, nil)
+}
+
+func NewSSHServerWithConfig(address string, hostKey ssh.Signer, authenticator *SSHAuthenticator, client GatewayClient, catalog *Catalog, configs *ConfigBroker) (*SSHServer, error) {
 	if address == "" || hostKey == nil || authenticator == nil || client == nil || catalog == nil {
 		return nil, fmt.Errorf("broker: SSH address, host key, authenticator, Gateway client, and catalog are required")
 	}
@@ -43,7 +48,7 @@ func NewSSHServer(address string, hostKey ssh.Signer, authenticator *SSHAuthenti
 		ServerVersion:     "SSH-2.0-SafeTerm",
 	}
 	serverConfig.AddHostKey(hostKey)
-	return &SSHServer{address: address, config: serverConfig, client: client, catalog: catalog, active: map[net.Conn]bool{}, slots: make(chan struct{}, maxSSHConnections)}, nil
+	return &SSHServer{address: address, config: serverConfig, client: client, catalog: catalog, configs: configs, active: map[net.Conn]bool{}, slots: make(chan struct{}, maxSSHConnections)}, nil
 }
 
 func LoadSSHHostKey(path string) (ssh.Signer, error) {
@@ -188,7 +193,7 @@ func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requ
 				accepted = ptyAccepted && !shellStarted && len(request.Payload) == 0
 				if accepted {
 					shellStarted = true
-					shell, err := NewShell(s.client, s.catalog, principal, channel, channel)
+					shell, err := NewShellWithConfig(s.client, s.catalog, principal, channel, channel, s.configs)
 					if err != nil {
 						accepted = false
 						shellStarted = false

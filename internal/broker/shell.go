@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"safeterm/internal/config"
+	"safeterm/internal/configmanager"
 	"safeterm/internal/contract"
 	"safeterm/internal/isolation"
 )
@@ -27,14 +28,19 @@ type Shell struct {
 	principal Principal
 	input     io.Reader
 	output    io.Writer
+	configs   *ConfigBroker
 	skipLF    bool
 }
 
 func NewShell(client GatewayClient, catalog *Catalog, principal Principal, input io.Reader, output io.Writer) (*Shell, error) {
+	return NewShellWithConfig(client, catalog, principal, input, output, nil)
+}
+
+func NewShellWithConfig(client GatewayClient, catalog *Catalog, principal Principal, input io.Reader, output io.Writer, configs *ConfigBroker) (*Shell, error) {
 	if client == nil || catalog == nil || !identityPattern.MatchString(principal.UserID) || len(principal.Roles) == 0 || input == nil || output == nil {
 		return nil, fmt.Errorf("broker: invalid restricted shell configuration")
 	}
-	return &Shell{client: client, catalog: catalog, principal: principal, input: input, output: output}, nil
+	return &Shell{client: client, catalog: catalog, principal: principal, input: input, output: output, configs: configs}, nil
 }
 
 func (s *Shell) Run(ctx context.Context) error {
@@ -164,7 +170,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: help")
 		}
-		fmt.Fprint(s.output, "help                 show this help\r\nlist                 list authorized operations\r\ndescribe NAME        show operation parameters\r\nrun NAME [K=V ...]   run an authorized operation\r\nwhoami               show authenticated identity\r\nclear                clear the terminal\r\nexit                 close this session\r\n")
+		fmt.Fprint(s.output, "help                         show this help\r\nlist                         list authorized operations\r\ndescribe NAME                show operation parameters\r\nrun NAME [K=V ...]           run an authorized operation\r\nconfig list                  list configuration resources\r\nconfig show ID               read registered fields\r\nconfig describe ID           show field schemas\r\nconfig edit ID SECTION KEY   validate, preview, and apply one field\r\nconfig apply TOKEN           apply an approved proposal\r\nconfig rollback ID           restore the newest retained backup\r\nwhoami                       show authenticated identity\r\nclear                        clear the terminal\r\nexit                         close this session\r\n")
 	case "list":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: list")
@@ -202,6 +208,8 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 			return false, err
 		}
 		return false, s.runOperation(ctx, operation, arguments, input)
+	case "config":
+		return false, s.runConfig(ctx, fields[1:], input)
 	case "whoami":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: whoami")
@@ -221,6 +229,200 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		return false, fmt.Errorf("unknown shell command %q; use 'help'", fields[0])
 	}
 	return false, nil
+}
+
+func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byte) error {
+	if s.configs == nil {
+		return fmt.Errorf("configuration management is unavailable")
+	}
+	if len(fields) == 0 {
+		return fmt.Errorf("usage: config list|show|describe|edit|apply|rollback")
+	}
+	switch fields[0] {
+	case "list":
+		if len(fields) != 1 {
+			return fmt.Errorf("usage: config list")
+		}
+		items, err := s.configs.List(ctx, s.principal)
+		if err != nil {
+			return err
+		}
+		if len(items) == 0 {
+			fmt.Fprint(s.output, "No authorized configuration resources.\r\n")
+		}
+		for _, item := range items {
+			fmt.Fprintf(s.output, "%-24s [%s/%s] %s\r\n", item.ID, item.Format, item.Access, item.Description)
+		}
+	case "describe":
+		if len(fields) != 2 {
+			return fmt.Errorf("usage: config describe ID")
+		}
+		description, err := s.configs.Describe(ctx, s.principal, fields[1])
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(s.output, "%s: %s\r\nprofile: %s format: %s access: %s\r\n", description.Resource.ID, description.Resource.Description, description.Resource.Profile, description.Resource.Format, description.Resource.Access)
+		for _, field := range description.Fields {
+			coordinate := field.Key
+			if field.Section != "" {
+				coordinate = field.Section + "." + field.Key
+			}
+			flags := []string{string(field.Type)}
+			if field.Required {
+				flags = append(flags, "required")
+			}
+			if field.Secret {
+				flags = append(flags, "secret")
+			}
+			if field.ReadOnly {
+				flags = append(flags, "read-only")
+			}
+			fmt.Fprintf(s.output, "- %-32s %s\r\n", coordinate, strings.Join(flags, ", "))
+		}
+	case "show":
+		if len(fields) != 2 {
+			return fmt.Errorf("usage: config show ID")
+		}
+		result, err := s.configs.Read(ctx, s.principal, fields[1])
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(s.output, "resource: %s\r\nversion: %s\r\n", result.ResourceID, result.Version)
+		for _, field := range result.Fields {
+			coordinate := field.Key
+			if field.Section != "" {
+				coordinate = field.Section + "." + field.Key
+			}
+			fmt.Fprintf(s.output, "%-32s = %s\r\n", coordinate, field.Value)
+		}
+	case "edit":
+		if len(fields) != 4 {
+			return fmt.Errorf("usage: config edit ID SECTION KEY (use - for the root section)")
+		}
+		section := fields[2]
+		if section == "-" {
+			section = ""
+		}
+		read, err := s.configs.Read(ctx, s.principal, fields[1])
+		if err != nil {
+			return err
+		}
+		description, err := s.configs.Describe(ctx, s.principal, fields[1])
+		if err != nil {
+			return err
+		}
+		var schema *configmanager.FieldDescription
+		for i := range description.Fields {
+			if description.Fields[i].Section == section && description.Fields[i].Key == fields[3] {
+				schema = &description.Fields[i]
+				break
+			}
+		}
+		if schema == nil {
+			return fmt.Errorf("field is unknown or unauthorized")
+		}
+		if schema.ReadOnly {
+			return fmt.Errorf("field is read-only")
+		}
+		fmt.Fprint(s.output, "new value: ")
+		value, err := s.readConfigValue(ctx, input, schema.Secret)
+		if err != nil {
+			return err
+		}
+		patch := configmanager.Patch{ResourceID: fields[1], Section: section, Key: fields[3], Value: value, BaseVersion: read.Version}
+		validation, err := s.configs.ValidatePatch(ctx, s.principal, patch)
+		if err != nil {
+			return err
+		}
+		if !validation.Valid {
+			return fmt.Errorf("validation failed: %s", validation.Message)
+		}
+		preview, err := s.configs.Preview(ctx, s.principal, patch)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(s.output, "preview:\r\n%s\r\nproposal: %s\r\nexpires: %s\r\n", strings.ReplaceAll(preview.Diff, "\n", "\r\n"), preview.Token, preview.ExpiresAt.Format(time.RFC3339))
+		if description.Resource.RequireSeparateApproval {
+			fmt.Fprint(s.output, "Separate approver must run: config apply TOKEN\r\n")
+			return nil
+		}
+		fmt.Fprint(s.output, "apply this change? [y/N]: ")
+		answer, err := s.readConfigValue(ctx, input, false)
+		if err != nil {
+			return err
+		}
+		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+			fmt.Fprint(s.output, "proposal not applied\r\n")
+			return nil
+		}
+		result, err := s.configs.Apply(ctx, s.principal, preview.Token)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(s.output, "applied: %s -> %s\r\n", result.PreviousVersion, result.Version)
+	case "apply":
+		if len(fields) != 2 {
+			return fmt.Errorf("usage: config apply TOKEN")
+		}
+		result, err := s.configs.Apply(ctx, s.principal, fields[1])
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(s.output, "applied %s: %s -> %s\r\n", result.ResourceID, result.PreviousVersion, result.Version)
+	case "rollback":
+		if len(fields) != 2 {
+			return fmt.Errorf("usage: config rollback ID")
+		}
+		fmt.Fprint(s.output, "restore newest backup? [y/N]: ")
+		answer, err := s.readConfigValue(ctx, input, false)
+		if err != nil {
+			return err
+		}
+		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
+			return nil
+		}
+		result, err := s.configs.Rollback(ctx, s.principal, fields[1])
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(s.output, "rolled back %s: %s -> %s\r\n", result.ResourceID, result.PreviousVersion, result.Version)
+	default:
+		return fmt.Errorf("unknown config command %q", fields[0])
+	}
+	return nil
+}
+
+func (s *Shell) readConfigValue(ctx context.Context, input <-chan byte, secret bool) (string, error) {
+	if !secret {
+		return s.readLine(ctx, input)
+	}
+	line := make([]byte, 0, 128)
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case b, ok := <-input:
+			if !ok {
+				return "", io.EOF
+			}
+			switch b {
+			case '\r', '\n':
+				fmt.Fprint(s.output, "\r\n")
+				return string(line), nil
+			case 0x03:
+				fmt.Fprint(s.output, "^C\r\n")
+				return "", fmt.Errorf("input cancelled")
+			case 0x7f, 0x08:
+				if len(line) > 0 {
+					line = line[:len(line)-1]
+				}
+			default:
+				if b >= 0x20 && b <= 0x7e && len(line) < maxShellLineBytes {
+					line = append(line, b)
+				}
+			}
+		}
+	}
 }
 
 func (s *Shell) describe(operation config.OperationDefinition) {

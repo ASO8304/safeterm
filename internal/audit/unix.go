@@ -40,11 +40,11 @@ func ListenUnix(path string, mode os.FileMode, producers map[uint32][]Producer, 
 			return nil, fmt.Errorf("audit: UID %d has no producer policy", uid)
 		}
 		for _, producer := range identities {
-			if producer.Component != ComponentGateway && producer.Component != ComponentRunner {
+			if producer.Component != ComponentGateway && producer.Component != ComponentRunner && producer.Component != ComponentConfigManager {
 				return nil, fmt.Errorf("audit: invalid producer component %q", producer.Component)
 			}
-			if producer.Component == ComponentRunner && producer.Profile == "" {
-				return nil, fmt.Errorf("audit: runner producer requires a profile")
+			if (producer.Component == ComponentRunner || producer.Component == ComponentConfigManager) && producer.Profile == "" {
+				return nil, fmt.Errorf("audit: profile-scoped producer requires a profile")
 			}
 		}
 		policies[uid] = append([]Producer(nil), identities...)
@@ -119,7 +119,7 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 	}
 	authorized := false
 	for _, producer := range producers {
-		if event.Component == producer.Component && (producer.Component != ComponentRunner || event.Profile == producer.Profile) {
+		if event.Component == producer.Component && ((producer.Component != ComponentRunner && producer.Component != ComponentConfigManager) || event.Profile == producer.Profile) {
 			authorized = true
 			break
 		}

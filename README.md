@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M12 — Authenticated SSH Broker and Restricted Terminal (complete; tagged v0.13.0-m12)**
+**Milestone: M13 — Structured Configuration Management (complete; release candidate)**
 
 Available capabilities:
 
@@ -30,16 +30,23 @@ Available capabilities:
 - A hardened SSH Broker with public-key identity, server-owned catalog roles,
   an authorization-filtered operation menu, a fixed custom-shell grammar, PTY
   terminal behavior, streamed output, and Ctrl+C semantic termination
+- Three least-privilege Config Manager profiles with authenticated Unix IPC,
+  semantic resource/field APIs, preserving INI and deterministic JSON adapters,
+  typed validation, redacted secrets, expiring proposals, optimistic concurrency,
+  atomic writes, bounded backups, rollback, and optional typed activation checks
+- An interactive `config` workflow in the SSH restricted terminal for listing,
+  describing, reading, validating, previewing, approving, applying, and rolling
+  back registered fields without exposing a file editor or operating-system shell
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
 is the trusted source of those roles for SSH traffic. Direct internal callers
 must still treat arbitrary `ClaimedRoles` as unverified input.
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
-runtime integrity boundary, bounded session control, and authenticated SSH
-Broker are implemented through M12. The Node Gateway remains local-only and
-accepts the Broker solely through authenticated Unix IPC. M12 evidence is
-recorded in [evidence/M12](evidence/M12/README.md).
+runtime integrity boundary, bounded session control, authenticated SSH Broker,
+and structured Config Managers are implemented through M13. The Node Gateway
+remains local-only and accepts the Broker solely through authenticated Unix
+IPC. M13 evidence is recorded in [evidence/M13](evidence/M13/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -69,14 +76,13 @@ Gateway; the Gateway performs no execution and forwards each operation over
 host-local IPC to exactly one Runner profile.
 
 ```text
-Client -> Broker -> Node Gateway -> diagnostics Runner
-                                -> network-observer Runner
-                                -> service-manager Runner
-                                -> web-config Manager
-                                -> database-config Manager
-                                -> network-config Manager
-                  Audit Service <- Gateway and every Runner
-                                <- every Config Manager
+Client -> SSH Broker -> Node Gateway -> diagnostics Runner
+                                    -> network-observer Runner
+                                    -> service-manager Runner
+                     -> application Config Manager
+                     -> database Config Manager
+                     -> network Config Manager
+          Audit Service <- Gateway, every Runner, and every Config Manager
 ```
 
 Profiles share a codebase but run as separate processes with separate service
@@ -140,14 +146,16 @@ Inside the terminal, use `list`, `describe NAME`, and
 [ADR-015](docs/decisions/ADR-015-restricted-ssh-broker.md), and the deployment
 instructions in [deploy/systemd](deploy/systemd/README.md).
 
-A structured configuration service is planned for M13 in
+A structured configuration service is implemented in M13 according to
 [ADR-014](docs/decisions/ADR-014-structured-configuration-management-service.md).
 It uses resource IDs, typed format adapters, validated patches, atomic writes,
 optimistic concurrency, preview-bound proposal tokens, rollback, and multiple
 least-privilege service profiles. Broker renders the interactive menu or form;
 the service never exposes arbitrary paths, replacement files, or a text editor.
 Its acceptance criteria are in
-[REQ-013](docs/requirements/REQ-013-structured-configuration-management.md).
+[REQ-013](docs/requirements/REQ-013-structured-configuration-management.md),
+with the terminal workflow and adapter grammar in
+[Structured Configuration Management](docs/configuration-management.md).
 
 ## Local Verification
 
@@ -203,6 +211,6 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
 | M11 | Bounded Streaming and Semantic Termination | ✅ Tagged: v0.12.0-m11 |
 | M12 | Authenticated SSH Broker and Restricted Terminal | ✅ Tagged: v0.13.0-m12 |
-| M13 | Structured Configuration Management | ⏳ Planned |
+| M13 | Structured Configuration Management | ✅ Complete; release candidate |
 | M14 | Security Testing | ⏳ Planned |
 | M15 | End-to-End Deployment and Demo | ⏳ Planned |

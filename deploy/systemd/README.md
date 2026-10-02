@@ -1,6 +1,7 @@
 # Linux systemd deployment
 
-M12 ships an authenticated restricted SSH Broker and an independent append-only Audit Service alongside one unprivileged
+M13 ships an authenticated restricted SSH Broker, three isolated Config
+Managers, and an independent append-only Audit Service alongside one unprivileged
 Node Gateway and three capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
 different users with separate runtime directories, sockets, catalogs, resource
@@ -15,6 +16,9 @@ safeterm-diagnostics
 safeterm-network
 safeterm-service-manager
 safeterm-audit
+safeterm-config-application
+safeterm-config-database
+safeterm-config-network
 ```
 
 The Runner accounts use `safeterm-gateway` as their service group so the
@@ -34,7 +38,7 @@ record by SHA-256 to detect modification, reordering, and deletion inside the
 retained chain. The hash chain is corruption evidence, not a digital signature
 or an external checkpoint against complete-file replacement or tail truncation.
 
-Install the binaries as `/usr/local/bin/safeterm-ssh-broker`, `/usr/local/bin/safeterm-gateway`,
+Install the binaries as `/usr/local/bin/safeterm-ssh-broker`, `/usr/local/bin/safeterm-config-manager`, `/usr/local/bin/safeterm-gateway`,
 `/usr/local/bin/safeterm-runner`, `/usr/local/bin/safeterm-audit`, and keep
 `catalog-sign` only on an offline administration host. Install the catalog,
 `catalog.sig`, and the separately provisioned public key at
@@ -83,6 +87,35 @@ never remove the bounds.
 The Broker accepts only one session channel per connection and rejects SSH
 exec, subsystems, forwarding, agent forwarding, and environment changes. Its
 fixed shell grammar is `help`, `list`, `describe`, `run`, `whoami`, `clear`,
-and `exit`. Long-running output uses M11 streaming; Ctrl+C sends the semantic
+and `exit`, plus the structured `config` subcommands. Long-running output uses M11 streaming; Ctrl+C sends the semantic
 termination request to Gateway. Catalog proposal/approval and additional
 client adapters remain separate control-plane work.
+
+Provision the M13 registry and three dedicated writable directories before
+starting the Config Managers. The registry must be owned by root and must not
+be group- or world-writable. Each managed directory belongs to exactly one
+Config Manager identity so atomic temporary files and bounded backups do not
+broaden access to unrelated configuration:
+
+```bash
+install -d -o root -g root -m 0755 /etc/safeterm/config-manager
+install -o root -g root -m 0644 deploy/config-manager/resources.example.json \
+  /etc/safeterm/config-manager/resources.json
+install -d -o safeterm-config-application -g safeterm-config-application -m 0700 \
+  /etc/safeterm-managed/application
+install -d -o safeterm-config-database -g safeterm-config-database -m 0700 \
+  /etc/safeterm-managed/database
+install -d -o safeterm-config-network -g safeterm-config-network -m 0700 \
+  /etc/safeterm-managed/network
+```
+
+Replace the example resource paths, schemas, and roles for the target host and
+create each initial file before service startup. A Config Manager refuses an
+invalid document, a symlinked managed file, an unavailable validator or typed
+activation operation, and any resource outside its selected profile. The SSH
+Broker reaches each manager through its own authenticated Unix socket. Use
+`config list`, `config describe ID`, `config show ID`, and
+`config edit ID SECTION KEY` inside the restricted terminal. Use `-` for a
+root-level JSON field. Protected resources return a proposal token that a
+different authorized identity applies with `config apply TOKEN`; retained
+backups can be restored with `config rollback ID`.

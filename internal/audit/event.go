@@ -13,8 +13,9 @@ import (
 const SchemaVersion = 1
 
 const (
-	ComponentGateway = "gateway"
-	ComponentRunner  = "runner"
+	ComponentGateway       = "gateway"
+	ComponentRunner        = "runner"
+	ComponentConfigManager = "config-manager"
 )
 
 // Event is the stable, transport-neutral audit contract. It deliberately
@@ -40,6 +41,12 @@ type Event struct {
 	StartedAt      *time.Time               `json:"started_at,omitempty"`
 	EndedAt        *time.Time               `json:"ended_at,omitempty"`
 	DurationMillis *int64                   `json:"duration_ms,omitempty"`
+	ResourceID     string                   `json:"resource_id,omitempty"`
+	Field          string                   `json:"field,omitempty"`
+	BaseVersion    string                   `json:"base_version,omitempty"`
+	NewVersion     string                   `json:"new_version,omitempty"`
+	ProposalID     string                   `json:"proposal_id,omitempty"`
+	ApprovalUserID string                   `json:"approval_user_id,omitempty"`
 	OccurredAt     time.Time                `json:"occurred_at"`
 }
 
@@ -113,7 +120,7 @@ func (e Event) Validate() error {
 	if !isUTC(e.OccurredAt) || (e.ReceivedAt != nil && !isUTC(*e.ReceivedAt)) || (e.StartedAt != nil && !isUTC(*e.StartedAt)) || (e.EndedAt != nil && !isUTC(*e.EndedAt)) {
 		return fmt.Errorf("audit: timestamps must use UTC")
 	}
-	if e.Component != ComponentGateway && e.Component != ComponentRunner {
+	if e.Component != ComponentGateway && e.Component != ComponentRunner && e.Component != ComponentConfigManager {
 		return fmt.Errorf("audit: unsupported component %q", e.Component)
 	}
 	allowedOutcomes := map[string]map[string]bool{
@@ -130,9 +137,23 @@ func (e Event) Validate() error {
 			"idle-timeout": true, "client-disconnected": true,
 			"session-exited": true,
 		},
+		ComponentConfigManager: {
+			"read": true, "validation-rejected": true, "preview-created": true,
+			"apply-rejected": true, "apply-authorized": true, "applied": true, "activation-succeeded": true,
+			"activation-failed": true, "rollback-authorized": true, "rollback-succeeded": true, "rollback-failed": true,
+		},
 	}
 	if !allowedOutcomes[e.Component][e.Outcome] {
 		return fmt.Errorf("audit: unsupported %s outcome %q", e.Component, e.Outcome)
+	}
+	if e.Component == ComponentConfigManager {
+		if e.ResourceID == "" || e.UserID == "" || e.Profile == "" {
+			return fmt.Errorf("audit: config-manager event requires resource, user, and profile")
+		}
+		if e.Result != "" || e.ExitCode != nil || e.StartedAt != nil || e.EndedAt != nil || e.DurationMillis != nil || e.FailureStage != "" {
+			return fmt.Errorf("audit: config-manager event cannot contain execution response data")
+		}
+		return nil
 	}
 	sessionOutcome := map[string]bool{
 		"session-started": true, "stream-opened": true, "terminate-requested": true,

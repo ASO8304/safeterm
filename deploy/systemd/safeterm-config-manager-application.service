@@ -1,0 +1,43 @@
+[Unit]
+Description=SafeTerm application Config Manager
+After=local-fs.target safeterm-audit.service
+Requires=safeterm-audit.service
+Before=safeterm-ssh-broker.service
+
+[Service]
+Type=simple
+User=safeterm-config-application
+Group=safeterm-broker
+SupplementaryGroups=safeterm-audit safeterm-gateway
+RuntimeDirectory=safeterm-config-application
+RuntimeDirectoryMode=0750
+UMask=0007
+ExecStart=/usr/local/bin/safeterm-config-manager -profile=application -run-as-user=safeterm-config-application -registry=/etc/safeterm/config-manager/resources.json -socket=/run/safeterm-config-application/manager.sock
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/etc/safeterm-managed/application
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=96M
+TasksMax=32
+LimitNOFILE=128
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target
+
