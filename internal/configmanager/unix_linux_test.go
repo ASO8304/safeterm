@@ -83,3 +83,20 @@ func TestConfigManagerIPCRejectsAmbiguousUnknownAndOversizedRequests(t *testing.
 		}
 	}
 }
+
+// TEST-SECURITY-017: REQ-014 AC-5 and AC-8.
+func TestConfigManagerIPCConnectionAdmissionIsBounded(t *testing.T) {
+	server := &UnixServer{connections: make(chan struct{}, maxConcurrentIPCConnections)}
+	for i := 0; i < maxConcurrentIPCConnections; i++ {
+		if !server.acquireConnection() {
+			t.Fatalf("connection %d rejected before limit", i)
+		}
+	}
+	if server.acquireConnection() {
+		t.Fatal("connection above limit was accepted")
+	}
+	server.releaseConnection()
+	if !server.acquireConnection() {
+		t.Fatal("released connection slot was not reusable")
+	}
+}

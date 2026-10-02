@@ -41,12 +41,12 @@ UID's peer policy, socket access, filesystem view, capabilities, and cgroup.
 | Shell/argument injection | Whitelisted operations and parameters; whole-token templates; direct argv execution; no shell | Injection corpus, fuzz seeds, AST/source invariant |
 | Forged remote identity or role | SSH key mapping creates server-owned roles; Gateway binds requests to allowed peer behavior | Live SSH tests, peer-policy tests, privilege-abuse suite |
 | Cross-profile privilege escalation | Separate UIDs/sockets/catalog subsets/capabilities; peer-scoped activation operations | Routing and systemd tests; Config Manager Gateway denial tests |
-| IPC parser confusion or memory exhaustion | Versioned strict JSON; unknown/trailing rejection; frame/deadline limits | Malformed and oversized IPC tests and fuzz seeds |
+| IPC parser confusion or memory exhaustion | Versioned strict JSON; unknown/trailing rejection; frame/deadline limits; fixed concurrent-connection admission ceilings | Malformed, oversized, and connection-saturation IPC tests plus fuzz seeds |
 | Catalog/executable replacement | Detached signature; canonical path, mode, hash, native ELF, held descriptor | Tamper, symlink, interpreter, and replacement tests |
 | Configuration traversal or corruption | Opaque resource IDs; canonical path rules; no links; schema/full-document validation; atomic rename | Path/link/parser/concurrency/rollback tests |
 | Proposal theft, replay, or confused approval | Random short-lived single-use token bound to actor, patch, resource and base hash | Tamper, replay, expiry, actor and separate-approval tests |
 | Secret or control-byte disclosure | Redacted fields/diffs/audit; argument names only; terminal byte filtering | Secret corpus, audit inspection, terminal sanitization tests |
-| Process/output/session exhaustion | Deadlines, output/queue/session limits, process groups, cgroup/systemd bounds | Resource-abuse and lifecycle tests; race detector |
+| Process/output/session exhaustion | Deadlines, output/queue/session/connection limits, process groups, finite cgroup/systemd bounds | Resource-abuse, manifest-value, and lifecycle tests; race detector |
 | Audit spoofing or tampering | Producer UID/profile policy; synchronous fsync; hash-linked records; single-link store | Producer-spoof, corruption, partial-write, hard-link tests |
 | Vulnerable dependency or unsafe dataflow | Minimal dependencies, checksum verification, govulncheck, CodeQL, and platform dependency review when available | Required Security CI jobs and retained SARIF |
 

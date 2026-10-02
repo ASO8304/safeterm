@@ -14,7 +14,10 @@ import (
 	"safeterm/internal/contract"
 )
 
-const maxIPCMessageBytes = 1 << 20
+const (
+	maxIPCMessageBytes          = 1 << 20
+	maxConcurrentIPCConnections = 128
+)
 
 type ipcReply struct {
 	Response *contract.ExecutionResponse `json:"response,omitempty"`
@@ -26,6 +29,7 @@ type UnixServer struct {
 	handler      Client
 	streaming    StreamingService
 	peerPolicies map[uint32]PeerPolicy
+	connections  chan struct{}
 }
 
 // PeerPolicy binds an authenticated operating-system identity to the IPC
@@ -78,7 +82,10 @@ func listenUnix(path string, mode os.FileMode, policies map[uint32]PeerPolicy, h
 	for uid, policy := range policies {
 		copyPolicies[uid] = policy
 	}
-	return &UnixServer{listener: listener, handler: handler, streaming: streaming, peerPolicies: copyPolicies}, nil
+	return &UnixServer{
+		listener: listener, handler: handler, streaming: streaming,
+		peerPolicies: copyPolicies, connections: make(chan struct{}, maxConcurrentIPCConnections),
+	}, nil
 }
 
 func (s *UnixServer) Serve(ctx context.Context) error {
@@ -102,9 +109,27 @@ func (s *UnixServer) Serve(ctx context.Context) error {
 			}
 			return fmt.Errorf("isolation: accept Unix connection: %w", err)
 		}
-		go s.handle(conn)
+		if !s.acquireConnection() {
+			_ = conn.Close()
+			continue
+		}
+		go func() {
+			defer s.releaseConnection()
+			s.handle(conn)
+		}()
 	}
 }
+
+func (s *UnixServer) acquireConnection() bool {
+	select {
+	case s.connections <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *UnixServer) releaseConnection() { <-s.connections }
 
 func (s *UnixServer) Close() error {
 	if s == nil || s.listener == nil {

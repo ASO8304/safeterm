@@ -71,6 +71,23 @@ func TestUnixIPCRejectsUntrustedPeer(t *testing.T) {
 	}
 }
 
+// TEST-SECURITY-015: REQ-014 AC-5 and AC-8.
+func TestUnixIPCConnectionAdmissionIsBounded(t *testing.T) {
+	server := &UnixServer{connections: make(chan struct{}, maxConcurrentIPCConnections)}
+	for i := 0; i < maxConcurrentIPCConnections; i++ {
+		if !server.acquireConnection() {
+			t.Fatalf("connection %d rejected before limit", i)
+		}
+	}
+	if server.acquireConnection() {
+		t.Fatal("connection above limit was accepted")
+	}
+	server.releaseConnection()
+	if !server.acquireConnection() {
+		t.Fatal("released connection slot was not reusable")
+	}
+}
+
 // TEST-SECURITY-011: REQ-014 AC-4 and AC-5.
 func TestUnixPeerPolicyRestrictsUnaryCommandsAndStreaming(t *testing.T) {
 	uid := uint32(os.Getuid())
