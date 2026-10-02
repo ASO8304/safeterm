@@ -33,7 +33,11 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 	}
 
 	builder := readText(t, scripts[0])
-	for _, artifact := range []string{"safeterm-audit", "safeterm-config-manager", "safeterm-gateway", "safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight", "SHA256SUMS"} {
+	for _, artifact := range []string{
+		"audit config-manager gateway runner ssh-broker preflight",
+		`"$staging/bin/safeterm-$entry"`,
+		"SHA256SUMS",
+	} {
 		if !strings.Contains(builder, artifact) {
 			t.Errorf("bundle builder does not include %s", artifact)
 		}
