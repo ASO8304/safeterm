@@ -3,14 +3,19 @@ package broker
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"strings"
 	"testing"
+	"time"
 
 	"safeterm/internal/configmanager"
 )
 
 type fakeConfigService struct {
-	id    string
-	actor configmanager.Actor
+	id         string
+	actor      configmanager.Actor
+	preview    configmanager.PreviewResult
+	applyCalls int
 }
 
 func (f *fakeConfigService) List(_ context.Context, a configmanager.Actor) ([]configmanager.ResourceSummary, error) {
@@ -27,10 +32,31 @@ func (f *fakeConfigService) ValidatePatch(context.Context, configmanager.Actor, 
 	return configmanager.ValidationResult{Valid: true}, nil
 }
 func (f *fakeConfigService) Preview(context.Context, configmanager.Actor, configmanager.Patch) (configmanager.PreviewResult, error) {
-	return configmanager.PreviewResult{}, nil
+	return f.preview, nil
 }
 func (f *fakeConfigService) Apply(context.Context, configmanager.Actor, string) (configmanager.ApplyResult, error) {
+	f.applyCalls++
 	return configmanager.ApplyResult{}, nil
+}
+
+// TEST-SECURITY-012: REQ-014 AC-8 and AC-10.
+func TestConfigBrokerBoundsAndExpiresProposalRoutes(t *testing.T) {
+	service := &fakeConfigService{id: "resource", preview: configmanager.PreviewResult{Token: strings.Repeat("a", 64), ExpiresAt: time.Now().Add(time.Minute)}}
+	broker, _ := NewConfigBroker([]configmanager.Service{service})
+	principal := Principal{UserID: "alice", Roles: []string{"operator"}}
+	for index := 0; index < maxConfigProposalRoutes; index++ {
+		broker.tokens[fmt.Sprintf("token-%d", index)] = configProposalRoute{client: service, expiresAt: time.Now().Add(time.Minute)}
+	}
+	if _, err := broker.Preview(context.Background(), principal, configmanager.Patch{ResourceID: "resource"}); err == nil {
+		t.Fatal("unbounded proposal route accepted")
+	}
+	broker.tokens = map[string]configProposalRoute{"expired": {client: service, expiresAt: time.Now().Add(-time.Second)}}
+	if _, err := broker.Apply(context.Background(), principal, "expired"); err == nil {
+		t.Fatal("expired proposal route accepted")
+	}
+	if service.applyCalls != 0 {
+		t.Fatal("expired route reached Config Manager")
+	}
 }
 func (f *fakeConfigService) Rollback(context.Context, configmanager.Actor, string) (configmanager.RollbackResult, error) {
 	return configmanager.RollbackResult{}, nil

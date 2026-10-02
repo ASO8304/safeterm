@@ -23,6 +23,9 @@ func readSecurityFile(path, description string, maxBytes int64, forbiddenPermiss
 	if !info.Mode().IsRegular() || info.Size() > maxBytes {
 		return nil, fmt.Errorf("broker: %s must be a regular file no larger than %d bytes", description, maxBytes)
 	}
+	if stat, ok := info.Sys().(*syscall.Stat_t); !ok || stat.Nlink != 1 {
+		return nil, fmt.Errorf("broker: %s must not have hard links", description)
+	}
 	if info.Mode().Perm()&forbiddenPermissions != 0 {
 		return nil, fmt.Errorf("broker: %s has insecure permissions", description)
 	}

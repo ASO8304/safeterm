@@ -1,0 +1,24 @@
+fuzz: elapsed: 0s, gathering baseline coverage: 0/6 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 6/6 completed, now fuzzing with 24 workers
+fuzz: elapsed: 3s, execs: 232494 (77497/sec), new interesting: 59 (total: 65)
+fuzz: elapsed: 6s, execs: 840448 (202589/sec), new interesting: 79 (total: 85)
+fuzz: elapsed: 9s, execs: 1375429 (178381/sec), new interesting: 86 (total: 92)
+fuzz: elapsed: 11s, execs: 1475291 (49520/sec), new interesting: 88 (total: 94)
+PASS
+ok  	safeterm/tests/security	11.041s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/3 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 3/3 completed, now fuzzing with 24 workers
+fuzz: elapsed: 3s, execs: 622268 (206934/sec), new interesting: 185 (total: 188)
+fuzz: elapsed: 6s, execs: 1405519 (261689/sec), new interesting: 226 (total: 229)
+fuzz: elapsed: 9s, execs: 2260535 (285015/sec), new interesting: 248 (total: 251)
+fuzz: elapsed: 11s, execs: 2552446 (163073/sec), new interesting: 253 (total: 256)
+PASS
+ok  	safeterm/tests/security	10.803s
+fuzz: elapsed: 0s, gathering baseline coverage: 0/2 completed
+fuzz: elapsed: 0s, gathering baseline coverage: 2/2 completed, now fuzzing with 24 workers
+fuzz: elapsed: 3s, execs: 478426 (159439/sec), new interesting: 126 (total: 128)
+fuzz: elapsed: 6s, execs: 1173894 (231856/sec), new interesting: 150 (total: 152)
+fuzz: elapsed: 9s, execs: 1851975 (226034/sec), new interesting: 165 (total: 167)
+fuzz: elapsed: 11s, execs: 2065613 (106483/sec), new interesting: 169 (total: 171)
+PASS
+ok  	safeterm/tests/security	11.020s

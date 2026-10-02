@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -122,16 +123,15 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 }
 
 func (s *UnixServer) dispatch(request ipcRequest) ipcReply {
+	if err := validateIPCRequestShape(request); err != nil {
+		return ipcReply{Error: "invalid request shape"}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 	defer cancel()
 	var reply ipcReply
 	var err error
 	switch request.Action {
 	case "list":
-		if request.ResourceID != "" || request.Patch != nil || request.Token != "" {
-			err = fmt.Errorf("invalid list request")
-			break
-		}
 		reply.Resources, err = s.service.List(ctx, request.Actor)
 	case "describe":
 		var value ResourceDescription
@@ -172,6 +172,36 @@ func (s *UnixServer) dispatch(request ipcRequest) ipcReply {
 		return ipcReply{Error: err.Error()}
 	}
 	return reply
+}
+
+func validateIPCRequestShape(request ipcRequest) error {
+	if err := validateActor(request.Actor); err != nil {
+		return err
+	}
+	switch request.Action {
+	case "list":
+		if request.ResourceID != "" || request.Patch != nil || request.Token != "" {
+			return fmt.Errorf("invalid list request")
+		}
+	case "describe", "read", "rollback":
+		if !identifierPattern.MatchString(request.ResourceID) || request.Patch != nil || request.Token != "" {
+			return fmt.Errorf("invalid resource request")
+		}
+	case "validate", "preview":
+		if request.Patch == nil || request.ResourceID != "" || request.Token != "" || !identifierPattern.MatchString(request.Patch.ResourceID) {
+			return fmt.Errorf("invalid patch request")
+		}
+	case "apply":
+		if request.ResourceID != "" || request.Patch != nil || len(request.Token) != 64 {
+			return fmt.Errorf("invalid apply request")
+		}
+		if _, err := hex.DecodeString(request.Token); err != nil {
+			return fmt.Errorf("invalid apply token")
+		}
+	default:
+		return fmt.Errorf("unsupported action")
+	}
+	return nil
 }
 
 type UnixClient struct {

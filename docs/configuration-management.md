@@ -65,6 +65,13 @@ file unchanged. Configured activation and health checks are fixed catalog
 operations sent through Node Gateway. A failure restores the backup when the
 resource enables automatic rollback.
 
+Gateway authenticates the Config Manager with `SO_PEERCRED` and maps that UID
+to exactly one configured profile. It derives the manager's allowed activation
+and health operations from the same root-owned resource registry used by the
+managers, then intersects them with the signed operation catalog. Only known,
+argument-free `systemd` operations are accepted. A manager cannot claim another
+profile, forge SSH Broker metadata, request streaming, or submit parameters.
+
 Every read and mutation lifecycle record is sent synchronously to the Audit
 Service. Records include the actor, profile, resource and field, version
 transition, proposal and approval identities, and outcome without raw values.

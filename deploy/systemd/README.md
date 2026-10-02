@@ -1,6 +1,6 @@
 # Linux systemd deployment
 
-M13 ships an authenticated restricted SSH Broker, three isolated Config
+M14 ships an authenticated restricted SSH Broker, three isolated Config
 Managers, and an independent append-only Audit Service alongside one unprivileged
 Node Gateway and three capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
@@ -27,6 +27,10 @@ Gateway UID with `SO_PEERCRED`; group membership alone cannot authorize a
 request. The Gateway similarly verifies each Runner UID. The SSH Broker has
 `safeterm-gateway` as a supplementary group so it can reach the Gateway socket;
 Gateway independently verifies the Broker UID before accepting a request.
+Gateway applies a distinct peer policy after that identity check: the Broker
+may use unary and streaming routes only with `broker_type=ssh`, while each
+Config Manager UID may use unary routing only for the typed activation and
+health operations assigned to its own profile.
 
 Gateway and Runner accounts also belong to the `safeterm-audit` group so they
 can reach the Audit Service socket. The Audit Service independently verifies
@@ -119,3 +123,10 @@ Broker reaches each manager through its own authenticated Unix socket. Use
 root-level JSON field. Protected resources return a proposal token that a
 different authorized identity applies with `config apply TOKEN`; retained
 backups can be restored with `config rollback ID`.
+
+Gateway must load the same root-owned registry as the Config Managers. Its
+manager mapping uses `PROFILE=USER` entries, for example
+`application=safeterm-config-application`. Profiles and UIDs must be unique.
+Every activation operation must also exist in the signed catalog as an
+argument-free `systemd` operation; Gateway refuses startup if the registry and
+catalog cannot produce a safe allowlist for a configured manager.

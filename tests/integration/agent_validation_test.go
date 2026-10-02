@@ -13,6 +13,22 @@ import (
 	"safeterm/internal/validation"
 )
 
+type validationOnlyPolicy struct{}
+
+func (validationOnlyPolicy) Authorize(*contract.ExecutionRequest) error { return nil }
+
+type validationOnlyTranslator struct{}
+
+func (validationOnlyTranslator) Translate(request *contract.ExecutionRequest) (string, []string, error) {
+	return request.Command, nil, nil
+}
+
+type validationOnlyExecutor struct{}
+
+func (validationOnlyExecutor) Execute(context.Context, string, []string) (string, string, int, error) {
+	return "ok", "", 0, nil
+}
+
 // buildCoreWithRealValidator loads the actual shipped repository config
 // and wires the real Validator (M4) into Agent Core (M2), while Policy,
 // Translation and Execution remain placeholders to isolate M4 behavior.
@@ -24,7 +40,7 @@ func buildCoreWithRealValidator(t *testing.T) *agent.Core {
 		t.Fatalf("failed to load shipped config: %v", err)
 	}
 	v := validation.New(cfg)
-	return agent.NewCore(v, agent.AllowAllPolicy{}, agent.IdentityTranslator{}, agent.NoOpExecutor{})
+	return agent.NewCore(v, validationOnlyPolicy{}, validationOnlyTranslator{}, validationOnlyExecutor{})
 }
 
 // TEST-INTEG-001

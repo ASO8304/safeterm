@@ -22,25 +22,48 @@ type ipcReply struct {
 }
 
 type UnixServer struct {
-	listener   *net.UnixListener
-	handler    Client
-	streaming  StreamingService
-	allowedUID map[uint32]bool
+	listener     *net.UnixListener
+	handler      Client
+	streaming    StreamingService
+	peerPolicies map[uint32]PeerPolicy
+}
+
+// PeerPolicy binds an authenticated operating-system identity to the IPC
+// capabilities it may use. Authorize runs after strict decoding and before a
+// unary request crosses the Gateway boundary.
+type PeerPolicy struct {
+	AllowStreaming bool
+	Authorize      func(*contract.ExecutionRequest) error
 }
 
 func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Client) (*UnixServer, error) {
-	return listenUnix(path, mode, allowedUIDs, handler, nil)
+	return listenUnix(path, mode, permissivePeerPolicies(allowedUIDs, false), handler, nil)
 }
 
 func ListenUnixStreaming(path string, mode os.FileMode, allowedUIDs []uint32, handler Client, streaming StreamingService) (*UnixServer, error) {
 	if streaming == nil {
 		return nil, fmt.Errorf("isolation: streaming service is required")
 	}
-	return listenUnix(path, mode, allowedUIDs, handler, streaming)
+	return listenUnix(path, mode, permissivePeerPolicies(allowedUIDs, true), handler, streaming)
 }
 
-func listenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Client, streaming StreamingService) (*UnixServer, error) {
-	if path == "" || handler == nil || len(allowedUIDs) == 0 {
+func ListenUnixStreamingWithPeerPolicies(path string, mode os.FileMode, policies map[uint32]PeerPolicy, handler Client, streaming StreamingService) (*UnixServer, error) {
+	if streaming == nil {
+		return nil, fmt.Errorf("isolation: streaming service is required")
+	}
+	return listenUnix(path, mode, policies, handler, streaming)
+}
+
+func permissivePeerPolicies(allowedUIDs []uint32, streaming bool) map[uint32]PeerPolicy {
+	policies := map[uint32]PeerPolicy{}
+	for _, uid := range allowedUIDs {
+		policies[uid] = PeerPolicy{AllowStreaming: streaming}
+	}
+	return policies
+}
+
+func listenUnix(path string, mode os.FileMode, policies map[uint32]PeerPolicy, handler Client, streaming StreamingService) (*UnixServer, error) {
+	if path == "" || handler == nil || len(policies) == 0 {
 		return nil, fmt.Errorf("isolation: socket path, handler, and allowed UIDs are required")
 	}
 	listener, err := net.ListenUnix("unix", &net.UnixAddr{Name: path, Net: "unix"})
@@ -51,11 +74,11 @@ func listenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Cli
 		listener.Close()
 		return nil, fmt.Errorf("isolation: secure socket permissions: %w", err)
 	}
-	allowed := map[uint32]bool{}
-	for _, uid := range allowedUIDs {
-		allowed[uid] = true
+	copyPolicies := make(map[uint32]PeerPolicy, len(policies))
+	for uid, policy := range policies {
+		copyPolicies[uid] = policy
 	}
-	return &UnixServer{listener: listener, handler: handler, streaming: streaming, allowedUID: allowed}, nil
+	return &UnixServer{listener: listener, handler: handler, streaming: streaming, peerPolicies: copyPolicies}, nil
 }
 
 func (s *UnixServer) Serve(ctx context.Context) error {
@@ -94,7 +117,8 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 	defer conn.Close()
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	credentials, err := credentialsFor(conn)
-	if err != nil || !s.allowedUID[credentials.UID] {
+	policy, allowed := s.peerPolicies[credentials.UID]
+	if err != nil || !allowed {
 		return
 	}
 	var request contract.ExecutionRequest
@@ -108,6 +132,10 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 		Type string `json:"type"`
 	}
 	if err := json.Unmarshal(frame, &probe); err == nil && probe.Type != "" {
+		if !policy.AllowStreaming {
+			_ = json.NewEncoder(conn).Encode(ipcReply{Error: "streaming is not authorized for peer"})
+			return
+		}
 		s.handleStream(conn, frame)
 		return
 	}
@@ -120,6 +148,12 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		_ = json.NewEncoder(conn).Encode(ipcReply{Error: "invalid request"})
 		return
+	}
+	if policy.Authorize != nil {
+		if err := policy.Authorize(&request); err != nil {
+			_ = json.NewEncoder(conn).Encode(ipcReply{Error: "peer is not authorized for request"})
+			return
+		}
 	}
 	_ = conn.SetReadDeadline(time.Time{})
 	response, err := s.handler.Handle(context.Background(), &request)

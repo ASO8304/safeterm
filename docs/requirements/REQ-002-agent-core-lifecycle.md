@@ -14,9 +14,10 @@ Design note: when M2 was created, real implementations of Validation (M4),
 Policy (M5), and Translation (M6) did not exist. The four stages were therefore
 defined as interfaces (`Validator`, `PolicyEnforcer`, `Translator`, and
 `Executor`). Agent Core guarantees ordering and early termination, not the
-internal logic of each stage. The implementations in `placeholders.go` exist
-only to prove pipeline behavior and provide **no security guarantees**. Real
-implementations replace them in the M4, M5, M6, and M7 integration paths.
+internal logic of each stage. M2 originally used permissive placeholders to
+prove pipeline behavior. M14 removed those exported production symbols; the
+equivalent test doubles now exist only in `_test.go` files. Runtime wiring uses
+the real M4–M7 implementations.
 
 ## Acceptance Criteria
 - [x] **AC-1:** If Validation fails, Policy, Translation, and Execution are never called

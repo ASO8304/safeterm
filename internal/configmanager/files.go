@@ -30,6 +30,9 @@ func readManagedFile(path string) ([]byte, os.FileInfo, error) {
 	if err != nil || !os.SameFile(before, after) || !after.Mode().IsRegular() {
 		return nil, nil, fmt.Errorf("configmanager: managed file changed while opening")
 	}
+	if links, ok := fileLinkCount(after); ok && links != 1 {
+		return nil, nil, fmt.Errorf("configmanager: managed file must not have hard links")
+	}
 	data, err := io.ReadAll(io.LimitReader(file, maxDocumentBytes+1))
 	if err != nil || len(data) > maxDocumentBytes {
 		return nil, nil, fmt.Errorf("configmanager: read managed file: size or I/O limit exceeded")
