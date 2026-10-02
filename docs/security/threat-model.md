@@ -48,7 +48,7 @@ UID's peer policy, socket access, filesystem view, capabilities, and cgroup.
 | Secret or control-byte disclosure | Redacted fields/diffs/audit; argument names only; terminal byte filtering | Secret corpus, audit inspection, terminal sanitization tests |
 | Process/output/session exhaustion | Deadlines, output/queue/session limits, process groups, cgroup/systemd bounds | Resource-abuse and lifecycle tests; race detector |
 | Audit spoofing or tampering | Producer UID/profile policy; synchronous fsync; hash-linked records; single-link store | Producer-spoof, corruption, partial-write, hard-link tests |
-| Vulnerable dependency or unsafe dataflow | Minimal dependencies, dependency review, govulncheck, CodeQL | Required Security CI jobs |
+| Vulnerable dependency or unsafe dataflow | Minimal dependencies, checksum verification, govulncheck, CodeQL, and platform dependency review when available | Required Security CI jobs and retained SARIF |
 
 ## Exclusions and residual risk
 SafeTerm does not defend against a malicious kernel/root administrator, theft of

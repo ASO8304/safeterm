@@ -54,7 +54,9 @@ threat model and makes the most important invariants merge-blocking.
 - [x] **AC-12:** The race detector passes across all packages, including
   concurrent audit, streaming, proposal, and session state.
 - [x] **AC-13:** CI runs the adversarial/race suite, Go vulnerability analysis,
-  dependency review, and CodeQL with least-privilege workflow permissions.
+  dependency integrity verification, and CodeQL with least-privilege workflow
+  permissions. GitHub Dependency Review additionally runs when the repository
+  enables that platform capability.
 - [x] **AC-14:** M14 stores local verification, race, fuzz-seed, and security
   scan evidence and maps every acceptance criterion into the test matrix.
 

@@ -26,8 +26,10 @@ connected; it did not constrain what that identity could request.
 - Treat fuzz functions as a permanent seed corpus in ordinary verification and
   run bounded fuzz campaigns when producing milestone evidence.
 - Add `make security`, which runs the adversarial suite and the race detector
-  across all packages. GitHub Actions also runs govulncheck, dependency review,
-  and CodeQL. These scanners complement tests; they do not replace review.
+  across all packages. GitHub Actions also runs govulncheck, module integrity,
+  and CodeQL, retains the SARIF artifact, and runs Dependency Review when that
+  repository capability is enabled. These scanners complement tests; they do
+  not replace review.
 - Extend authenticated Unix Gateway IPC with per-UID `PeerPolicy`. The SSH
   Broker peer may use unary and streaming requests but must present `ssh`
   metadata. Each Config Manager UID is mapped to one profile and may use unary
