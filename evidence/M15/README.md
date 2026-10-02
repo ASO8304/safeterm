@@ -23,6 +23,10 @@ make e2e
 sudo deploy/demo/run-demo.sh
 ```
 
-The first two commands are required CI checks for the M15 pull request. Their
-immutable GitHub Actions run links are recorded here before the milestone tag
-is published.
+The successful release-candidate runs are retained by GitHub Actions:
+
+- [Build, Vet, Test and Deployment/SSH End-to-End](https://github.com/ASO8304/safeterm/actions/runs/36994902183)
+- [Adversarial/race, vulnerability, dependency, and CodeQL gates](https://github.com/ASO8304/safeterm/actions/runs/36994902152)
+
+These runs execute commit `9cccb46`, including the assertion correction made
+after the first hosted test exposed a mismatch in the deployment-asset test.
