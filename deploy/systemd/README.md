@@ -73,6 +73,13 @@ file mode, native ELF type, and SHA-256 immediately before each process, then
 execute the held `/proc/self/fd` descriptor. Keep executable mounts read-only;
 the supplied Runner units enforce this with `ProtectSystem=strict`.
 
+Every local IPC server rejects frames above 1 MiB, applies a read or operation
+deadline, and uses fixed connection admission. Gateway/Runner transport permits
+at most 128 concurrent connections; Audit and each Config Manager permit 64.
+Connections above those ceilings are closed before a handler goroutine is
+created. These application limits complement the finite `MemoryMax` and
+`TasksMax` values in the units.
+
 The shipped service-manager catalog contains no active operation and its unit
 has no Linux capability. Before adding service operations, deployment tooling
 must install an OS policy that grants `safeterm-service-manager` only the exact

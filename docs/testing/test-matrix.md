@@ -134,6 +134,12 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-SECURITY-012 | REQ-014 (AC-8, AC-10) | bounded and expiring Broker proposal route cache | Security | PASS |
 | TEST-SECURITY-013 | REQ-014 (AC-4) | per-profile Config Manager activation authorization | Security | PASS |
 | TEST-SECURITY-014 | REQ-014 (AC-5) | strict Config Manager IPC shapes, unknown fields, and size bounds | Security | PASS |
+| TEST-SECURITY-015..017 | REQ-014 (AC-8) | bounded connection admission for Gateway/Runner, Audit, and Config Manager Unix IPC | Security | PASS |
+| TEST-SECURITY-018 | REQ-014 (AC-1) | threat-model structure and control-to-verification table conformance | Security | PASS |
+| TEST-AUDIT-001..008, TEST-SSH-BROKER-001..007 | REQ-014 (AC-9) | secret-safe audit events, producer binding, hash-chain verification, and terminal-byte filtering | Security | PASS |
+| M14-RACE-GATE | REQ-014 (AC-12) | repository-wide race detector including concurrent audit, session, proposal, and IPC state | CI / Security | PASS |
+| M14-HOSTED-SECURITY | REQ-014 (AC-13) | adversarial/race, govulncheck, dependency integrity, and zero-finding CodeQL jobs | CI / Security | PASS |
+| M14-EVIDENCE-CONFORMANCE | REQ-014 (AC-14) | non-empty verification, race/security, fuzz, and hosted vulnerability evidence plus complete AC mapping | Security | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).

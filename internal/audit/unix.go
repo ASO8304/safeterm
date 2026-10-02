@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const maxIPCMessageBytes = 1 << 20
+const (
+	maxIPCMessageBytes          = 1 << 20
+	maxConcurrentIPCConnections = 64
+)
 
 type ipcReply struct {
 	Accepted bool   `json:"accepted"`
@@ -20,9 +23,10 @@ type ipcReply struct {
 }
 
 type UnixServer struct {
-	listener  *net.UnixListener
-	sink      Sink
-	producers map[uint32][]Producer
+	listener    *net.UnixListener
+	sink        Sink
+	producers   map[uint32][]Producer
+	connections chan struct{}
 }
 
 type Producer struct {
@@ -57,7 +61,7 @@ func ListenUnix(path string, mode os.FileMode, producers map[uint32][]Producer, 
 		listener.Close()
 		return nil, fmt.Errorf("audit: secure socket permissions: %w", err)
 	}
-	return &UnixServer{listener: listener, sink: sink, producers: policies}, nil
+	return &UnixServer{listener: listener, sink: sink, producers: policies, connections: make(chan struct{}, maxConcurrentIPCConnections)}, nil
 }
 
 func (s *UnixServer) Serve(ctx context.Context) error {
@@ -81,9 +85,27 @@ func (s *UnixServer) Serve(ctx context.Context) error {
 			}
 			return fmt.Errorf("audit: accept Unix connection: %w", err)
 		}
-		go s.handle(conn)
+		if !s.acquireConnection() {
+			_ = conn.Close()
+			continue
+		}
+		go func() {
+			defer s.releaseConnection()
+			s.handle(conn)
+		}()
 	}
 }
+
+func (s *UnixServer) acquireConnection() bool {
+	select {
+	case s.connections <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *UnixServer) releaseConnection() { <-s.connections }
 
 func (s *UnixServer) Close() error {
 	if s == nil || s.listener == nil {

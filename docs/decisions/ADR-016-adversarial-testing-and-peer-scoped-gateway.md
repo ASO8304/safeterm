@@ -41,6 +41,14 @@ connected; it did not constrain what that identity could request.
 - Bound the Broker's proposal-token routing cache and prune expired routes.
   Config Managers retain their independent proposal bound as the authoritative
   limit.
+- Bound concurrent Unix IPC connections before allocating a handler goroutine:
+  128 at the Gateway/Runner transport and 64 at the Audit and Config Manager
+  transports. Excess connections are closed immediately; accepted connections
+  retain their existing frame-size and deadline bounds.
+- Validate effective systemd hardening values in the adversarial suite, not
+  only the presence of directive names. Memory and task ceilings must be finite
+  and positive, `NoNewPrivileges` must be enabled, and only the network
+  observer may retain its exact `CAP_NET_RAW` capability.
 - Remove the obsolete `cmd/agent` foundation stub and exported M2 bypass
   placeholders. Permissive pipeline doubles remain available only to tests;
   deployed entry points are the Broker, Gateway, profile Runners, Config

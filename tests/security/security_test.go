@@ -2,6 +2,7 @@ package security_test
 
 import (
 	"context"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -143,14 +144,72 @@ func TestDeployedServicesRetainExplicitResourceAndPrivilegeBounds(t *testing.T) 
 			t.Fatal(err)
 		}
 		unit := string(data)
-		for _, required := range []string{"NoNewPrivileges=", "CapabilityBoundingSet=", "MemoryMax=", "TasksMax="} {
-			if !strings.Contains(unit, required) {
-				t.Errorf("%s missing %s", entry.Name(), required)
-			}
+		noNewPrivileges, ok := systemdSetting(unit, "NoNewPrivileges")
+		if !ok || (noNewPrivileges != "yes" && noNewPrivileges != "true") {
+			t.Errorf("%s must enable NoNewPrivileges", entry.Name())
 		}
-		if strings.Contains(unit, "CAP_SYS_ADMIN") || (strings.Contains(unit, "AmbientCapabilities=CAP_") && entry.Name() != "safeterm-runner-network-observer.service") {
-			t.Errorf("%s grants broad ambient privilege", entry.Name())
+		memoryMax, ok := systemdSetting(unit, "MemoryMax")
+		if !ok || !finiteSystemdSize(memoryMax) {
+			t.Errorf("%s has no finite positive MemoryMax", entry.Name())
 		}
+		tasksMax, ok := systemdSetting(unit, "TasksMax")
+		parsedTasks, parseErr := strconv.ParseUint(tasksMax, 10, 32)
+		if !ok || parseErr != nil || parsedTasks == 0 || parsedTasks > 1024 {
+			t.Errorf("%s has invalid TasksMax %q", entry.Name(), tasksMax)
+		}
+		bounding, hasBounding := systemdSetting(unit, "CapabilityBoundingSet")
+		ambient, hasAmbient := systemdSetting(unit, "AmbientCapabilities")
+		if !hasBounding || !hasAmbient {
+			t.Errorf("%s must explicitly define capability sets", entry.Name())
+		}
+		expectedCapabilities := ""
+		if entry.Name() == "safeterm-runner-network-observer.service" {
+			expectedCapabilities = "CAP_NET_RAW"
+		}
+		if bounding != expectedCapabilities || ambient != expectedCapabilities {
+			t.Errorf("%s capabilities bounding=%q ambient=%q, want %q", entry.Name(), bounding, ambient, expectedCapabilities)
+		}
+	}
+}
+
+func systemdSetting(unit, key string) (string, bool) {
+	var value string
+	found := false
+	for _, line := range strings.Split(unit, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, key+"=") {
+			value = strings.TrimSpace(strings.TrimPrefix(line, key+"="))
+			found = true
+		}
+	}
+	return value, found
+}
+
+func finiteSystemdSize(value string) bool {
+	if value == "" || strings.EqualFold(value, "infinity") {
+		return false
+	}
+	digits := strings.TrimRight(value, "KMGTPE")
+	if digits == "" || len(digits) < len(value)-1 {
+		return false
+	}
+	parsed, err := strconv.ParseUint(digits, 10, 64)
+	return err == nil && parsed > 0
+}
+
+func TestSystemdBoundValidationRejectsUnsafeEffectiveValues(t *testing.T) {
+	for _, value := range []string{"", "0", "infinity", "Infinity", "unbounded", "128MB"} {
+		if finiteSystemdSize(value) {
+			t.Errorf("unsafe MemoryMax value %q accepted", value)
+		}
+	}
+	for _, value := range []string{"1", "128M", "2G"} {
+		if !finiteSystemdSize(value) {
+			t.Errorf("finite MemoryMax value %q rejected", value)
+		}
+	}
+	if value, ok := systemdSetting("MemoryMax=128M\nMemoryMax=infinity\n", "MemoryMax"); !ok || value != "infinity" {
+		t.Fatalf("effective duplicate setting=%q found=%v", value, ok)
 	}
 }
 
@@ -176,6 +235,60 @@ func TestSignedCatalogContainsNoShellOrCallerSelectedExecutable(t *testing.T) {
 			if strings.Contains(token, "{") && !(strings.HasPrefix(token, "{") && strings.HasSuffix(token, "}") && strings.Count(token, "{") == 1 && strings.Count(token, "}") == 1) {
 				t.Errorf("partial placeholder in %s: %q", operation.Name, token)
 			}
+		}
+	}
+}
+
+// TEST-SECURITY-018: REQ-014 AC-1, AC-13, and AC-14.
+func TestM14SecurityArtifactsStayComplete(t *testing.T) {
+	root := filepath.Clean(filepath.Join("..", ".."))
+	requiredContent := map[string][]string{
+		"docs/security/threat-model.md": {
+			"## Scope and assets", "## Trust boundaries", "## Invariants and verification",
+			"## Exclusions and residual risk", "| Threat | Required control | Verification |",
+		},
+		".github/workflows/security.yml": {
+			"permissions:\n  contents: read", "make security", "golang/govulncheck-action",
+			"go mod verify", "go list -m all", "github/codeql-action/analyze", "Enforce zero CodeQL findings",
+		},
+	}
+	for relative, required := range requiredContent {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(relative)))
+		if err != nil {
+			t.Fatalf("read %s: %v", relative, err)
+		}
+		content := string(data)
+		for _, marker := range required {
+			if !strings.Contains(content, marker) {
+				t.Errorf("%s missing required marker %q", relative, marker)
+			}
+		}
+	}
+
+	for _, name := range []string{"make-verify.log", "security.log", "fuzz.log", "govulncheck-ci.log"} {
+		info, err := os.Stat(filepath.Join(root, "evidence", "M14", name))
+		if err != nil || info.Size() == 0 {
+			t.Errorf("M14 evidence %s missing or empty: %v", name, err)
+		}
+	}
+
+	matrix, err := os.ReadFile(filepath.Join(root, "docs", "testing", "test-matrix.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	matrixText := string(matrix)
+	for ac := 1; ac <= 14; ac++ {
+		commaMarker := fmt.Sprintf("AC-%d,", ac)
+		closingMarker := fmt.Sprintf("AC-%d)", ac)
+		mapped := false
+		for _, line := range strings.Split(matrixText, "\n") {
+			if strings.Contains(line, "REQ-014 (") && (strings.Contains(line, commaMarker) || strings.Contains(line, closingMarker)) {
+				mapped = true
+				break
+			}
+		}
+		if !mapped {
+			t.Errorf("test matrix does not map REQ-014 AC-%d", ac)
 		}
 	}
 }

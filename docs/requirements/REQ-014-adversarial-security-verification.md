@@ -34,7 +34,8 @@ threat model and makes the most important invariants merge-blocking.
   streaming.
 - [x] **AC-5:** Local IPC rejects untrusted peers, oversized frames, unknown
   fields, trailing documents, ambiguous request shapes, raw signal controls,
-  and unsupported protocol versions before reaching a handler.
+  unsupported protocol versions, and connections above a fixed concurrency
+  ceiling before reaching a handler.
 - [x] **AC-6:** Filesystem tests cover traversal, symlink replacement, hard-link
   aliasing, non-regular files, insecure modes, executable hash changes, and
   path changes between validation and use.
@@ -42,7 +43,8 @@ threat model and makes the most important invariants merge-blocking.
   and pinned-descriptor checks reject modified or interpreter-backed content.
 - [x] **AC-8:** Runtime resource tests cover output limits, backpressure,
   concurrent session ceilings, idle/execution deadlines, bounded IPC, bounded
-  proposal routing, and process-group cleanup.
+  proposal routing, process-group cleanup, finite systemd memory/task limits,
+  and connection admission ceilings for every local IPC service.
 - [x] **AC-9:** Audit and configuration tests prove that secrets and argument
   values are excluded, terminal control bytes are neutralized, audit producer
   sources cannot be spoofed, and hash-chain corruption is detected.

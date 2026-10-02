@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-const maxIPCMessageBytes = 1 << 20
+const (
+	maxIPCMessageBytes          = 1 << 20
+	maxConcurrentIPCConnections = 64
+)
 
 type Service interface {
 	List(context.Context, Actor) ([]ResourceSummary, error)
@@ -46,9 +49,10 @@ type ipcReply struct {
 }
 
 type UnixServer struct {
-	listener *net.UnixListener
-	service  Service
-	allowed  map[uint32]bool
+	listener    *net.UnixListener
+	service     Service
+	allowed     map[uint32]bool
+	connections chan struct{}
 }
 
 func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, service Service) (*UnixServer, error) {
@@ -67,7 +71,7 @@ func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, service Ser
 	for _, uid := range allowedUIDs {
 		allowed[uid] = true
 	}
-	return &UnixServer{listener: listener, service: service, allowed: allowed}, nil
+	return &UnixServer{listener: listener, service: service, allowed: allowed, connections: make(chan struct{}, maxConcurrentIPCConnections)}, nil
 }
 
 func (s *UnixServer) Serve(ctx context.Context) error {
@@ -83,9 +87,27 @@ func (s *UnixServer) Serve(ctx context.Context) error {
 			}
 			return err
 		}
-		go s.handle(conn)
+		if !s.acquireConnection() {
+			_ = conn.Close()
+			continue
+		}
+		go func() {
+			defer s.releaseConnection()
+			s.handle(conn)
+		}()
 	}
 }
+
+func (s *UnixServer) acquireConnection() bool {
+	select {
+	case s.connections <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+
+func (s *UnixServer) releaseConnection() { <-s.connections }
 
 func (s *UnixServer) Close() error {
 	if s == nil || s.listener == nil {
