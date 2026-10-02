@@ -1,0 +1,6 @@
+{
+  "capture": {
+    "interface": "any",
+    "max_packets": 1000
+  }
+}
