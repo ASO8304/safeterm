@@ -60,6 +60,9 @@ func Check(options CheckOptions) (Report, error) {
 		if err := verifyManifest(root); err != nil {
 			return Report{}, err
 		}
+		if err := rejectUnexpectedPrivateKeys(filepath.Join(root, "etc", "safeterm")); err != nil {
+			return Report{}, err
+		}
 	}
 	binDir := filepath.Join(root, "bin")
 	configDir := filepath.Join(root, "etc", "safeterm")
@@ -139,6 +142,40 @@ func Check(options CheckOptions) (Report, error) {
 		}
 	}
 	return Report{CatalogVersion: cfg.Version, Profiles: len(cfg.Profiles), Operations: len(cfg.Operations), Executables: len(cfg.Executables), Resources: len(registry.Resources), Units: len(SystemdUnits)}, nil
+}
+
+func rejectUnexpectedPrivateKeys(configDir string) error {
+	allowed := filepath.Clean(filepath.Join(configDir, "ssh", "ssh_host_ed25519_key"))
+	return filepath.WalkDir(configDir, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Clean(path) == allowed {
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() {
+			return fmt.Errorf("deployment: unsafe configuration entry %q", path)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if info.Size() > 4<<20 {
+			return fmt.Errorf("deployment: configuration file %q exceeds 4 MiB", path)
+		}
+		name := strings.ToLower(entry.Name())
+		if strings.HasSuffix(name, ".key") || strings.HasSuffix(name, ".private-key") || strings.Contains(name, "signing") {
+			return fmt.Errorf("deployment: unexpected private-key material %q", path)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "PRIVATE KEY-----") {
+			return fmt.Errorf("deployment: unexpected private-key material %q", path)
+		}
+		return nil
+	})
 }
 
 // ManagedFiles returns the exact, preflight-validated bundle source and

@@ -56,10 +56,22 @@ func TestBundlePreflightAcceptsCompleteBundleAndRejectsTampering(t *testing.T) {
 	if report.CatalogVersion != "m15-test" || report.Profiles != 1 || report.Operations != 1 || report.Resources != 1 || report.Units != len(SystemdUnits) {
 		t.Fatalf("report=%+v", report)
 	}
+	privateKey := filepath.Join(bundle, "etc", "safeterm", "catalog-signing.key")
+	if err := os.WriteFile(privateKey, []byte("-----BEGIN PRIVATE KEY-----\nnot-a-runtime-secret\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	writeTestManifest(t, bundle)
+	if _, err := Check(CheckOptions{Root: bundle}); err == nil {
+		t.Fatal("catalog private key passed preflight")
+	}
+	if err := os.Remove(privateKey); err != nil {
+		t.Fatal(err)
+	}
 	signature := filepath.Join(bundle, "etc", "safeterm", "catalog.sig")
 	if err := os.WriteFile(signature, []byte("tampered\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	writeTestManifest(t, bundle)
 	if _, err := Check(CheckOptions{Root: bundle}); err == nil {
 		t.Fatal("tampered signature passed preflight")
 	}
@@ -150,6 +162,9 @@ func writeTestManifest(t *testing.T, root string) {
 		if err != nil {
 			return err
 		}
+		if filepath.ToSlash(relative) == manifestName {
+			return nil
+		}
 		digest, err := fileDigest(path)
 		if err != nil {
 			return err
@@ -161,7 +176,14 @@ func writeTestManifest(t *testing.T, root string) {
 		t.Fatal(err)
 	}
 	sort.Strings(lines)
-	if err := os.WriteFile(filepath.Join(root, manifestName), []byte(strings.Join(lines, "\n")+"\n"), 0o444); err != nil {
+	manifest := filepath.Join(root, manifestName)
+	if err := os.Chmod(manifest, 0o644); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifest, []byte(strings.Join(lines, "\n")+"\n"), 0o444); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(manifest, 0o444); err != nil {
 		t.Fatal(err)
 	}
 }

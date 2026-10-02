@@ -53,7 +53,8 @@ deploy/scripts/build-bundle.sh \
 
 The builder runs semantic preflight and writes `SHA256SUMS`. Copy the complete
 directory without modifying it. Do not include the private catalog key or any
-SSH client private key.
+SSH client private key. Bundle preflight scans the staged runtime configuration
+and rejects private-key material outside the required SSH host-key path.
 
 On the fresh runtime host, inspect the plan before making changes:
 
