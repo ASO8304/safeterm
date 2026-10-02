@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M13 — Structured Configuration Management (complete; release candidate)**
+**Milestone: M13 — Structured Configuration Management (complete; tagged v0.14.0-m13)**
 
 Available capabilities:
 
@@ -211,6 +211,6 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M10 | Integrity Verification | ✅ Tagged: v0.11.0-m10 |
 | M11 | Bounded Streaming and Semantic Termination | ✅ Tagged: v0.12.0-m11 |
 | M12 | Authenticated SSH Broker and Restricted Terminal | ✅ Tagged: v0.13.0-m12 |
-| M13 | Structured Configuration Management | ✅ Complete; release candidate |
+| M13 | Structured Configuration Management | ✅ Tagged: v0.14.0-m13 |
 | M14 | Security Testing | ⏳ Planned |
 | M15 | End-to-End Deployment and Demo | ⏳ Planned |
