@@ -313,4 +313,4 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M16 | Interactive Terminal UX and Console Access | ✅ Tagged: v0.17.0-m16 |
 | M17 | Online and Air-Gapped Installation Package | ✅ Tagged: v0.18.0-m17 |
 | M18 | Transactional Installation Rollback | ✅ Tagged: v0.19.0-m18 |
-| M19 | Operator Catalog, Log Streaming, and Terminal UX | ✅ Tagged: v0.20.0-m19 |
+| M19 | Operator Catalog, Log Streaming, and Terminal UX | ✅ Tagged: v0.20.1-m19 |

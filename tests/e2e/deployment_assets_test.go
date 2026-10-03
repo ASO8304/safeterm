@@ -68,10 +68,14 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 		"/etc/safeterm/console/users.json", "/etc/safeterm/config-manager/resources.json",
 		"preserved-managed", "safeterm-preflight", "--no-start",
 		"safeterm-runner-log-reader.service", "/usr/bin/tail", "/usr/bin/sudo",
+		"stop_units_if_present()", `systemctl cat "$unit"`,
 	} {
 		if !strings.Contains(installer, marker) {
 			t.Errorf("offline target installer is missing %q", marker)
 		}
+	}
+	if strings.Contains(installer, "systemctl stop safeterm-runner-log-reader.service") {
+		t.Fatal("upgrade stops a newly introduced unit without checking that it is installed")
 	}
 	checksum := strings.Index(installer, "sha256sum -c PACKAGE-SHA256SUMS")
 	rootCheck := strings.Index(installer, `"$(id -u)" -eq 0`)

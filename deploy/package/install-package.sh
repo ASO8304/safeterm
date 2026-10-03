@@ -38,6 +38,16 @@ transaction_root=/var/backups/safeterm-installer
 transaction=
 units='safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
+stop_units_if_present() {
+  for unit in "$@"; do
+    # Upgrades can introduce a unit that the installed release does not have.
+    # Ignore only that not-installed case; a real stop failure still aborts.
+    if systemctl cat "$unit" >/dev/null 2>&1; then
+      systemctl stop "$unit"
+    fi
+  done
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --prepare-catalog) [ "$#" -ge 2 ] || usage; prepare_output=$2; shift 2 ;;
@@ -262,11 +272,11 @@ if [ -d /etc/safeterm-managed ]; then
   cp -a /etc/safeterm-managed "$work/preserved-managed"
 fi
 if [ -f /etc/systemd/system/safeterm-ssh-broker.service ]; then
-  systemctl stop safeterm-ssh-broker.service
-  systemctl stop safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
-  systemctl stop safeterm-gateway.service
-  systemctl stop safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
-  systemctl stop safeterm-audit.service
+  stop_units_if_present safeterm-ssh-broker.service
+  stop_units_if_present safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
+  stop_units_if_present safeterm-gateway.service
+  stop_units_if_present safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
+  stop_units_if_present safeterm-audit.service
 fi
 "$payload/base-install.sh" --bundle "$work/bundle" --no-start
 if [ -d "$work/preserved-managed" ]; then
