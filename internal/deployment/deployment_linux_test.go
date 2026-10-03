@@ -122,6 +122,11 @@ func buildTestBundle(t *testing.T) string {
 	}
 	identities := map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "authorized_keys": []string{string(ssh.MarshalAuthorizedKey(sshPublic))}}}}
 	writeJSON(t, filepath.Join(sshDir, "users.json"), identities, 0o600)
+	consoleDir := filepath.Join(configDir, "console")
+	if err := os.Mkdir(consoleDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeJSON(t, filepath.Join(consoleDir, "users.json"), map[string]any{"users": []any{map[string]any{"os_user": "safeterm", "user_id": "safeterm", "roles": []string{"viewer"}}}}, 0o600)
 	registry := configmanager.Registry{Version: "m15", Resources: []configmanager.Resource{{ID: "demo-options", Description: "Demo", Profile: "application", Path: "/etc/safeterm-managed/application/options.json", Format: configmanager.FormatJSON, Access: configmanager.AccessReadOnly, Fields: []configmanager.FieldSchema{{Key: "enabled", Type: configmanager.FieldBoolean, Required: true}}, Permissions: configmanager.Permissions{ReadRoles: []string{"viewer"}}}}}
 	if err := os.Mkdir(filepath.Join(configDir, "config-manager"), 0o755); err != nil {
 		t.Fatal(err)

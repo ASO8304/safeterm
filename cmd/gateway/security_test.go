@@ -39,11 +39,14 @@ func TestConfigManagerPeerIsLimitedToRegisteredTypedActivation(t *testing.T) {
 	}
 }
 
-func TestBrokerPeerRequiresSSHMetadata(t *testing.T) {
-	if err := brokerPeerAuthorizer(&contract.ExecutionRequest{Metadata: contract.Metadata{BrokerType: "ssh"}}); err != nil {
+func TestBrokerPeerRequiresMatchingMetadata(t *testing.T) {
+	if err := brokerPeerAuthorizer("ssh")(&contract.ExecutionRequest{Metadata: contract.Metadata{BrokerType: "ssh"}}); err != nil {
 		t.Fatal(err)
 	}
-	if brokerPeerAuthorizer(&contract.ExecutionRequest{Metadata: contract.Metadata{BrokerType: "config-manager"}}) == nil {
+	if brokerPeerAuthorizer("ssh")(&contract.ExecutionRequest{Metadata: contract.Metadata{BrokerType: "config-manager"}}) == nil {
 		t.Fatal("non-SSH metadata accepted from Broker UID")
+	}
+	if err := brokerPeerAuthorizer("console")(&contract.ExecutionRequest{Metadata: contract.Metadata{BrokerType: "console"}}); err != nil {
+		t.Fatal(err)
 	}
 }

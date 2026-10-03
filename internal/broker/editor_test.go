@@ -1,0 +1,76 @@
+package broker
+
+import (
+	"bytes"
+	"context"
+	"strings"
+	"testing"
+)
+
+func TestEditorSupportsCursorDeleteHistoryAndPrompt(t *testing.T) {
+	catalog, _ := NewCatalog(brokerTestConfig())
+	input := make(chan byte, 128)
+	for _, value := range []byte("hep\x1b[D" + "l" + "\x1b[C\x7f\r") {
+		input <- value
+	}
+	output := &bytes.Buffer{}
+	shell, err := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"viewer"}}, bytes.NewReader(nil), output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, err := shell.readLine(context.Background(), input, shell.prompt(), false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if line != "hel" {
+		t.Fatalf("line=%q", line)
+	}
+	if !strings.Contains(output.String(), "safeterm::alice> ") {
+		t.Fatalf("output=%q", output.String())
+	}
+	for _, value := range []byte("\x1b[A\r") {
+		input <- value
+	}
+	line, err = shell.readLine(context.Background(), input, shell.prompt(), false, true)
+	if err != nil || line != "hel" {
+		t.Fatalf("history line=%q err=%v", line, err)
+	}
+}
+
+func TestEditorCompletesAuthorizedOperationsAndParameters(t *testing.T) {
+	catalog, _ := NewCatalog(brokerTestConfig())
+	shell, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"netops"}}, bytes.NewReader(nil), &bytes.Buffer{})
+	if got := shell.completionCandidates(context.Background(), "run tr", "tr"); len(got) != 1 || got[0] != "trace" {
+		t.Fatalf("operations=%v", got)
+	}
+	if got := shell.completionCandidates(context.Background(), "run trace po", "po"); len(got) != 1 || got[0] != "port=" {
+		t.Fatalf("parameters=%v", got)
+	}
+	viewer, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, bytes.NewReader(nil), &bytes.Buffer{})
+	if got := viewer.completionCandidates(context.Background(), "run tr", "tr"); len(got) != 0 {
+		t.Fatalf("unauthorized completion=%v", got)
+	}
+}
+
+func TestConsoleIdentityUsesConfiguredRoles(t *testing.T) {
+	data := []byte(`{"users":[{"os_user":"safeterm","user_id":"console-operator","roles":["netops","viewer"]}]}`)
+	principal, err := ParseConsolePrincipal(data, "safeterm", map[string]bool{"viewer": true, "netops": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if principal.UserID != "console-operator" || principal.BrokerType != "console" || strings.Join(principal.Roles, ",") != "netops,viewer" {
+		t.Fatalf("principal=%+v", principal)
+	}
+	if _, err := ParseConsolePrincipal(data, "other", map[string]bool{"viewer": true, "netops": true}); err == nil {
+		t.Fatal("unregistered OS user accepted")
+	}
+	catalog, _ := NewCatalog(brokerTestConfig())
+	shell, err := NewShellForBroker(&fakeGateway{}, catalog, principal, bytes.NewReader(nil), &bytes.Buffer{}, nil, "console")
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, err := shell.request("system_info", map[string]string{})
+	if err != nil || request.Metadata.BrokerType != "console" || request.Metadata.UserID != "console-operator" {
+		t.Fatalf("request=%+v err=%v", request, err)
+	}
+}

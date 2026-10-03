@@ -1,6 +1,6 @@
 # Linux systemd deployment
 
-M15 ships an authenticated restricted SSH Broker, three isolated Config
+SafeTerm ships authenticated restricted SSH and local-console Brokers, three isolated Config
 Managers, and an independent append-only Audit Service alongside one unprivileged
 Node Gateway and three capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
@@ -16,6 +16,7 @@ Required service accounts:
 ```text
 safeterm-gateway
 safeterm-broker
+safeterm
 safeterm-diagnostics
 safeterm-network
 safeterm-service-manager
@@ -28,11 +29,12 @@ safeterm-config-network
 The Runner accounts use `safeterm-gateway` as their service group so the
 Gateway can reach their socket directories. Runner servers still verify the
 Gateway UID with `SO_PEERCRED`; group membership alone cannot authorize a
-request. The Gateway similarly verifies each Runner UID. The SSH Broker has
-`safeterm-gateway` as a supplementary group so it can reach the Gateway socket;
-Gateway independently verifies the Broker UID before accepting a request.
-Gateway applies a distinct peer policy after that identity check: the Broker
-may use unary and streaming routes only with `broker_type=ssh`, while each
+request. The Gateway similarly verifies each Runner UID. The SSH Broker and
+console account have `safeterm-gateway` as a supplementary group so they can
+reach the Gateway socket; Gateway independently verifies each Broker UID before
+accepting a request. Gateway applies a distinct peer policy after that identity
+check: each Broker may use unary and streaming routes only with its bound
+`broker_type` (`ssh` or `console`), while each
 Config Manager UID may use unary routing only for the typed activation and
 health operations assigned to its own profile.
 
@@ -46,7 +48,7 @@ record by SHA-256 to detect modification, reordering, and deletion inside the
 retained chain. The hash chain is corruption evidence, not a digital signature
 or an external checkpoint against complete-file replacement or tail truncation.
 
-Install the binaries as `/usr/local/bin/safeterm-ssh-broker`, `/usr/local/bin/safeterm-config-manager`, `/usr/local/bin/safeterm-gateway`,
+Install the binaries as `/usr/local/bin/safeterm-ssh-broker`, `/usr/local/bin/safeterm-console`, `/usr/local/bin/safeterm-config-manager`, `/usr/local/bin/safeterm-gateway`,
 `/usr/local/bin/safeterm-runner`, `/usr/local/bin/safeterm-audit`, and keep
 `catalog-sign` only on an offline administration host. Install the catalog,
 `catalog.sig`, and the separately provisioned public key at
@@ -68,6 +70,14 @@ Replace the example public key before startup. The identity file maps each key
 and matching SSH username to roles that exist in the signed catalog. A key may
 belong to only one user. Connect with `ssh -t -p 2222 alice@HOST`; the PTY runs
 the SafeTerm command menu and never starts an operating-system shell.
+
+Install `deploy/console/users.example.json` as the root-owned
+`/etc/safeterm/console/users.json`. The automated installer creates the
+unprivileged `safeterm` login account, assigns `/usr/local/bin/safeterm-console`
+as its shell, and grants only the socket traversal groups needed by that client.
+Set its password explicitly with `passwd safeterm` before console login. The
+console executable accepts no path or role overrides and still depends on
+Gateway and the isolated Config Managers and Runners.
 
 Before deployment, calculate SHA-256 for the exact target-host binaries,
 update every executable registry entry, and sign the complete catalog with the
@@ -103,7 +113,9 @@ The Broker accepts only one session channel per connection and rejects SSH
 exec, subsystems, forwarding, agent forwarding, and environment changes. Its
 fixed shell grammar is `help`, `list`, `describe`, `run`, `whoami`, `clear`,
 and `exit`, plus the structured `config` subcommands. Long-running output uses M11 streaming; Ctrl+C sends the semantic
-termination request to Gateway. Catalog proposal/approval and additional
+termination request to Gateway. Tab completion is derived from authorized
+catalog/config views, and history remains in memory only for the session.
+Catalog proposal/approval and additional
 client adapters remain separate control-plane work.
 
 Provision the M13 registry and three dedicated writable directories before

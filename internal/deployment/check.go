@@ -16,7 +16,7 @@ import (
 
 var RuntimeBinaries = []string{
 	"safeterm-audit", "safeterm-config-manager", "safeterm-gateway",
-	"safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight",
+	"safeterm-console", "safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight",
 }
 
 var SystemdUnits = []string{
@@ -110,6 +110,13 @@ func Check(options CheckOptions) (Report, error) {
 		return Report{}, err
 	}
 	if _, err := broker.LoadSSHHostKey(filepath.Join(configDir, "ssh", "ssh_host_ed25519_key")); err != nil {
+		return Report{}, err
+	}
+	consoleData, err := os.ReadFile(filepath.Join(configDir, "console", "users.json"))
+	if err != nil {
+		return Report{}, err
+	}
+	if _, err := broker.ParseConsolePrincipal(consoleData, "safeterm", catalog.KnownRoles()); err != nil {
 		return Report{}, err
 	}
 	registryPath := filepath.Join(configDir, "config-manager", "resources.json")
@@ -240,7 +247,7 @@ func requireSecureFile(path string, executable bool) error {
 }
 
 func checkAccounts(cfg *config.Config) error {
-	names := []string{"safeterm-audit", "safeterm-broker", "safeterm-gateway", "safeterm-config-application", "safeterm-config-database", "safeterm-config-network"}
+	names := []string{"safeterm", "safeterm-audit", "safeterm-broker", "safeterm-gateway", "safeterm-config-application", "safeterm-config-database", "safeterm-config-network"}
 	for _, profile := range cfg.Profiles {
 		names = append(names, profile.RunAsUser)
 	}

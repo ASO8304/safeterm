@@ -30,6 +30,7 @@ type Shell struct {
 	output    io.Writer
 	configs   *ConfigBroker
 	skipLF    bool
+	history   []string
 }
 
 func NewShell(client GatewayClient, catalog *Catalog, principal Principal, input io.Reader, output io.Writer) (*Shell, error) {
@@ -37,9 +38,17 @@ func NewShell(client GatewayClient, catalog *Catalog, principal Principal, input
 }
 
 func NewShellWithConfig(client GatewayClient, catalog *Catalog, principal Principal, input io.Reader, output io.Writer, configs *ConfigBroker) (*Shell, error) {
+	return NewShellForBroker(client, catalog, principal, input, output, configs, "ssh")
+}
+
+func NewShellForBroker(client GatewayClient, catalog *Catalog, principal Principal, input io.Reader, output io.Writer, configs *ConfigBroker, brokerType string) (*Shell, error) {
 	if client == nil || catalog == nil || !identityPattern.MatchString(principal.UserID) || len(principal.Roles) == 0 || input == nil || output == nil {
 		return nil, fmt.Errorf("broker: invalid restricted shell configuration")
 	}
+	if brokerType != "ssh" && brokerType != "console" {
+		return nil, fmt.Errorf("broker: invalid restricted shell type")
+	}
+	principal.BrokerType = brokerType
 	return &Shell{client: client, catalog: catalog, principal: principal, input: input, output: output, configs: configs}, nil
 }
 
@@ -53,8 +62,7 @@ func (s *Shell) Run(ctx context.Context) error {
 	go readBytes(s.input, input, done)
 	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s. Type 'help' for commands.\r\n", s.principal.UserID)
 	for {
-		fmt.Fprint(s.output, "safeterm> ")
-		line, err := s.readLine(ctx, input)
+		line, err := s.readLine(ctx, input, s.prompt(), false, true)
 		if err != nil {
 			if err == io.EOF {
 				fmt.Fprint(s.output, "\r\n")
@@ -91,75 +99,6 @@ func readBytes(reader io.Reader, output chan<- byte, done <-chan struct{}) {
 	}
 }
 
-func (s *Shell) readLine(ctx context.Context, input <-chan byte) (string, error) {
-	line := make([]byte, 0, 128)
-	escapeState := 0
-	for {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case b, ok := <-input:
-			if !ok {
-				return "", io.EOF
-			}
-			if escapeState == 1 {
-				if b == '[' {
-					escapeState = 2
-				} else {
-					escapeState = 0
-				}
-				continue
-			}
-			if escapeState == 2 {
-				if b >= 0x40 && b <= 0x7e {
-					escapeState = 0
-				}
-				continue
-			}
-			if b != '\n' {
-				s.skipLF = false
-			}
-			switch b {
-			case 0x1b:
-				escapeState = 1
-			case 0x03:
-				line = line[:0]
-				fmt.Fprint(s.output, "^C\r\n")
-				return "", nil
-			case 0x04:
-				if len(line) == 0 {
-					return "", io.EOF
-				}
-			case '\r':
-				s.skipLF = true
-				fmt.Fprint(s.output, "\r\n")
-				return string(line), nil
-			case '\n':
-				if s.skipLF {
-					s.skipLF = false
-					continue
-				}
-				fmt.Fprint(s.output, "\r\n")
-				return string(line), nil
-			case 0x7f, 0x08:
-				if len(line) > 0 {
-					line = line[:len(line)-1]
-					fmt.Fprint(s.output, "\b \b")
-				}
-			default:
-				if b >= 0x20 && b <= 0x7e {
-					if len(line) >= maxShellLineBytes {
-						fmt.Fprint(s.output, "\a")
-						continue
-					}
-					line = append(line, b)
-					_, _ = s.output.Write([]byte{b})
-				}
-			}
-		}
-	}
-}
-
 func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte) (bool, error) {
 	if line == "" {
 		return false, nil
@@ -170,7 +109,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: help")
 		}
-		fmt.Fprint(s.output, "help                         show this help\r\nlist                         list authorized operations\r\ndescribe NAME                show operation parameters\r\nrun NAME [K=V ...]           run an authorized operation\r\nconfig list                  list configuration resources\r\nconfig show ID               read registered fields\r\nconfig describe ID           show field schemas\r\nconfig edit ID SECTION KEY   validate, preview, and apply one field\r\nconfig apply TOKEN           apply an approved proposal\r\nconfig rollback ID           restore the newest retained backup\r\nwhoami                       show authenticated identity\r\nclear                        clear the terminal\r\nexit                         close this session\r\n")
+		fmt.Fprint(s.output, "help                         show this help\r\nlist                         list authorized operations\r\ndescribe NAME                show operation parameters\r\nrun NAME [K=V ...]           run an authorized operation\r\nconfig list                  list configuration resources\r\nconfig show ID               read registered fields\r\nconfig describe ID           show field schemas\r\nconfig edit ID SECTION KEY   validate, preview, and apply one field\r\nconfig apply TOKEN           apply an approved proposal\r\nconfig rollback ID           restore the newest retained backup\r\nwhoami                       show authenticated identity\r\nclear                        clear the terminal\r\nexit                         close this session\r\nkeys: Tab complete; Up/Down history; Left/Right/Home/End edit; Ctrl+C cancel\r\n")
 	case "list":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: list")
@@ -324,8 +263,7 @@ func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byt
 		if schema.ReadOnly {
 			return fmt.Errorf("field is read-only")
 		}
-		fmt.Fprint(s.output, "new value: ")
-		value, err := s.readConfigValue(ctx, input, schema.Secret)
+		value, err := s.readConfigValue(ctx, input, "new value: ", schema.Secret)
 		if err != nil {
 			return err
 		}
@@ -346,8 +284,7 @@ func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byt
 			fmt.Fprint(s.output, "Separate approver must run: config apply TOKEN\r\n")
 			return nil
 		}
-		fmt.Fprint(s.output, "apply this change? [y/N]: ")
-		answer, err := s.readConfigValue(ctx, input, false)
+		answer, err := s.readConfigValue(ctx, input, "apply this change? [y/N]: ", false)
 		if err != nil {
 			return err
 		}
@@ -373,8 +310,7 @@ func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byt
 		if len(fields) != 2 {
 			return fmt.Errorf("usage: config rollback ID")
 		}
-		fmt.Fprint(s.output, "restore newest backup? [y/N]: ")
-		answer, err := s.readConfigValue(ctx, input, false)
+		answer, err := s.readConfigValue(ctx, input, "restore newest backup? [y/N]: ", false)
 		if err != nil {
 			return err
 		}
@@ -392,37 +328,8 @@ func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byt
 	return nil
 }
 
-func (s *Shell) readConfigValue(ctx context.Context, input <-chan byte, secret bool) (string, error) {
-	if !secret {
-		return s.readLine(ctx, input)
-	}
-	line := make([]byte, 0, 128)
-	for {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case b, ok := <-input:
-			if !ok {
-				return "", io.EOF
-			}
-			switch b {
-			case '\r', '\n':
-				fmt.Fprint(s.output, "\r\n")
-				return string(line), nil
-			case 0x03:
-				fmt.Fprint(s.output, "^C\r\n")
-				return "", fmt.Errorf("input cancelled")
-			case 0x7f, 0x08:
-				if len(line) > 0 {
-					line = line[:len(line)-1]
-				}
-			default:
-				if b >= 0x20 && b <= 0x7e && len(line) < maxShellLineBytes {
-					line = append(line, b)
-				}
-			}
-		}
-	}
+func (s *Shell) readConfigValue(ctx context.Context, input <-chan byte, prompt string, secret bool) (string, error) {
+	return s.readLine(ctx, input, prompt, secret, false)
 }
 
 func (s *Shell) describe(operation config.OperationDefinition) {
@@ -469,7 +376,7 @@ func parseArguments(fields []string) (map[string]string, error) {
 
 func (s *Shell) request(operation string, arguments map[string]string) (*contract.ExecutionRequest, error) {
 	return contract.NewExecutionRequest(operation, arguments, contract.Metadata{
-		BrokerType: "ssh", UserID: s.principal.UserID,
+		BrokerType: s.principal.BrokerType, UserID: s.principal.UserID,
 		ClaimedRoles: append([]string(nil), s.principal.Roles...), ReceivedAt: time.Now().UTC(),
 	})
 }
@@ -531,8 +438,10 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return s.client.Terminate(ctx, (SSHControlAdapter{}).Interrupt(sessionID, s.principal.UserID))
+	return s.client.Terminate(ctx, terminate(sessionID, contract.SessionOwner{BrokerType: s.principal.BrokerType, UserID: s.principal.UserID}))
 }
+
+func (s *Shell) prompt() string { return fmt.Sprintf("safeterm::%s> ", s.principal.UserID) }
 
 func (s *Shell) writeResponse(response *contract.ExecutionResponse) {
 	if response == nil {

@@ -7,7 +7,7 @@ Before=safeterm-ssh-broker.service
 [Service]
 Type=simple
 User=safeterm-config-network
-Group=safeterm-broker
+Group=safeterm-clients
 SupplementaryGroups=safeterm-audit safeterm-gateway
 RuntimeDirectory=safeterm-config-network
 RuntimeDirectoryMode=0750

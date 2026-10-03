@@ -43,25 +43,35 @@ EOF
 [ "$dry_run" = false ] || { echo "Dry run: PASS"; exit 0; }
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
 
-groups='safeterm-audit safeterm-broker safeterm-gateway safeterm-diagnostics safeterm-network safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
+groups='safeterm safeterm-audit safeterm-broker safeterm-clients safeterm-gateway safeterm-diagnostics safeterm-network safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
 for name in $groups; do
   groupadd -f "$name"
+  [ "$name" = safeterm ] && continue
   if ! id -u "$name" >/dev/null 2>&1; then
     useradd --system --no-create-home --shell /usr/sbin/nologin --gid "$name" "$name"
   fi
 done
 
+if ! id -u safeterm >/dev/null 2>&1; then
+  useradd --create-home --shell /usr/local/bin/safeterm-console --gid safeterm safeterm
+fi
+
 for name in safeterm-gateway safeterm-diagnostics safeterm-network safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network; do
   usermod -a -G safeterm-audit "$name"
 done
-usermod -a -G safeterm-gateway safeterm-broker
+usermod -a -G safeterm-gateway,safeterm-clients safeterm-broker
+usermod -a -G safeterm-gateway,safeterm-clients safeterm
 for name in safeterm-config-application safeterm-config-database safeterm-config-network; do
-  usermod -a -G safeterm-broker,safeterm-gateway "$name"
+  usermod -a -G safeterm-gateway "$name"
 done
 
 for binary in "$bundle"/bin/safeterm-*; do
   install -o root -g root -m 0555 "$binary" "/usr/local/bin/$(basename -- "$binary")"
 done
+usermod --shell /usr/local/bin/safeterm-console safeterm
+if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
+  echo /usr/local/bin/safeterm-console >>/etc/shells
+fi
 install -d -o root -g root -m 0755 /etc/safeterm
 cp -R "$bundle/etc/safeterm/." /etc/safeterm/
 chown -R root:root /etc/safeterm
@@ -69,6 +79,8 @@ find /etc/safeterm -type d -exec chmod 0755 {} \;
 find /etc/safeterm -type f -exec chmod 0644 {} \;
 chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
+chown root:safeterm /etc/safeterm/console/users.json
+chmod 0640 /etc/safeterm/console/users.json
 
 install -d -o root -g root -m 0755 /etc/safeterm-managed
 managed_plan=$(mktemp "${TMPDIR:-/tmp}/safeterm-managed.XXXXXX")

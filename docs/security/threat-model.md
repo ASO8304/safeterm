@@ -1,7 +1,7 @@
 # SafeTerm Threat Model
 
 ## Scope and assets
-This model covers the SSH Broker, Node Gateway, capability-isolated Runners,
+This model covers the SSH Broker, local Console Broker, Node Gateway, capability-isolated Runners,
 Config Managers, Audit Service, signed catalogs, root-owned identity/resource
 registries, managed configuration files, Unix sockets, execution results, and
 streaming session state on one Linux host.
@@ -20,11 +20,15 @@ Untrusted SSH client
      -> peer-scoped Gateway socket -> operation-specific Runner UID
      -> profile-specific Config Manager socket -> exact managed directory
 
+Local console login
+  -> OS authentication / fixed SafeTerm login shell / root-owned role mapping
+  -> console UID -> the same peer-scoped Gateway and Config Manager boundaries
+
 Gateway, Runner, and Config Manager UIDs
   -> producer-scoped Audit socket -> append-only Audit UID/store
 
 Offline signer -> root-owned public key + signed catalog
-Root administrator -> SSH identities + Config Manager registry
+Root administrator -> SSH/console identities + Config Manager registry
 ```
 
 The network, terminal bytes, command names, arguments, configuration candidate
@@ -39,7 +43,7 @@ UID's peer policy, socket access, filesystem view, capabilities, and cgroup.
 | Threat | Required control | Verification |
 |---|---|---|
 | Shell/argument injection | Whitelisted operations and parameters; whole-token templates; direct argv execution; no shell | Injection corpus, fuzz seeds, AST/source invariant |
-| Forged remote identity or role | SSH key mapping creates server-owned roles; Gateway binds requests to allowed peer behavior | Live SSH tests, peer-policy tests, privilege-abuse suite |
+| Forged identity or role | SSH key or console OS-user mapping creates server-owned roles; Gateway binds each broker type to its peer UID | Live SSH tests, console identity tests, peer-policy tests, privilege-abuse suite |
 | Cross-profile privilege escalation | Separate UIDs/sockets/catalog subsets/capabilities; peer-scoped activation operations | Routing and systemd tests; Config Manager Gateway denial tests |
 | IPC parser confusion or memory exhaustion | Versioned strict JSON; unknown/trailing rejection; frame/deadline limits; fixed concurrent-connection admission ceilings | Malformed, oversized, and connection-saturation IPC tests plus fuzz seeds |
 | Catalog/executable replacement | Detached signature; canonical path, mode, hash, native ELF, held descriptor | Tamper, symlink, interpreter, and replacement tests |

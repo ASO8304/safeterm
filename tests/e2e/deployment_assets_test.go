@@ -34,7 +34,7 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 
 	builder := readText(t, scripts[0])
 	for _, artifact := range []string{
-		"audit config-manager gateway runner ssh-broker preflight",
+		"audit config-manager console gateway runner ssh-broker preflight",
 		`"$staging/bin/safeterm-$entry"`,
 		"SHA256SUMS",
 	} {
@@ -55,6 +55,11 @@ func TestInstallerVerifiesBeforeMutationAndStartsDependenciesInOrder(t *testing.
 	}
 	if !strings.Contains(installer, "--dry-run") || !strings.Contains(installer, "sha256sum -c") || !strings.Contains(installer, "safeterm-preflight --installed") {
 		t.Fatal("installer is missing dry-run, checksum, or installed-preflight enforcement")
+	}
+	for _, marker := range []string{"safeterm-console", "useradd --create-home", "usermod --shell", "/etc/safeterm/console/users.json"} {
+		if !strings.Contains(installer, marker) {
+			t.Errorf("installer is missing console-login marker %q", marker)
+		}
 	}
 
 	order := []string{
