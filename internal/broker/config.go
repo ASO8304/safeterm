@@ -38,7 +38,11 @@ func NewConfigBroker(clients []configmanager.Service) (*ConfigBroker, error) {
 }
 
 func configActor(principal Principal) configmanager.Actor {
-	return configmanager.Actor{BrokerType: "ssh", UserID: principal.UserID, Roles: append([]string(nil), principal.Roles...)}
+	brokerType := principal.BrokerType
+	if brokerType == "" {
+		brokerType = "ssh"
+	}
+	return configmanager.Actor{BrokerType: brokerType, UserID: principal.UserID, Roles: append([]string(nil), principal.Roles...)}
 }
 
 func (b *ConfigBroker) List(ctx context.Context, principal Principal) ([]configmanager.ResourceSummary, error) {

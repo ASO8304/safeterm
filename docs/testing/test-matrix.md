@@ -147,6 +147,10 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-E2E-001..004 | REQ-015 (AC-8..AC-10) | real SSH, Unix IPC, Gateway, Runner, integrity, execution, and correlated Audit path | End-to-End | PASS |
 | TEST-E2E-005..006 | REQ-015 (AC-10..AC-12) | operator demo public workflow, host-key verification, preflight, and documented scope | End-to-End | PASS |
 | M15-HOSTED-E2E | REQ-015 (AC-8..AC-12) | isolated hosted deployment and SSH end-to-end CI job | CI / End-to-End | PASS |
+| TEST-TERMINAL-001 | REQ-016 (AC-1..AC-4) | prompt, cursor editing, deletion, and bounded history | Unit | PASS |
+| TEST-TERMINAL-002 | REQ-016 (AC-4) | role-filtered operation and parameter completion | Security | PASS |
+| TEST-CONSOLE-001 | REQ-016 (AC-6..AC-7) | OS-user identity mapping and explicit console broker type | Security | PASS |
+| TEST-CONSOLE-002 | REQ-016 (AC-8..AC-9) | bundle, installer, peer groups, and preflight assets | Integration | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).

@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M15 — End-to-End Deployment and Demo (complete; tagged `v0.16.0-m15`)**
+**Milestone: M16 — Interactive Terminal UX and Console Access (complete)**
 
 Available capabilities:
 
@@ -47,17 +47,21 @@ Available capabilities:
   systemd installer with dry-run support, and an automated disposable-host demo
 - A public-boundary E2E test that authenticates over SSH and crosses real Unix
   IPC, Gateway, Runner, integrity, direct execution, and durable Audit boundaries
+- A full restricted-shell line editor with cursor movement, insertion/deletion,
+  bounded history, secret-safe input, and authorization-aware Tab completion
+- A local `safeterm` console login that presents the same restricted terminal
+  and crosses the same signed-catalog, IPC, policy, Runner, config, and audit boundaries
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
 is the trusted source of those roles for SSH traffic. Direct internal callers
 must still treat arbitrary `ClaimedRoles` as unverified input.
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
-runtime integrity boundary, bounded session control, authenticated SSH Broker,
-structured Config Managers, adversarial security controls, and reproducible
-deployment are implemented through M15. The Node Gateway
-remains local-only and accepts the Broker solely through authenticated Unix
-IPC. M15 evidence is recorded in [evidence/M15](evidence/M15/README.md).
+runtime integrity boundary, bounded session control, authenticated SSH and
+console Brokers, structured Config Managers, adversarial security controls,
+and reproducible deployment are implemented through M16. The Node Gateway
+remains local-only and accepts Brokers solely through authenticated Unix IPC.
+M15 deployment evidence is recorded in [evidence/M15](evidence/M15/README.md).
 
 Example translation output for trace with port=999 and host=192.168.10.20:
 
@@ -87,8 +91,9 @@ Gateway; the Gateway performs no execution and forwards each operation over
 host-local IPC to exactly one Runner profile.
 
 ```text
-Client -> SSH Broker -> Node Gateway -> diagnostics Runner
-                                    -> network-observer Runner
+SSH client -> SSH Broker -----\
+                              +-> Node Gateway -> diagnostics Runner
+Local TTY -> Console Broker --/                -> network-observer Runner
                                     -> service-manager Runner
                      -> application Config Manager
                      -> database Config Manager
@@ -188,6 +193,17 @@ menu. See [REQ-015](docs/requirements/REQ-015-end-to-end-deployment-and-demo.md)
 [ADR-017](docs/decisions/ADR-017-signed-bundle-and-two-level-e2e-verification.md),
 and the [deployment guide](docs/deployment.md).
 
+M16 gives the restricted terminal normal line-editing behavior: cursor keys,
+Home/End, insertion and deletion, bounded per-session history, and Tab
+completion filtered through the user's authorized catalog and config views.
+The same terminal is installed as the fixed login shell for the local
+`safeterm` OS account. Its identity and roles come from a root-managed mapping,
+and Gateway binds `broker_type=console` to that account's peer UID. It does not
+start Bash or expose arbitrary command execution. See
+[REQ-016](docs/requirements/REQ-016-interactive-terminal-and-console-broker.md),
+[ADR-018](docs/decisions/ADR-018-shared-restricted-terminal-and-console-login.md),
+and the [deployment guide](docs/deployment.md).
+
 ## Local Verification
 
 ```bash
@@ -250,3 +266,4 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M13 | Structured Configuration Management | ✅ Tagged: v0.14.0-m13 |
 | M14 | Adversarial Security Verification | ✅ Tagged: v0.15.1-m14 |
 | M15 | End-to-End Deployment and Demo | ✅ Tagged: v0.16.0-m15 |
+| M16 | Interactive Terminal UX and Console Access | ✅ Complete |

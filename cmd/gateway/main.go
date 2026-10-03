@@ -24,6 +24,7 @@ func main() {
 	configDir := flag.String("config", "/etc/safeterm", "catalog directory")
 	socketPath := flag.String("socket", "/run/safeterm-gateway/gateway.sock", "Gateway socket")
 	brokerUser := flag.String("broker-user", "safeterm-broker", "allowed local Broker user")
+	consoleUser := flag.String("console-user", "safeterm", "allowed local console Broker user")
 	configManagerUsers := flag.String("config-manager-users", "application=safeterm-config-application,database=safeterm-config-database,network=safeterm-config-network", "comma-separated profile=user Config Manager activation clients")
 	configRegistry := flag.String("config-resource-registry", "/etc/safeterm/config-manager/resources.json", "root-owned Config Manager resource registry")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
@@ -31,13 +32,13 @@ func main() {
 	catalogPublicKey := flag.String("catalog-public-key", "", "trusted catalog Ed25519 public key (defaults under config directory)")
 	catalogSignature := flag.String("catalog-signature", "", "detached catalog signature (defaults under config directory)")
 	flag.Parse()
-	if err := run(*configDir, *socketPath, *brokerUser, *configManagerUsers, *configRegistry, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
+	if err := run(*configDir, *socketPath, *brokerUser, *consoleUser, *configManagerUsers, *configRegistry, *auditSocket, *auditUser, *catalogPublicKey, *catalogSignature); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run(configDir, socketPath, brokerUser, configManagerUsers, configRegistry, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
+func run(configDir, socketPath, brokerUser, consoleUser, configManagerUsers, configRegistry, auditSocket, auditUser, catalogPublicKey, catalogSignature string) error {
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
 		return err
@@ -98,7 +99,19 @@ func run(configDir, socketPath, brokerUser, configManagerUsers, configRegistry, 
 	if err != nil {
 		return fmt.Errorf("gateway: parse Broker UID: %w", err)
 	}
-	peerPolicies := map[uint32]isolation.PeerPolicy{uint32(brokerUID): {AllowStreaming: true, Authorize: brokerPeerAuthorizer}}
+	peerPolicies := map[uint32]isolation.PeerPolicy{uint32(brokerUID): {AllowStreaming: true, Authorize: brokerPeerAuthorizer("ssh")}}
+	consoleAccount, err := user.Lookup(consoleUser)
+	if err != nil {
+		return fmt.Errorf("gateway: resolve console Broker user: %w", err)
+	}
+	consoleUID, err := strconv.ParseUint(consoleAccount.Uid, 10, 32)
+	if err != nil {
+		return fmt.Errorf("gateway: parse console Broker UID: %w", err)
+	}
+	if consoleUID == brokerUID {
+		return fmt.Errorf("gateway: console and SSH Broker UIDs must be distinct")
+	}
+	peerPolicies[uint32(consoleUID)] = isolation.PeerPolicy{AllowStreaming: true, Authorize: brokerPeerAuthorizer("console")}
 	resourceRegistry, err := configmanager.LoadRegistry(configRegistry)
 	if err != nil {
 		return fmt.Errorf("gateway: load Config Manager registry: %w", err)
@@ -137,11 +150,13 @@ func run(configDir, socketPath, brokerUser, configManagerUsers, configRegistry, 
 	return server.Serve(ctx)
 }
 
-func brokerPeerAuthorizer(request *contract.ExecutionRequest) error {
-	if request == nil || request.Metadata.BrokerType != "ssh" {
-		return fmt.Errorf("gateway: Broker peer must use ssh identity")
+func brokerPeerAuthorizer(brokerType string) func(*contract.ExecutionRequest) error {
+	return func(request *contract.ExecutionRequest) error {
+		if request == nil || request.Metadata.BrokerType != brokerType {
+			return fmt.Errorf("gateway: Broker peer must use %s identity", brokerType)
+		}
+		return nil
 	}
-	return nil
 }
 
 func validatedManagerOperations(cfg *config.Config, registry *configmanager.Registry, profile string) (map[string]bool, error) {

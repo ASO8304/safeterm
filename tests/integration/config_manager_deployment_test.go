@@ -19,7 +19,7 @@ func TestConfigManagerDeploymentProfilesAreIsolated(t *testing.T) {
 			t.Fatal(err)
 		}
 		unit := string(data)
-		for _, required := range []string{"User=" + user, "Group=safeterm-broker", "SupplementaryGroups=safeterm-audit", "NoNewPrivileges=yes", "ProtectSystem=strict", "RestrictAddressFamilies=AF_UNIX", "CapabilityBoundingSet=", "-profile=" + profile, "-run-as-user=" + user, "ReadWritePaths=/etc/safeterm-managed/" + profile} {
+		for _, required := range []string{"User=" + user, "Group=safeterm-clients", "SupplementaryGroups=safeterm-audit", "NoNewPrivileges=yes", "ProtectSystem=strict", "RestrictAddressFamilies=AF_UNIX", "CapabilityBoundingSet=", "-profile=" + profile, "-run-as-user=" + user, "ReadWritePaths=/etc/safeterm-managed/" + profile} {
 			if !strings.Contains(unit, required) {
 				t.Errorf("%s missing %q", path, required)
 			}

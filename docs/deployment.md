@@ -39,7 +39,10 @@ catalog-sign -config /tmp/safeterm-catalog \
 
 Add the root-managed SSH host private key at
 `ssh/ssh_host_ed25519_key`, the public-key identity map at `ssh/users.json`,
-and the resource registry at `config-manager/resources.json`. Prepare a managed
+the local-login identity map at `console/users.json`, and the resource registry
+at `config-manager/resources.json`. A production console map can start from
+`deploy/console/users.example.json`; keep only the roles that operator needs.
+Prepare a managed
 seed directory whose layout is `PROFILE/basename(registered path)`.
 
 Build the bundle:
@@ -78,6 +81,26 @@ ssh -t -p 2222 alice@HOST
 Inside the restricted terminal, run `whoami`, `list`, `run system_info`, and
 `config list`. Long-running `trace` output can be stopped with Ctrl+C, which
 maps to the semantic terminate protocol.
+
+The prompt includes the authenticated identity, for example
+`safeterm::alice> `. Tab completes only authorized commands, operations,
+parameters, config resources, sections, and fields. Arrow keys provide cursor
+movement and session history; Home, End, Delete, Backspace, Ctrl+A, Ctrl+E,
+Ctrl+U, Ctrl+W, and Ctrl+L provide normal line editing.
+
+For local VM or physical-console access, enroll a password after installation:
+
+```bash
+sudo passwd safeterm
+```
+
+Then log in as `safeterm` from the Linux console. The account's fixed login
+shell is `/usr/local/bin/safeterm-console`, so it displays
+`safeterm::safeterm> ` and the same restricted menu. The installer intentionally
+does not choose a password. Roles are controlled only by the root-owned
+`/etc/safeterm/console/users.json`; the login user cannot supply roles, paths,
+or a replacement identity file. After changing that file, start a new login
+session. No SafeTerm service restart is required.
 
 ## Disposable-host demo
 

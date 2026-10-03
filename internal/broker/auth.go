@@ -19,8 +19,9 @@ var identityPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$`)
 // Principal is the identity established by SSH public-key authentication.
 // Roles are loaded by the Broker and never accepted from the remote client.
 type Principal struct {
-	UserID string
-	Roles  []string
+	UserID     string
+	Roles      []string
+	BrokerType string
 }
 
 type SSHUser struct {
@@ -88,7 +89,7 @@ func NewSSHAuthenticator(config SSHIdentityConfig, knownRoles map[string]bool) (
 			if _, exists := result.byFingerprint[fingerprint]; exists {
 				return nil, fmt.Errorf("broker: authorized key %q is assigned more than once", fingerprint)
 			}
-			result.byFingerprint[fingerprint] = Principal{UserID: user.UserID, Roles: append([]string(nil), roles...)}
+			result.byFingerprint[fingerprint] = Principal{UserID: user.UserID, Roles: append([]string(nil), roles...), BrokerType: "ssh"}
 		}
 	}
 	return result, nil
@@ -112,7 +113,7 @@ func principalFromPermissions(permissions *ssh.Permissions) (Principal, error) {
 	if permissions == nil || permissions.Extensions == nil {
 		return Principal{}, fmt.Errorf("broker: authenticated principal is missing")
 	}
-	principal := Principal{UserID: permissions.Extensions["safeterm.user_id"]}
+	principal := Principal{UserID: permissions.Extensions["safeterm.user_id"], BrokerType: "ssh"}
 	if encoded := permissions.Extensions["safeterm.roles"]; encoded != "" {
 		principal.Roles = strings.Split(encoded, "\x1f")
 	}
