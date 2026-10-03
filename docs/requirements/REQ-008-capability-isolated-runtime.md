@@ -23,8 +23,9 @@ upstream routing.
 - [x] **AC-1:** Every operation maps to exactly one configured Runner profile
   and one supported executor kind; missing, unknown, or conflicting mappings
   make configuration loading fail.
-- [x] **AC-2:** The initial runtime supports separate `diagnostics`,
-  `network-observer`, and `service-manager` profiles without separate codebases.
+- [x] **AC-2:** The runtime supports separate `diagnostics`,
+  `network-observer`, `log-reader`, and `service-manager` profiles without
+  separate codebases.
 - [x] **AC-3:** Each profile runs as an independent process with its own service
   identity, local IPC endpoint, configuration subset, and resource limits.
 - [x] **AC-4:** A Runner rejects an operation outside its locally loaded profile

@@ -46,6 +46,30 @@ func TestPrepareConfigRefreshesDigestsWithoutPublishingSigningMaterial(t *testin
 	}
 }
 
+func TestSystemdSudoersContainsOnlySignedExactCommands(t *testing.T) {
+	cfg, err := config.LoadConfig("../../configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines, err := systemdSudoers(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.Join(lines, "\n")
+	for _, expected := range []string{
+		"/usr/bin/systemctl --no-pager status safeterm-gateway.service",
+		"/usr/bin/systemctl --no-pager restart safeterm-ssh-broker.service",
+		"safeterm-service-manager ALL=(root) NOPASSWD: SAFETERM_SYSTEMD",
+	} {
+		if !strings.Contains(text, expected) {
+			t.Errorf("sudoers policy missing %q", expected)
+		}
+	}
+	if strings.Contains(text, "*") || strings.Contains(text, " ALL\n") {
+		t.Fatalf("sudoers policy contains a wildcard grant: %s", text)
+	}
+}
+
 // TEST-DEPLOY-002: REQ-015 AC-3 and AC-4.
 func TestBundlePreflightAcceptsCompleteBundleAndRejectsTampering(t *testing.T) {
 	bundle := buildTestBundle(t)

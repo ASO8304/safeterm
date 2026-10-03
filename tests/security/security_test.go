@@ -145,7 +145,12 @@ func TestDeployedServicesRetainExplicitResourceAndPrivilegeBounds(t *testing.T) 
 		}
 		unit := string(data)
 		noNewPrivileges, ok := systemdSetting(unit, "NoNewPrivileges")
-		if !ok || (noNewPrivileges != "yes" && noNewPrivileges != "true") {
+		privilegedController := entry.Name() == "safeterm-runner-service-manager.service"
+		if privilegedController {
+			if !ok || noNewPrivileges != "no" || !strings.Contains(unit, "RestrictSUIDSGID=no") {
+				t.Errorf("%s must permit only the sudoers-confined typed controller", entry.Name())
+			}
+		} else if !ok || (noNewPrivileges != "yes" && noNewPrivileges != "true") {
 			t.Errorf("%s must enable NoNewPrivileges", entry.Name())
 		}
 		memoryMax, ok := systemdSetting(unit, "MemoryMax")

@@ -9,6 +9,7 @@ import (
 
 var (
 	namePattern       = regexp.MustCompile(`^[a-z][a-z0-9_-]*$`)
+	aliasPattern      = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]*$`)
 	profilePattern    = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 	capabilityPattern = regexp.MustCompile(`^CAP_[A-Z0-9_]+$`)
 	unitPattern       = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]*\.service$`)
@@ -63,6 +64,14 @@ func validateProfiles(items []ProfileDefinition) (map[RunnerProfile]ProfileDefin
 		}
 		if profile.ExecutorKind == ExecutorSystemd && profile.ControllerExecutableRef == "" {
 			return nil, fmt.Errorf("config: systemd profile %q requires a controller executable", profile.Name)
+		}
+		if profile.ExecutorKind == ExecutorProcess && len(profile.ControllerArgsPrefix) != 0 {
+			return nil, fmt.Errorf("config: process profile %q must not define controller arguments", profile.Name)
+		}
+		for _, argument := range profile.ControllerArgsPrefix {
+			if argument == "" || strings.ContainsRune(argument, '\x00') {
+				return nil, fmt.Errorf("config: profile %q has an invalid controller argument", profile.Name)
+			}
 		}
 		if !filepath.IsAbs(profile.SocketPath) {
 			return nil, fmt.Errorf("config: profile %q: socket_path must be absolute", profile.Name)
@@ -125,6 +134,21 @@ func validateProfileExecutables(profiles map[RunnerProfile]ProfileDefinition, ex
 		executable, exists := executables[profile.ControllerExecutableRef]
 		if !exists || !containsProfile(executable.AllowedProfiles, profile.Name) {
 			return fmt.Errorf("config: profile %q: controller executable %q is not approved for this profile", profile.Name, profile.ControllerExecutableRef)
+		}
+		if len(profile.ControllerArgsPrefix) != 0 {
+			expected := []string{"-n", "/usr/bin/systemctl", "--no-pager"}
+			if executable.Path != "/usr/bin/sudo" || len(profile.ControllerArgsPrefix) != len(expected) {
+				return fmt.Errorf("config: profile %q has an unsupported privileged controller", profile.Name)
+			}
+			for index := range expected {
+				if profile.ControllerArgsPrefix[index] != expected[index] {
+					return fmt.Errorf("config: profile %q has an unsupported privileged controller", profile.Name)
+				}
+			}
+			systemctl, ok := executables["systemctl"]
+			if !ok || systemctl.Path != "/usr/bin/systemctl" || !containsProfile(systemctl.AllowedProfiles, profile.Name) {
+				return fmt.Errorf("config: profile %q privileged controller requires an approved systemctl executable", profile.Name)
+			}
 		}
 	}
 	return nil
@@ -189,7 +213,7 @@ func containsProfile(items []RunnerProfile, wanted RunnerProfile) bool {
 
 func validSystemdAction(action string) bool {
 	switch action {
-	case "start", "stop", "restart", "status":
+	case "start", "stop", "restart", "reload", "enable", "disable", "status":
 		return true
 	default:
 		return false
@@ -202,7 +226,7 @@ func validateParameterDefinition(opName string, parameter ParameterDefinition) e
 	}
 	switch parameter.Type {
 	case ParamTypeInt:
-		if parameter.Pattern != "" {
+		if parameter.Pattern != "" || len(parameter.ValueMap) != 0 {
 			return fmt.Errorf("config: operation %q: parameter %q: pattern is not valid for type %q", opName, parameter.Name, ParamTypeInt)
 		}
 		if parameter.Min != nil && parameter.Max != nil && *parameter.Min > *parameter.Max {
@@ -214,6 +238,23 @@ func validateParameterDefinition(opName string, parameter ParameterDefinition) e
 		}
 	default:
 		return fmt.Errorf("config: operation %q: parameter %q: unknown type %q", opName, parameter.Name, parameter.Type)
+	}
+	if len(parameter.ValueMap) != 0 {
+		re, err := regexp.Compile(parameter.Pattern)
+		if err != nil {
+			return fmt.Errorf("config: operation %q: parameter %q has invalid pattern: %w", opName, parameter.Name, err)
+		}
+		for alias, value := range parameter.ValueMap {
+			if !aliasPattern.MatchString(alias) || value == "" || strings.ContainsRune(value, '\x00') {
+				return fmt.Errorf("config: operation %q: parameter %q has invalid mapped value %q", opName, parameter.Name, alias)
+			}
+			if parameter.Pattern != "" {
+				location := re.FindStringIndex(alias)
+				if location == nil || location[0] != 0 || location[1] != len(alias) {
+					return fmt.Errorf("config: operation %q: mapped alias %q does not match parameter %q pattern", opName, alias, parameter.Name)
+				}
+			}
+		}
 	}
 	return nil
 }

@@ -20,9 +20,19 @@
   {
     "name": "service-manager",
     "executor_kind": "systemd",
-    "controller_executable_ref": "systemctl",
+    "controller_executable_ref": "sudo",
+    "controller_args_prefix": ["-n", "/usr/bin/systemctl", "--no-pager"],
     "socket_path": "/run/safeterm-service-manager/runner.sock",
     "run_as_user": "safeterm-service-manager",
+    "capabilities": [],
+    "memory_limit_mib": 128,
+    "process_limit": 16
+  },
+  {
+    "name": "log-reader",
+    "executor_kind": "process",
+    "socket_path": "/run/safeterm-log-reader/runner.sock",
+    "run_as_user": "safeterm-log-reader",
     "capabilities": [],
     "memory_limit_mib": 128,
     "process_limit": 16

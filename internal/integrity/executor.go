@@ -95,13 +95,9 @@ func (e *Executor) Execute(ctx context.Context, command string, args []string) (
 	if e == nil || e.delegate == nil || ctx == nil {
 		return "", "", exitCodeUnavailable, fmt.Errorf("integrity: invalid executor call")
 	}
-	binding, ok := e.bindings[command]
-	if !ok || command == "" {
-		return "", "", exitCodeUnavailable, fmt.Errorf("integrity: executable path is not approved for this profile")
-	}
-	file, err := verifyOpen(command, binding)
+	file, err := e.openVerified(command)
 	if err != nil {
-		return "", "", exitCodeUnavailable, fmt.Errorf("integrity: verify %q: %w", command, err)
+		return "", "", exitCodeUnavailable, err
 	}
 	defer file.Close()
 
@@ -110,6 +106,32 @@ func (e *Executor) Execute(ctx context.Context, command string, args []string) (
 	// replacement window between hashing and execve for native Linux binaries.
 	pinnedPath := fmt.Sprintf("/proc/self/fd/%d", file.Fd())
 	return e.delegate.Execute(ctx, pinnedPath, args)
+}
+
+// VerifyExecutable repeats the profile-scoped integrity check without running
+// the file. Typed controllers use it for fixed executable dependencies such as
+// systemctl that are launched by the directly executed sudo controller.
+func (e *Executor) VerifyExecutable(command string) error {
+	if e == nil || e.delegate == nil {
+		return fmt.Errorf("integrity: invalid executor call")
+	}
+	file, err := e.openVerified(command)
+	if err != nil {
+		return err
+	}
+	return file.Close()
+}
+
+func (e *Executor) openVerified(command string) (*os.File, error) {
+	binding, ok := e.bindings[command]
+	if !ok || command == "" {
+		return nil, fmt.Errorf("integrity: executable path is not approved for this profile")
+	}
+	file, err := verifyOpen(command, binding)
+	if err != nil {
+		return nil, fmt.Errorf("integrity: verify %q: %w", command, err)
+	}
+	return file, nil
 }
 
 func verifyOpen(configuredPath string, approved binding) (*os.File, error) {

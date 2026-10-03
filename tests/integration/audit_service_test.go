@@ -97,7 +97,7 @@ func TestGatewayAndRunnerPersistCorrelatedAuditTrail(t *testing.T) {
 	}
 	wantOutcomes := []string{"routed", "accepted", "completed", "returned"}
 	for i, entry := range entries {
-		if entry.Event.RequestID != request.RequestID || entry.Event.CatalogVersion != "1.1.0" || entry.Event.Outcome != wantOutcomes[i] {
+		if entry.Event.RequestID != request.RequestID || entry.Event.CatalogVersion != "1.2.0" || entry.Event.Outcome != wantOutcomes[i] {
 			t.Fatalf("entry %d = %+v", i, entry)
 		}
 	}

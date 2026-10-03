@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"safeterm/internal/broker"
@@ -26,9 +27,42 @@ var SystemdUnits = []string{
 	"safeterm-config-manager-network.service",
 	"safeterm-gateway.service",
 	"safeterm-runner-diagnostics.service",
+	"safeterm-runner-log-reader.service",
 	"safeterm-runner-network-observer.service",
 	"safeterm-runner-service-manager.service",
 	"safeterm-ssh-broker.service",
+}
+
+// SystemdSudoers returns the exact root commands required by signed, typed
+// systemd operations. It never emits caller-provided parameters or wildcards.
+func SystemdSudoers(root string) ([]string, error) {
+	root = filepath.Clean(root)
+	configDir := filepath.Join(root, "etc", "safeterm")
+	if root == "/" {
+		configDir = "/etc/safeterm"
+	}
+	cfg, err := config.LoadConfig(configDir)
+	if err != nil {
+		return nil, err
+	}
+	return systemdSudoers(cfg)
+}
+
+func systemdSudoers(cfg *config.Config) ([]string, error) {
+	commands := []string{}
+	for _, operation := range cfg.Operations {
+		if operation.ExecutorKind == config.ExecutorSystemd {
+			commands = append(commands, "/usr/bin/systemctl --no-pager "+operation.Systemd.Action+" "+operation.Systemd.Unit)
+		}
+	}
+	if len(commands) == 0 {
+		return nil, fmt.Errorf("deployment: catalog has no typed systemd operations")
+	}
+	sort.Strings(commands)
+	return []string{
+		"Cmnd_Alias SAFETERM_SYSTEMD = " + strings.Join(commands, ", "),
+		"safeterm-service-manager ALL=(root) NOPASSWD: SAFETERM_SYSTEMD",
+	}, nil
 }
 
 type CheckOptions struct {
@@ -96,6 +130,20 @@ func Check(options CheckOptions) (Report, error) {
 	}
 	if err := integrity.VerifyCatalogFiles(cfg, filepath.Join(configDir, "trust", "catalog-ed25519.pub"), filepath.Join(configDir, "catalog.sig")); err != nil {
 		return Report{}, err
+	}
+	if options.Installed {
+		expected, err := systemdSudoers(cfg)
+		if err != nil {
+			return Report{}, err
+		}
+		path := "/etc/sudoers.d/safeterm-service-manager"
+		if err := requireSecureFile(path, false); err != nil {
+			return Report{}, err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil || strings.TrimSpace(string(data)) != strings.Join(expected, "\n") {
+			return Report{}, fmt.Errorf("deployment: installed service-manager sudoers policy does not match signed catalog")
+		}
 	}
 	for _, profile := range cfg.Profiles {
 		if _, err := integrity.NewExecutor(cfg, profile.Name, verificationExecutor{}); err != nil {

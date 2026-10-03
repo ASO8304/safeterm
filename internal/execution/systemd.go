@@ -60,15 +60,34 @@ func (e *SystemdExecutor) Execute(ctx context.Context, unit string, args []strin
 type SystemctlController struct {
 	runner agent.Executor
 	path   string
+	prefix []string
+}
+
+type executableVerifier interface {
+	VerifyExecutable(command string) error
 }
 
 func NewSystemctlController(path string, timeoutRunner agent.Executor) (*SystemctlController, error) {
+	return NewSystemctlControllerWithPrefix(path, nil, timeoutRunner)
+}
+
+func NewSystemctlControllerWithPrefix(path string, prefix []string, timeoutRunner agent.Executor) (*SystemctlController, error) {
 	if !filepath.IsAbs(path) || timeoutRunner == nil {
 		return nil, fmt.Errorf("execution: systemctl path and runner are required")
 	}
-	return &SystemctlController{runner: timeoutRunner, path: path}, nil
+	return &SystemctlController{runner: timeoutRunner, path: path, prefix: append([]string(nil), prefix...)}, nil
 }
 
 func (c *SystemctlController) Control(ctx context.Context, action, unit string) (string, string, int, error) {
-	return c.runner.Execute(ctx, c.path, []string{action, unit})
+	if verifier, ok := c.runner.(executableVerifier); ok {
+		for _, argument := range c.prefix {
+			if filepath.IsAbs(argument) {
+				if err := verifier.VerifyExecutable(argument); err != nil {
+					return "", "", ExitCodeUnavailable, fmt.Errorf("execution: verify controller dependency: %w", err)
+				}
+			}
+		}
+	}
+	args := append(append([]string(nil), c.prefix...), action, unit)
+	return c.runner.Execute(ctx, c.path, args)
 }

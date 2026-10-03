@@ -26,10 +26,11 @@ without turning `systemctl` arguments into caller-controlled command input.
   ADR-012/M10 verifies its canonical path and file hash immediately before execution.
 - Service operations compile to an exact unit/action pair. `SystemdExecutor`
   checks that pair against its catalog snapshot before invoking its controller.
-  The initial Linux controller executes a fixed absolute `systemctl` adapter
-  with exactly two argv elements; no caller can add flags, change the unit, or
-  select a shell. Deployment must separately grant the service account only the
-  cataloged systemd actions and units.
+  The Linux controller executes verified `/usr/bin/sudo` with a fixed
+  non-interactive `/usr/bin/systemctl --no-pager` prefix followed by exactly
+  the cataloged action and unit. No caller can add flags, change the unit, or
+  select a shell. Deployment grants the service account only those exact
+  cataloged systemd commands through a generated no-wildcard sudoers rule.
 - Active catalogs are cloned and validated before an atomic pointer swap. A
   rejected update cannot partially mutate the current snapshot.
 - Gateway and Runner expose transport-neutral lifecycle events containing the
@@ -58,6 +59,7 @@ without turning `systemctl` arguments into caller-controlled command input.
   bounded streaming protocol.
 - Deployments must provision separate users and a narrow OS authorization rule
   before activating service-manager operations.
-- ADR-012 completes executable integrity in M10: the systemctl adapter and
-  every process executable are canonicalized, hash-verified, and descriptor-
-  pinned immediately before execution.
+- ADR-012 completes executable integrity in M10: both sudo and systemctl, plus
+  every process executable, are canonicalized and hash-verified immediately
+  before execution. The directly executed sudo binary and process executables
+  are descriptor-pinned.

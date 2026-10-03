@@ -1,6 +1,9 @@
 [
   { "name": "viewer", "description": "Read-only access to safe, non-sensitive operations." },
   { "name": "netops", "description": "Network diagnostics and traffic capture operations." },
+  { "name": "log-viewer", "description": "Stream only catalog-approved log files." },
+  { "name": "service-viewer", "description": "Read status for catalog-approved systemd services." },
+  { "name": "service-operator", "description": "Start, stop, restart, enable, or disable catalog-approved systemd services." },
   { "name": "config-viewer", "description": "Read registered non-secret configuration fields." },
   { "name": "config-operator", "description": "Validate, preview, and apply registered configuration fields." },
   { "name": "config-approver", "description": "Independently approve protected configuration proposals." }

@@ -17,9 +17,9 @@ works with the Linux-first runtime established by ADR-009 and ADR-010.
 
 ## Decision
 - Each executable registry entry contains an exact lowercase SHA-256 digest.
-  A systemd profile names its fixed controller through
-  `controller_executable_ref`, so `/usr/bin/systemctl` has the same integrity
-  boundary as process operations.
+  A systemd profile names `/usr/bin/sudo` as its fixed controller and declares
+  `/usr/bin/systemctl` in its validated fixed prefix. Both executables are
+  approved for that profile and verified before service operations.
 - Gateway and Runner require a detached Ed25519 signature before using a
   catalog. The public trust key is provisioned separately from editable catalog
   files. Runtime services receive only the public key and signature; signing
@@ -44,6 +44,10 @@ works with the Linux-first runtime established by ADR-009 and ADR-010.
   `/proc/self/fd/<fd>` to the existing process Runner. The child therefore
   selects the verified open inode rather than reopening the catalog path. The
   descriptor remains open until execution completes.
+- Fixed executable dependencies in a typed controller prefix are verified
+  immediately before the controller runs. The directly executed controller is
+  descriptor-pinned; sudo then invokes the already-verified fixed systemctl
+  path under the exact generated command rule.
 - Integrity remains the Executor boundary. A mismatch returns exit code -1 and
   no output, and Core reports the existing structured execution-stage failure.
   Validation, Policy, Translation, and Core are unchanged.

@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M18 — Transactional Installation Rollback (complete)**
+**Milestone: M19 — Operator Catalog and Terminal UX (complete)**
 
 Available capabilities:
 
@@ -55,6 +55,8 @@ Available capabilities:
   module download, or Internet access on the target and preserves installed state on upgrade
 - A checksum-protected pre-install transaction and offline rollback command that
   restores SafeTerm files, data, accounts, signing keys, and systemd state
+- Commented catalog-authoring templates, allowlisted `tail -F` log aliases,
+  role-separated typed systemd controls, and task-oriented terminal help
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
@@ -63,7 +65,8 @@ must still treat arbitrary `ClaimedRoles` as unverified input.
 The Agent Core pipeline, capability-isolated host runtime, local Audit Service,
 runtime integrity boundary, bounded session control, authenticated SSH and
 console Brokers, structured Config Managers, adversarial security controls,
-and reproducible deployment are implemented through M16. The Node Gateway
+reproducible deployment, transactional installation, and operator catalog
+workflows are implemented through M19. The Node Gateway
 remains local-only and accepts Brokers solely through authenticated Unix IPC.
 M15 deployment evidence is recorded in [evidence/M15](evidence/M15/README.md).
 
@@ -98,6 +101,7 @@ host-local IPC to exactly one Runner profile.
 SSH client -> SSH Broker -----\
                               +-> Node Gateway -> diagnostics Runner
 Local TTY -> Console Broker --/                -> network-observer Runner
+                                    -> log-reader Runner
                                     -> service-manager Runner
                      -> application Config Manager
                      -> database Config Manager
@@ -235,6 +239,15 @@ command or the package copy. See
 sudo /usr/local/sbin/safeterm-install-rollback latest
 ```
 
+M19 adds administrator-facing `TEMPLATE.jsonc` files, mapped parameters that
+turn public aliases into fixed catalog values, an isolated streaming Log Reader,
+and exact typed systemd controls backed by a generated no-wildcard sudoers
+policy. The terminal accepts `run log service_A`, completes mapped values, and
+provides topic and operation help. See
+[REQ-019](docs/requirements/REQ-019-operator-catalog-and-terminal-ux.md),
+[ADR-021](docs/decisions/ADR-021-mapped-parameters-and-typed-service-control.md),
+and the [catalog authoring guide](docs/catalog-authoring.md).
+
 ## Local Verification
 
 ```bash
@@ -298,5 +311,6 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M14 | Adversarial Security Verification | ✅ Tagged: v0.15.1-m14 |
 | M15 | End-to-End Deployment and Demo | ✅ Tagged: v0.16.0-m15 |
 | M16 | Interactive Terminal UX and Console Access | ✅ Tagged: v0.17.0-m16 |
-| M17 | Online and Air-Gapped Installation Package | ✅ Complete |
-| M18 | Transactional Installation Rollback | ✅ Complete |
+| M17 | Online and Air-Gapped Installation Package | ✅ Tagged: v0.18.0-m17 |
+| M18 | Transactional Installation Rollback | ✅ Tagged: v0.19.0-m18 |
+| M19 | Operator Catalog, Log Streaming, and Terminal UX | ✅ Tagged: v0.20.0-m19 |

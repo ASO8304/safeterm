@@ -1,0 +1,45 @@
+[
+  // Process operation: argv tokens are never interpreted by a shell.
+  {
+    "name": "example_stream",                 // lowercase logical command: [a-z][a-z0-9_-]*
+    "description": "Operator-facing help text.",
+    "runner_profile": "log-reader",           // must exist in profiles
+    "executor_kind": "process",
+    "executable_ref": "tail",                 // must be approved for this profile
+    "args_template": ["-n", "50", "-F", "--", "{source}"],
+    "parameters": [
+      {
+        "name": "source",
+        "type": "string",                     // string or int
+        "required": true,
+        "pattern": "^[A-Za-z0-9_.@-]+$",      // optional full-match RE2 expression
+        "value_map": {                         // optional alias -> fixed argv value allowlist
+          "service_A": "/var/log/service-a.log",
+          "service_B": "/var/log/service-b.log"
+        }
+      },
+      {
+        "name": "count",
+        "type": "int",
+        "required": true,
+        "min": 1,                              // int only; optional
+        "max": 100                             // int only; optional
+      }
+    ],
+    "long_running": true                       // true enables streaming and semantic Ctrl+C
+  },
+
+  // Typed systemd operation: unit and action are catalog-owned and accept no parameters.
+  {
+    "name": "restart_example",
+    "description": "Restart the approved example service.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": {
+      "unit": "example.service",
+      "action": "restart"                     // start, stop, restart, reload, enable, disable, status
+    },
+    "parameters": [],
+    "long_running": false
+  }
+]

@@ -15,8 +15,8 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Profiles) != 3 {
-		t.Fatalf("profiles=%d, want 3", len(cfg.Profiles))
+	if len(cfg.Profiles) != 4 {
+		t.Fatalf("profiles=%d, want 4", len(cfg.Profiles))
 	}
 	for _, profile := range cfg.Profiles {
 		path := filepath.Join("..", "..", "deploy", "systemd", "safeterm-runner-"+string(profile.Name)+".service")
@@ -25,13 +25,19 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 			t.Fatal(err)
 		}
 		unit := strings.ReplaceAll(string(data), "\r\n", "\n")
-		for _, required := range []string{
+		requiredSettings := []string{
 			"User=" + profile.RunAsUser,
 			"ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile " + string(profile.Name),
-			"NoNewPrivileges=yes", "ProtectSystem=strict", "ProtectHome=yes",
+			"ProtectSystem=strict", "ProtectHome=yes",
 			"MemoryMax=", "TasksMax=", "RestrictAddressFamilies=AF_UNIX",
 			"Requires=safeterm-audit.service", "SupplementaryGroups=safeterm-audit",
-		} {
+		}
+		if profile.Name == config.ProfileServiceManager {
+			requiredSettings = append(requiredSettings, "NoNewPrivileges=no", "RestrictSUIDSGID=no")
+		} else {
+			requiredSettings = append(requiredSettings, "NoNewPrivileges=yes", "RestrictSUIDSGID=yes")
+		}
+		for _, required := range requiredSettings {
 			if !strings.Contains(unit, required) {
 				t.Errorf("%s missing %q", path, required)
 			}

@@ -60,7 +60,7 @@ func (s *Shell) Run(ctx context.Context) error {
 	done := make(chan struct{})
 	defer close(done)
 	go readBytes(s.input, input, done)
-	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s. Type 'help' for commands.\r\n", s.principal.UserID)
+	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples.\r\n", s.principal.UserID)
 	for {
 		line, err := s.readLine(ctx, input, s.prompt(), false, true)
 		if err != nil {
@@ -106,10 +106,14 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	fields := strings.Fields(line)
 	switch fields[0] {
 	case "help":
-		if len(fields) != 1 {
-			return false, fmt.Errorf("usage: help")
+		if len(fields) > 2 {
+			return false, fmt.Errorf("usage: help [run|config|keys|OPERATION]")
 		}
-		fmt.Fprint(s.output, "help                         show this help\r\nlist                         list authorized operations\r\ndescribe NAME                show operation parameters\r\nrun NAME [K=V ...]           run an authorized operation\r\nconfig list                  list configuration resources\r\nconfig show ID               read registered fields\r\nconfig describe ID           show field schemas\r\nconfig edit ID SECTION KEY   validate, preview, and apply one field\r\nconfig apply TOKEN           apply an approved proposal\r\nconfig rollback ID           restore the newest retained backup\r\nwhoami                       show authenticated identity\r\nclear                        clear the terminal\r\nexit                         close this session\r\nkeys: Tab complete; Up/Down history; Left/Right/Home/End edit; Ctrl+C cancel\r\n")
+		topic := ""
+		if len(fields) == 2 {
+			topic = fields[1]
+		}
+		return false, s.writeHelp(topic)
 	case "list":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: list")
@@ -142,7 +146,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		if !ok {
 			return false, fmt.Errorf("operation %q is unknown or unauthorized", fields[1])
 		}
-		arguments, err := parseArguments(fields[2:])
+		arguments, err := parseOperationArguments(operation, fields[2:])
 		if err != nil {
 			return false, err
 		}
@@ -335,7 +339,7 @@ func (s *Shell) readConfigValue(ctx context.Context, input <-chan byte, prompt s
 func (s *Shell) describe(operation config.OperationDefinition) {
 	fmt.Fprintf(s.output, "%s: %s\r\nprofile: %s\r\nmode: %s\r\n", operation.Name, operation.Description, operation.RunnerProfile, map[bool]string{true: "stream", false: "bounded"}[operation.LongRunning])
 	if len(operation.Parameters) == 0 {
-		fmt.Fprint(s.output, "parameters: none\r\n")
+		fmt.Fprintf(s.output, "parameters: none\r\nexample: %s\r\n", operationExample(operation))
 		return
 	}
 	parameters := append([]config.ParameterDefinition(nil), operation.Parameters...)
@@ -355,15 +359,29 @@ func (s *Shell) describe(operation config.OperationDefinition) {
 		if parameter.Pattern != "" {
 			constraints += " pattern=" + parameter.Pattern
 		}
+		if len(parameter.ValueMap) != 0 {
+			aliases := make([]string, 0, len(parameter.ValueMap))
+			for alias := range parameter.ValueMap {
+				aliases = append(aliases, alias)
+			}
+			sort.Strings(aliases)
+			constraints += " allowed=" + strings.Join(aliases, "|")
+		}
 		fmt.Fprintf(s.output, "- %s (%s, %s)%s\r\n", parameter.Name, parameter.Type, required, constraints)
 	}
+	fmt.Fprintf(s.output, "example: %s\r\n", operationExample(operation))
 }
 
-func parseArguments(fields []string) (map[string]string, error) {
+func parseOperationArguments(operation config.OperationDefinition, fields []string) (map[string]string, error) {
 	arguments := make(map[string]string, len(fields))
+	positional := false
 	for _, field := range fields {
 		parts := strings.SplitN(field, "=", 2)
-		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		if len(parts) != 2 {
+			positional = true
+			continue
+		}
+		if parts[0] == "" || parts[1] == "" {
 			return nil, fmt.Errorf("argument %q must use KEY=VALUE syntax", field)
 		}
 		if _, exists := arguments[parts[0]]; exists {
@@ -371,7 +389,58 @@ func parseArguments(fields []string) (map[string]string, error) {
 		}
 		arguments[parts[0]] = parts[1]
 	}
+	if positional {
+		if len(arguments) != 0 {
+			return nil, fmt.Errorf("use either positional values or KEY=VALUE arguments, not both")
+		}
+		if len(fields) > len(operation.Parameters) {
+			return nil, fmt.Errorf("too many values; use 'describe %s' for the expected parameters", operation.Name)
+		}
+		for index, value := range fields {
+			if strings.Contains(value, "=") {
+				return nil, fmt.Errorf("use either positional values or KEY=VALUE arguments, not both")
+			}
+			arguments[operation.Parameters[index].Name] = value
+		}
+	}
 	return arguments, nil
+}
+
+func (s *Shell) writeHelp(topic string) error {
+	switch topic {
+	case "":
+		fmt.Fprint(s.output, "Getting started\r\n  1. list                         see what you may run\r\n  2. describe NAME                see parameters and an example\r\n  3. run NAME [VALUE ...]         run with simple positional values\r\n     run NAME [KEY=VALUE ...]     run with explicit named values\r\n\r\nConfiguration\r\n  config list                    list resources you may access\r\n  config describe ID             show editable fields and types\r\n  config show ID                 read current non-secret values\r\n  config edit ID SECTION KEY     validate, preview, and propose/apply a value\r\n  config apply TOKEN             apply an approved proposal\r\n  config rollback ID             restore the newest retained backup\r\n\r\nSession\r\n  whoami                         show your identity and roles\r\n  clear                          clear the screen\r\n  exit                           close this session\r\n\r\nTry: 'help run', 'help config', 'help keys', or 'help OPERATION'.\r\n")
+	case "run":
+		fmt.Fprint(s.output, "Run operations\r\n  list\r\n  describe trace\r\n  run trace host=192.168.45.140 port=999\r\n  run log service_A\r\n\r\nLong-running operations stream output. Press Ctrl+C once to request a safe terminate.\r\nArguments are values, never shell text; pipes, redirects, and command substitution are unavailable.\r\n")
+	case "config":
+		fmt.Fprint(s.output, "Configuration workflow\r\n  config list\r\n  config describe cats-options\r\n  config show cats-options\r\n  config edit cats-options cats Cat_Port\r\n\r\nThe editor validates the new value and shows a preview before applying it. Tab completes resource, section, and field names.\r\n")
+	case "keys":
+		fmt.Fprint(s.output, "Editing keys\r\n  Tab             complete commands, operations, parameters, and allowed values\r\n  Up / Down       browse command history\r\n  Left / Right    move the cursor\r\n  Home / End      jump to the beginning or end\r\n  Backspace/Del   delete around the cursor\r\n  Ctrl+C          cancel input or terminate the active stream\r\n")
+	default:
+		operation, ok := s.catalog.AuthorizedOperation(topic, s.principal.Roles)
+		if !ok {
+			return fmt.Errorf("help topic or authorized operation %q was not found", topic)
+		}
+		s.describe(operation)
+	}
+	return nil
+}
+
+func operationExample(operation config.OperationDefinition) string {
+	parts := []string{"run", operation.Name}
+	for _, parameter := range operation.Parameters {
+		value := "VALUE"
+		if len(parameter.ValueMap) != 0 {
+			aliases := make([]string, 0, len(parameter.ValueMap))
+			for alias := range parameter.ValueMap {
+				aliases = append(aliases, alias)
+			}
+			sort.Strings(aliases)
+			value = aliases[0]
+		}
+		parts = append(parts, parameter.Name+"="+value)
+	}
+	return strings.Join(parts, " ")
 }
 
 func (s *Shell) request(operation string, arguments map[string]string) (*contract.ExecutionRequest, error) {

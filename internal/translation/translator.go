@@ -14,6 +14,7 @@ import (
 type argument struct {
 	literal   string
 	parameter string
+	valueMap  map[string]string
 }
 
 type operation struct {
@@ -42,12 +43,12 @@ func New(cfg *config.Config) (*Translator, error) {
 		executablePaths[executable.ID] = executable.Path
 	}
 	for _, op := range cfg.Operations {
-		defined := make(map[string]bool, len(op.Parameters))
+		defined := make(map[string]config.ParameterDefinition, len(op.Parameters))
 		for _, p := range op.Parameters {
-			if defined[p.Name] {
+			if _, exists := defined[p.Name]; exists {
 				return nil, fmt.Errorf("translation: operation %q: duplicate parameter %q", op.Name, p.Name)
 			}
-			defined[p.Name] = true
+			defined[p.Name] = p
 		}
 		if op.ExecutorKind == config.ExecutorSystemd {
 			ops[op.Name] = operation{command: op.Systemd.Unit, args: []argument{{literal: op.Systemd.Action}}}
@@ -63,10 +64,12 @@ func New(cfg *config.Config) (*Translator, error) {
 				return nil, fmt.Errorf("translation: operation %q: args_template[%d]: invalid placeholder %q; expected a whole {name} token", op.Name, i, token)
 			}
 			name := token[1 : len(token)-1]
-			if !defined[name] {
+			parameter, exists := defined[name]
+			if !exists {
 				return nil, fmt.Errorf("translation: operation %q: args_template[%d]: undefined parameter %q", op.Name, i, name)
 			}
 			args[i].parameter = name
+			args[i].valueMap = cloneMap(parameter.ValueMap)
 		}
 		ops[op.Name] = operation{command: executablePaths[op.ExecutableRef], args: args}
 	}
@@ -95,7 +98,25 @@ func (t *Translator) Translate(req *contract.ExecutionRequest) (string, []string
 		if !present {
 			return "", nil, fmt.Errorf("translation: operation %q: missing argument %q required by template", req.Command, token.parameter)
 		}
+		if len(token.valueMap) != 0 {
+			mapped, allowed := token.valueMap[value]
+			if !allowed {
+				return "", nil, fmt.Errorf("translation: operation %q: argument %q is not mapped", req.Command, token.parameter)
+			}
+			value = mapped
+		}
 		args[i] = value
 	}
 	return op.command, args, nil
+}
+
+func cloneMap(source map[string]string) map[string]string {
+	if len(source) == 0 {
+		return nil
+	}
+	result := make(map[string]string, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+	return result
 }

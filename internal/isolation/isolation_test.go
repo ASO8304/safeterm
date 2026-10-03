@@ -51,8 +51,27 @@ func TestSnapshotRoutesAndFiltersProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(serviceManager.Executables) != 1 || serviceManager.Executables[0].ID != "systemctl" {
+	serviceExecutables := map[string]bool{}
+	for _, executable := range serviceManager.Executables {
+		serviceExecutables[executable.ID] = true
+	}
+	if len(serviceManager.Executables) != 2 || !serviceExecutables["sudo"] || !serviceExecutables["systemctl"] {
 		t.Fatalf("service-manager controller binding missing: %+v", serviceManager.Executables)
+	}
+	logOperation, ok := snapshot.Operation("log")
+	if !ok {
+		t.Fatal("log operation missing")
+	}
+	logOperation.Parameters[0].ValueMap["service_A"] = "/etc/shadow"
+	secondLogOperation, _ := snapshot.Operation("log")
+	if secondLogOperation.Parameters[0].ValueMap["service_A"] == "/etc/shadow" {
+		t.Fatal("operation value map aliased active snapshot")
+	}
+	profileDefinition, _ := snapshot.Profile(config.ProfileServiceManager)
+	profileDefinition.ControllerArgsPrefix[0] = "--changed"
+	secondProfileDefinition, _ := snapshot.Profile(config.ProfileServiceManager)
+	if secondProfileDefinition.ControllerArgsPrefix[0] == "--changed" {
+		t.Fatal("profile controller prefix aliased active snapshot")
 	}
 }
 
@@ -68,22 +87,22 @@ func TestStoreActivationIsAtomicAndFailClosed(t *testing.T) {
 	if err := store.Activate(invalid); err == nil {
 		t.Fatal("invalid snapshot activated")
 	}
-	if store.Current() != previous || store.Current().Version() != "1.1.0" {
+	if store.Current() != previous || store.Current().Version() != "1.2.0" {
 		t.Fatal("failed activation changed current snapshot")
 	}
 	next := testCatalog(t)
-	next.Version = "1.2.0"
+	next.Version = "1.3.0"
 	if err := store.Activate(next); err != nil {
 		t.Fatal(err)
 	}
-	if store.Current() == previous || store.Current().Version() != "1.2.0" {
+	if store.Current() == previous || store.Current().Version() != "1.3.0" {
 		t.Fatal("valid snapshot was not atomically activated")
 	}
 }
 
 // TEST-INTEGRITY-014
 func TestVerifiedStoreRejectsUnsignedActivationAndRollsBack(t *testing.T) {
-	trusted := map[string]bool{"1.1.0": true}
+	trusted := map[string]bool{"1.2.0": true}
 	verifier := func(candidate *config.Config) error {
 		if candidate == nil || !trusted[candidate.Version] {
 			return errors.New("invalid signature")
@@ -95,15 +114,15 @@ func TestVerifiedStoreRejectsUnsignedActivationAndRollsBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	unsigned := testCatalog(t)
-	unsigned.Version = "1.2.0"
-	if err := store.Activate(unsigned); err == nil || store.Current().Version() != "1.1.0" {
+	unsigned.Version = "1.3.0"
+	if err := store.Activate(unsigned); err == nil || store.Current().Version() != "1.2.0" {
 		t.Fatalf("unsigned activation error=%v version=%q", err, store.Current().Version())
 	}
-	trusted["1.2.0"] = true
-	if err := store.Activate(unsigned); err != nil || store.Current().Version() != "1.2.0" {
+	trusted["1.3.0"] = true
+	if err := store.Activate(unsigned); err != nil || store.Current().Version() != "1.3.0" {
 		t.Fatalf("signed activation error=%v version=%q", err, store.Current().Version())
 	}
-	if err := store.Rollback(); err != nil || store.Current().Version() != "1.1.0" {
+	if err := store.Rollback(); err != nil || store.Current().Version() != "1.2.0" {
 		t.Fatalf("rollback error=%v version=%q", err, store.Current().Version())
 	}
 	if err := store.Rollback(); err == nil {
@@ -224,7 +243,7 @@ func TestLifecycleEventsExposeCorrelationWithoutArguments(t *testing.T) {
 		t.Fatalf("events=%d", len(recorder.events))
 	}
 	for _, event := range recorder.events {
-		if event.RequestID != request.RequestID || event.CatalogVersion != "1.1.0" || event.Profile != string(config.ProfileDiagnostics) || event.Operation != "system_info" || event.OccurredAt.IsZero() {
+		if event.RequestID != request.RequestID || event.CatalogVersion != "1.2.0" || event.Profile != string(config.ProfileDiagnostics) || event.Operation != "system_info" || event.OccurredAt.IsZero() {
 			t.Fatalf("incomplete event: %+v", event)
 		}
 	}

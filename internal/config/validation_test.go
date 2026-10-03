@@ -168,12 +168,32 @@ func TestValidateConfig_TypedBackendsRejectFreeFormConfiguration(t *testing.T) {
 					cfg.Operations[0].Systemd.Unit = "../../demo"
 				}
 				if name == "bad action" {
-					cfg.Operations[0].Systemd.Action = "enable"
+					cfg.Operations[0].Systemd.Action = "daemon-reload"
 				}
 			}
 			requireInvalid(t, cfg, "operation")
 		})
 	}
+}
+
+func TestValidateConfig_ValueMapAndPrivilegedControllerAreConstrained(t *testing.T) {
+	cfg := validConfig()
+	cfg.Operations[0].Parameters = []ParameterDefinition{{Name: "source", Type: ParamTypeString, Required: true, ValueMap: map[string]string{"service_A": "/var/log/service-a.log"}}}
+	if err := ValidateConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Operations[0].Parameters[0].ValueMap["../escape"] = "/etc/shadow"
+	requireInvalid(t, cfg, "mapped value")
+
+	cfg = validConfig()
+	cfg.Executables = append(cfg.Executables, ExecutableDefinition{ID: "sudo", Path: "/usr/bin/sudo", SHA256: testSHA256, AllowedProfiles: []RunnerProfile{ProfileServiceManager}})
+	cfg.Profiles[2].ControllerExecutableRef = "sudo"
+	cfg.Profiles[2].ControllerArgsPrefix = []string{"-n", "/usr/bin/systemctl", "--no-pager"}
+	if err := ValidateConfig(cfg); err != nil {
+		t.Fatal(err)
+	}
+	cfg.Profiles[2].ControllerArgsPrefix = []string{"-n", "/bin/sh"}
+	requireInvalid(t, cfg, "privileged controller")
 }
 
 // TEST-INTEGRITY-016

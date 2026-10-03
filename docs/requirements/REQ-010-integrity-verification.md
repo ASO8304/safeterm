@@ -10,7 +10,7 @@ SafeTerm must fail closed when an active catalog is not signed by a trusted
 catalog authority or when the file selected for execution no longer matches
 the approved executable registry entry. Integrity checks apply independently
 inside every Runner profile and cover both process operations and the fixed
-`systemctl` controller used by the typed service-management backend.
+`sudo`/`systemctl` chain used by the typed service-management backend.
 
 Every executable entry carries an exact lowercase SHA-256 digest. A Runner
 verifies the file at startup and immediately before each execution, resolves
@@ -38,10 +38,10 @@ catalog representation before accepting the snapshot.
 - [x] **AC-6:** Integrity failures return no stdout/stderr, use exit code -1,
   and become a structured `execution_error` at the existing Core execution
   stage without changing Core or its four interfaces.
-- [x] **AC-7:** The typed systemd controller is loaded through the same verified
-  process boundary and cannot bypass executable integrity checks.
-- [x] **AC-8:** Profile-filtered snapshots retain only the process executables
-  and controller executable required by that Runner profile.
+- [x] **AC-7:** The typed systemd controller and its fixed systemctl dependency
+  are approved for the profile and cannot bypass executable integrity checks.
+- [x] **AC-8:** Profile-filtered snapshots retain only the process executables,
+  controller, and fixed controller dependencies required by that Runner profile.
 - [x] **AC-9:** Catalog signatures cover a deterministic deep copy of version,
   operations, executable paths and digests, profiles, roles, and policies.
   Semantically unordered collections have stable ordering while argv template

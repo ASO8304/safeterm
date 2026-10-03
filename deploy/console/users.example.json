@@ -6,6 +6,8 @@
       "roles": [
         "viewer",
         "netops",
+        "log-viewer",
+        "service-viewer",
         "config-viewer",
         "config-operator",
         "config-approver"

@@ -5,6 +5,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"safeterm/internal/config"
 )
 
 func TestEditorSupportsCursorDeleteHistoryAndPrompt(t *testing.T) {
@@ -49,6 +51,19 @@ func TestEditorCompletesAuthorizedOperationsAndParameters(t *testing.T) {
 	viewer, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, bytes.NewReader(nil), &bytes.Buffer{})
 	if got := viewer.completionCandidates(context.Background(), "run tr", "tr"); len(got) != 0 {
 		t.Fatalf("unauthorized completion=%v", got)
+	}
+}
+
+func TestPositionalMappedArgumentAndHelpExample(t *testing.T) {
+	operation := config.OperationDefinition{
+		Name: "log", Parameters: []config.ParameterDefinition{{Name: "source", Type: config.ParamTypeString, Required: true, ValueMap: map[string]string{"service_A": "/var/log/service-a.log"}}},
+	}
+	arguments, err := parseOperationArguments(operation, []string{"service_A"})
+	if err != nil || arguments["source"] != "service_A" {
+		t.Fatalf("arguments=%v err=%v", arguments, err)
+	}
+	if got := operationExample(operation); got != "run log source=service_A" {
+		t.Fatalf("example=%q", got)
 	}
 }
 

@@ -31,7 +31,8 @@ upgrades, and configuration unnecessarily complex.
 - The initial profiles are:
   1. `diagnostics`, with no elevated capability;
   2. `network-observer`, with only the explicitly required network capabilities;
-  3. `service-manager`, with authority over an explicit allowlist of service
+  3. `log-reader`, with access only to administrator-approved log files; and
+  4. `service-manager`, with authority over an explicit allowlist of service
      units and actions.
 - A new profile is justified only when its operations require a different
   privilege, resource, data-access, or trust boundary. SafeTerm will not create

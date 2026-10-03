@@ -6,18 +6,24 @@ Go, or Internet access on the Ubuntu target, follow the
 
 ## Fresh-host scope
 
-M15 targets a fresh, disposable Linux host with systemd. Run the full demo in
-a VM, not on a workstation or an existing production host. The installer
-creates system users, writes `/etc/safeterm`, installs units, and enables nine
-services. In-place upgrades and uninstall are outside the M15 contract.
+The original M15 demo workflow targets a fresh, disposable Linux host with
+systemd. Run that full demo in a VM. The current offline installer also supports
+in-place upgrades with a checksum-protected rollback transaction. It creates
+system users, writes `/etc/safeterm`, installs units, and enables ten services.
 
 ## Prerequisites
 
 - Linux with systemd and root access
 - Go 1.26 or newer on the bundle-building host
 - `ssh`, `ssh-keygen`, `ssh-keyscan`, `sha256sum`, and standard account tools
-- `/usr/bin/uname`, `/usr/bin/tcpdump`, and `/usr/bin/systemctl`
+- `/usr/bin/uname`, `/usr/bin/tcpdump`, `/usr/bin/tail`, `/usr/bin/systemctl`,
+  and `/usr/bin/sudo`
 - TCP port 2222 available for the SSH Broker
+
+On an upgrade, existing SSH and console identity files are preserved. Add the
+`log-viewer` and `service-viewer` roles to the intended identities before using
+the new read-only operations. Grant `service-operator` only to users who may
+change the lifecycle or boot state of cataloged units.
 
 ## Production bundle workflow
 

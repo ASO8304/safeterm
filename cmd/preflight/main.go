@@ -14,6 +14,7 @@ func main() {
 	installed := flag.Bool("installed", false, "check the installed system paths and service accounts")
 	jsonOutput := flag.Bool("json", false, "print the successful report as JSON")
 	managedPlan := flag.Bool("managed-plan", false, "print validated managed-file install rows")
+	sudoersPlan := flag.Bool("sudoers-plan", false, "print exact sudoers rules for typed systemd operations")
 	flag.Parse()
 	if *installed {
 		*root = "/"
@@ -35,6 +36,21 @@ func main() {
 		}
 		for _, file := range files {
 			fmt.Printf("%s\t%s\t%s\n", file.Source, file.Target, file.User)
+		}
+		return
+	}
+	if *sudoersPlan {
+		if *installed {
+			fmt.Fprintln(os.Stderr, "SafeTerm preflight: --sudoers-plan requires --bundle")
+			os.Exit(2)
+		}
+		lines, err := deployment.SystemdSudoers(*root)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "SafeTerm preflight: FAIL:", err)
+			os.Exit(1)
+		}
+		for _, line := range lines {
+			fmt.Println(line)
 		}
 		return
 	}

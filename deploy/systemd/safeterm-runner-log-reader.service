@@ -1,0 +1,29 @@
+[Unit]
+Description=SafeTerm allowlisted log reader runner
+Requires=safeterm-audit.service
+After=safeterm-audit.service
+
+[Service]
+Type=simple
+User=safeterm-log-reader
+Group=safeterm-gateway
+SupplementaryGroups=safeterm-audit adm
+RuntimeDirectory=safeterm-log-reader
+RuntimeDirectoryMode=0750
+ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile log-reader --timeout 30m --output-limit 1048576 --stream-chunk 16384 --stream-queue 64 --stream-max-sessions 64 --stream-idle-timeout 5m --interrupt-grace 2s --terminate-grace 2s
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=128M
+TasksMax=16
+
+[Install]
+WantedBy=multi-user.target

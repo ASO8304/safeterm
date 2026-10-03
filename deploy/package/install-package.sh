@@ -36,7 +36,7 @@ start_services=true
 local_key_dir=/root/.config/safeterm
 transaction_root=/var/backups/safeterm-installer
 transaction=
-units='safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
+units='safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -60,7 +60,7 @@ done
 case "$(uname -m)" in x86_64) host_arch=amd64 ;; aarch64|arm64) host_arch=arm64 ;; *) host_arch=unsupported ;; esac
 target_arch=$(cat "$package_dir/TARGET_ARCH")
 [ "$host_arch" = "$target_arch" ] || { echo "package architecture $target_arch does not match host $host_arch" >&2; exit 1; }
-for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/systemctl; do
+for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo; do
   [ -x "$executable" ] || { echo "required target executable is missing: $executable" >&2; exit 1; }
 done
 
@@ -81,9 +81,10 @@ fi
 if [ -n "$signed_catalog" ] && [ "$local_signing" = true ]; then usage; fi
 if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then usage; fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
-for tool in sha256sum install useradd usermod groupadd systemctl ssh-keygen awk grep sed tar date find realpath; do
+for tool in sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
+getent group adm >/dev/null 2>&1 || { echo "required Ubuntu group is missing: adm" >&2; exit 1; }
 case "$ssh_user" in ''|*[!A-Za-z0-9_.@-]*) echo "invalid SSH identity" >&2; exit 1 ;; esac
 [ "${#ssh_user}" -le 128 ] || { echo "SSH identity is too long" >&2; exit 1; }
 
@@ -121,14 +122,17 @@ create_install_transaction() {
 /etc/systemd/system/safeterm-audit.service
 /etc/systemd/system/safeterm-runner-diagnostics.service
 /etc/systemd/system/safeterm-runner-network-observer.service
+/etc/systemd/system/safeterm-runner-log-reader.service
 /etc/systemd/system/safeterm-runner-service-manager.service
 /etc/systemd/system/safeterm-gateway.service
 /etc/systemd/system/safeterm-config-manager-application.service
 /etc/systemd/system/safeterm-config-manager-database.service
 /etc/systemd/system/safeterm-config-manager-network.service
 /etc/systemd/system/safeterm-ssh-broker.service
+/etc/sudoers.d/safeterm-service-manager
 /var/lib/safeterm
 /var/lib/safeterm-installer
+/var/log/safeterm-readable
 /var/mail/safeterm
 /var/spool/mail/safeterm
 /home/safeterm'
@@ -205,7 +209,7 @@ else
   key_data=$(awk 'NR==1 {print $2}' "$ssh_public_key")
   case "$key_type" in ssh-ed25519|ecdsa-sha2-*|ssh-rsa) ;; *) echo "unsupported SSH public key" >&2; exit 1 ;; esac
   cat >"$work/config/ssh/users.json" <<EOF
-{"users":[{"user_id":"$ssh_user","roles":["viewer","netops","config-viewer","config-operator","config-approver"],"authorized_keys":["$key_type $key_data"]}]}
+{"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"authorized_keys":["$key_type $key_data"]}]}
 EOF
   chmod 0600 "$work/config/ssh/users.json"
 fi
@@ -261,7 +265,7 @@ if [ -f /etc/systemd/system/safeterm-ssh-broker.service ]; then
   systemctl stop safeterm-ssh-broker.service
   systemctl stop safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl stop safeterm-gateway.service
-  systemctl stop safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service
+  systemctl stop safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl stop safeterm-audit.service
 fi
 "$payload/base-install.sh" --bundle "$work/bundle" --no-start
@@ -271,13 +275,13 @@ fi
 /usr/local/bin/safeterm-preflight --installed
 
 if [ "$start_services" = true ]; then
-  systemctl enable safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl enable safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
-  systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service
+  systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl restart safeterm-gateway.service
   systemctl restart safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl restart safeterm-ssh-broker.service
-  systemctl --quiet is-active safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl --quiet is-active safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 echo "SafeTerm package installation: PASS"
 echo "Rollback remains available with: sudo /usr/local/sbin/safeterm-install-rollback $(basename "$transaction")"

@@ -73,6 +73,19 @@ func TestTranslate_ExactTraceExample(t *testing.T) {
 	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/tcpdump", []string{"-i", "any", "port", "999", "and", "host", "192.168.10.20"})
 }
 
+func TestTranslate_MappedLogAliasNeverUsesCallerPath(t *testing.T) {
+	cfg := shippedConfig(t)
+	req := &contract.ExecutionRequest{Command: "log", Arguments: map[string]string{"source": "service_A"}}
+	if err := validation.New(cfg).Validate(req); err != nil {
+		t.Fatal(err)
+	}
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/tail", []string{"-n", "50", "-F", "--", "/var/log/safeterm-readable/service_A.log"})
+	bad := &contract.ExecutionRequest{Command: "log", Arguments: map[string]string{"source": "/etc/shadow"}}
+	if err := validation.New(cfg).Validate(bad); err == nil {
+		t.Fatal("unmapped caller path accepted")
+	}
+}
+
 // TEST-TRANS-002
 // Requirement: REQ-006 (AC-2)
 // A complete value remains one argument, including whitespace or an empty value.
