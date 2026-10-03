@@ -98,7 +98,7 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 		if err != nil {
 			return err
 		}
-		controller, err := execution.NewSystemctlController(controllerPath, verifiedRunner)
+		controller, err := execution.NewSystemctlControllerWithPrefix(controllerPath, profile.ControllerArgsPrefix, verifiedRunner)
 		if err != nil {
 			return err
 		}

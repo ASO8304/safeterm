@@ -2,7 +2,7 @@
 set -eu
 
 transaction_root=/var/backups/safeterm-installer
-units='safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
+units='safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 usage() {
   echo "usage: $0 [latest|TRANSACTION_ID]" >&2
@@ -35,7 +35,7 @@ done
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in
-    /etc/safeterm|/etc/safeterm-managed|/etc/cat|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
+    /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
     *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
   esac
   rm -rf -- "$path"

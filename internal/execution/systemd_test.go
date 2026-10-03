@@ -2,6 +2,8 @@ package execution
 
 import (
 	"context"
+	"errors"
+	"reflect"
 	"testing"
 
 	"safeterm/internal/agent"
@@ -13,6 +15,24 @@ var _ agent.Executor = (*SystemdExecutor)(nil)
 type fakeServiceController struct {
 	calls        int
 	action, unit string
+}
+
+type recordingExecutor struct {
+	command   string
+	args      []string
+	verified  []string
+	verifyErr error
+}
+
+func (r *recordingExecutor) Execute(_ context.Context, command string, args []string) (string, string, int, error) {
+	r.command = command
+	r.args = append([]string(nil), args...)
+	return "", "", 0, nil
+}
+
+func (r *recordingExecutor) VerifyExecutable(command string) error {
+	r.verified = append(r.verified, command)
+	return r.verifyErr
 }
 
 func (c *fakeServiceController) Control(_ context.Context, action, unit string) (string, string, int, error) {
@@ -67,5 +87,28 @@ func TestSystemdExecutorRejectsFreeFormInputsBeforeController(t *testing.T) {
 	}
 	if controller.calls != 0 {
 		t.Fatalf("controller called %d times", controller.calls)
+	}
+}
+
+func TestSystemctlControllerUsesFixedPrivilegePrefix(t *testing.T) {
+	recorder := &recordingExecutor{}
+	controller, err := NewSystemctlControllerWithPrefix("/usr/bin/sudo", []string{"-n", "/usr/bin/systemctl", "--no-pager"}, recorder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := controller.Control(context.Background(), "status", "demo.service"); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"-n", "/usr/bin/systemctl", "--no-pager", "status", "demo.service"}
+	if recorder.command != "/usr/bin/sudo" || !reflect.DeepEqual(recorder.args, want) {
+		t.Fatalf("command=%q args=%v", recorder.command, recorder.args)
+	}
+	if !reflect.DeepEqual(recorder.verified, []string{"/usr/bin/systemctl"}) {
+		t.Fatalf("verified dependencies=%v", recorder.verified)
+	}
+	recorder.command = ""
+	recorder.verifyErr = errors.New("tampered")
+	if _, _, exitCode, err := controller.Control(context.Background(), "status", "demo.service"); err == nil || exitCode != ExitCodeUnavailable || recorder.command != "" {
+		t.Fatalf("dependency failure reached controller: command=%q exit=%d err=%v", recorder.command, exitCode, err)
 	}
 }

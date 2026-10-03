@@ -2,7 +2,7 @@
 
 SafeTerm ships authenticated restricted SSH and local-console Brokers, three isolated Config
 Managers, and an independent append-only Audit Service alongside one unprivileged
-Node Gateway and three capability-isolated Runner units. All Runner units use
+Node Gateway and four capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
 different users with separate runtime directories, sockets, catalogs, resource
 limits, and capability bounding sets.
@@ -19,6 +19,7 @@ safeterm-broker
 safeterm
 safeterm-diagnostics
 safeterm-network
+safeterm-log-reader
 safeterm-service-manager
 safeterm-audit
 safeterm-config-application
@@ -94,11 +95,20 @@ Connections above those ceilings are closed before a handler goroutine is
 created. These application limits complement the finite `MemoryMax` and
 `TasksMax` values in the units.
 
-The shipped service-manager catalog contains no active operation and its unit
-has no Linux capability. Before adding service operations, deployment tooling
-must install an OS policy that grants `safeterm-service-manager` only the exact
-systemd units and actions present in the approved catalog. Never grant this
-account unrestricted `sudo` or general systemd management authority.
+The service-manager accepts only argument-free unit/action pairs from the
+signed catalog. The installer generates
+`/etc/sudoers.d/safeterm-service-manager` with every exact permitted systemctl
+argv and validates it with `visudo`; it never emits a wildcard. Status-only
+operations belong to `service-viewer`, while lifecycle changes require the
+non-default `service-operator` role. The service-manager unit permits the sudo
+set-user-ID transition but retains its other sandbox and resource controls.
+
+The log-reader Runner has no Linux capability and executes only signed process
+operations. Its `log` operation maps public aliases to fixed catalog paths and
+uses `tail -F`; callers can never provide a path. The Ubuntu `adm` group grants
+read access to selected logs. Custom service logs and their logrotate policy
+must retain group `adm` and mode 0640 (or use a deliberately narrower site
+group and matching unit override).
 
 M11 also enables bounded long-running sessions over the authenticated Unix
 socket. The network-observer unit permits at most 64 sessions, 16 KiB chunks,

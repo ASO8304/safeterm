@@ -21,5 +21,98 @@
       { "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
     ],
     "long_running": true
+  },
+  {
+    "name": "log",
+    "description": "Follow an approved service log. Press Ctrl+C to stop.",
+    "runner_profile": "log-reader",
+    "executor_kind": "process",
+    "executable_ref": "tail",
+    "args_template": ["-n", "50", "-F", "--", "{source}"],
+    "parameters": [
+      {
+        "name": "source",
+        "type": "string",
+        "required": true,
+        "value_map": {
+          "service_A": "/var/log/safeterm-readable/service_A.log",
+          "system": "/var/log/syslog",
+          "authentication": "/var/log/auth.log"
+        }
+      }
+    ],
+    "long_running": true
+  },
+  {
+    "name": "status_safeterm_audit",
+    "description": "Show SafeTerm Audit Service status.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-audit.service", "action": "status" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "status_safeterm_gateway",
+    "description": "Show SafeTerm Gateway status.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-gateway.service", "action": "status" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "status_safeterm_ssh",
+    "description": "Show SafeTerm SSH Broker status.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "status" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "start_safeterm_ssh",
+    "description": "Start the SafeTerm SSH Broker.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "start" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "stop_safeterm_ssh",
+    "description": "Stop the SafeTerm SSH Broker; the current SSH session will close.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "stop" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "restart_safeterm_ssh",
+    "description": "Restart the SafeTerm SSH Broker; the current SSH session may close.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "restart" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "enable_safeterm_ssh",
+    "description": "Enable the SafeTerm SSH Broker at boot.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "enable" },
+    "parameters": [],
+    "long_running": false
+  },
+  {
+    "name": "disable_safeterm_ssh",
+    "description": "Disable the SafeTerm SSH Broker at boot without stopping it.",
+    "runner_profile": "service-manager",
+    "executor_kind": "systemd",
+    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "disable" },
+    "parameters": [],
+    "long_running": false
   }
 ]

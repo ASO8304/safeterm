@@ -102,6 +102,11 @@ func validateTypedValue(opName string, p config.ParameterDefinition, value strin
 		return nil
 
 	case config.ParamTypeString:
+		if len(p.ValueMap) != 0 {
+			if _, ok := p.ValueMap[value]; !ok {
+				return fmt.Errorf("validation: operation %q: argument %q is not an allowed value", opName, p.Name)
+			}
+		}
 		if p.Pattern == "" {
 			return nil
 		}

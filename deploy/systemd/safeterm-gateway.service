@@ -1,7 +1,7 @@
 [Unit]
 Description=SafeTerm unprivileged node gateway
 Requires=safeterm-audit.service
-After=safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service
+After=safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
 
 [Service]
 Type=simple

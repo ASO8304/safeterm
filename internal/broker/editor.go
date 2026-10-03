@@ -255,6 +255,13 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 		}
 		return matching(names, prefix)
 	}
+	if command == "help" && index == 1 {
+		values := []string{"config", "keys", "run"}
+		for _, operation := range s.catalog.AuthorizedOperations(s.principal.Roles) {
+			values = append(values, operation.Name)
+		}
+		return matching(values, prefix)
+	}
 	if command == "run" && index >= 2 && len(fields) >= 2 {
 		operation, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
 		if !ok {
@@ -267,11 +274,23 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 			}
 		}
 		values := []string{}
-		for _, parameter := range operation.Parameters {
+		position := index - 2
+		for parameterIndex, parameter := range operation.Parameters {
 			if !used[parameter.Name] || strings.HasPrefix(prefix, parameter.Name+"=") {
 				values = append(values, parameter.Name+"=")
 			}
+			if parameterIndex == position && !strings.Contains(prefix, "=") {
+				for alias := range parameter.ValueMap {
+					values = append(values, alias)
+				}
+			}
+			if strings.HasPrefix(prefix, parameter.Name+"=") {
+				for alias := range parameter.ValueMap {
+					values = append(values, parameter.Name+"="+alias)
+				}
+			}
 		}
+		sort.Strings(values)
 		return matching(values, prefix)
 	}
 	if command != "config" || s.configs == nil {

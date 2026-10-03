@@ -18,6 +18,7 @@ type RunnerProfile string
 const (
 	ProfileDiagnostics     RunnerProfile = "diagnostics"
 	ProfileNetworkObserver RunnerProfile = "network-observer"
+	ProfileLogReader       RunnerProfile = "log-reader"
 	ProfileServiceManager  RunnerProfile = "service-manager"
 )
 
@@ -41,6 +42,9 @@ type ParameterDefinition struct {
 	Min      *int          `json:"min,omitempty"`
 	Max      *int          `json:"max,omitempty"`
 	Pattern  string        `json:"pattern,omitempty"`
+	// ValueMap exposes stable operator-facing aliases while translating them
+	// to fixed, catalog-owned argv values such as approved log paths.
+	ValueMap map[string]string `json:"value_map,omitempty"`
 }
 
 // OperationDefinition describes one safe operation SafeTerm exposes to
@@ -75,6 +79,7 @@ type ProfileDefinition struct {
 	Name                    RunnerProfile `json:"name"`
 	ExecutorKind            ExecutorKind  `json:"executor_kind"`
 	ControllerExecutableRef string        `json:"controller_executable_ref,omitempty"`
+	ControllerArgsPrefix    []string      `json:"controller_args_prefix,omitempty"`
 	SocketPath              string        `json:"socket_path"`
 	RunAsUser               string        `json:"run_as_user"`
 	Capabilities            []string      `json:"capabilities"`

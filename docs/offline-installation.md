@@ -12,13 +12,18 @@ The target must already provide systemd and these Ubuntu tools and executable
 paths:
 
 ```text
-sha256sum install useradd usermod groupadd systemctl ssh-keygen awk grep sed tar date find realpath
-/usr/bin/uname /usr/bin/tcpdump /usr/bin/systemctl
+sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo
+/usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo
 ```
 
 Install missing OS packages from an Ubuntu installation medium or internal APT
 mirror when the target has no Internet access. SafeTerm deliberately does not
 embed distribution packages or silently alter APT sources.
+
+The package is self-documenting for later customization. Commented catalog
+templates are under `payload/catalog-source/`, and identity/configuration
+registry templates are under `payload/templates/`. Files ending in `.jsonc`
+are examples for administrators and are not loaded by SafeTerm.
 
 ## Build on the connected machine
 
@@ -29,7 +34,7 @@ ship and build a package for the target architecture:
 git clone https://github.com/ASO8304/safeterm.git
 cd safeterm
 git fetch --tags
-git checkout v0.18.0-m17
+git checkout v0.20.0-m19
 
 deploy/package/create-package.sh \
   --arch amd64 \

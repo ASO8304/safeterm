@@ -2,7 +2,7 @@
 set -eu
 
 [ "$(id -u)" -eq 0 ] || { echo "the full systemd demo requires root" >&2; exit 1; }
-for tool in go ssh ssh-keygen ssh-keyscan systemctl tcpdump; do
+for tool in go ssh ssh-keygen ssh-keyscan systemctl tcpdump tail sudo visudo; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
 
@@ -23,10 +23,10 @@ ssh-keygen -q -t ed25519 -N '' -f "$work_dir/config/ssh/ssh_host_ed25519_key"
 ssh-keygen -q -t ed25519 -N '' -f "$work_dir/secrets/alice_ed25519"
 alice_key=$(cat "$work_dir/secrets/alice_ed25519.pub")
 cat >"$work_dir/config/ssh/users.json" <<EOF
-{"users":[{"user_id":"alice","roles":["viewer","netops","config-viewer","config-operator","config-approver"],"authorized_keys":["$alice_key"]}]}
+{"users":[{"user_id":"alice","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"authorized_keys":["$alice_key"]}]}
 EOF
 cat >"$work_dir/config/console/users.json" <<'EOF'
-{"users":[{"os_user":"safeterm","user_id":"safeterm","roles":["viewer","netops","config-viewer","config-operator","config-approver"]}]}
+{"users":[{"os_user":"safeterm","user_id":"safeterm","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"]}]}
 EOF
 cp "$repo_dir/deploy/config-manager/resources.example.json" "$work_dir/config/config-manager/resources.json"
 chmod 0600 "$work_dir/config/ssh/ssh_host_ed25519_key" "$work_dir/config/ssh/users.json" "$work_dir/config/console/users.json"

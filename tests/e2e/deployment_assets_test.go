@@ -67,6 +67,7 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 		"/etc/safeterm/ssh/ssh_host_ed25519_key", "/etc/safeterm/ssh/users.json",
 		"/etc/safeterm/console/users.json", "/etc/safeterm/config-manager/resources.json",
 		"preserved-managed", "safeterm-preflight", "--no-start",
+		"safeterm-runner-log-reader.service", "/usr/bin/tail", "/usr/bin/sudo",
 	} {
 		if !strings.Contains(installer, marker) {
 			t.Errorf("offline target installer is missing %q", marker)
@@ -104,6 +105,39 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 	localKeyInstall := strings.Index(installer, `install -d -o root -g root -m 0700 "$local_key_dir"`)
 	if transaction < 0 || localKeyInstall < 0 || transaction > localKeyInstall {
 		t.Fatal("rollback transaction must precede persistent local signing-key creation")
+	}
+}
+
+func TestOperatorCatalogTemplatesAndPrivilegeAssets(t *testing.T) {
+	repository := repositoryRoot(t)
+	for _, path := range []string{
+		"configs/catalog.template.jsonc", "configs/operations/TEMPLATE.jsonc",
+		"configs/executables/TEMPLATE.jsonc", "configs/profiles/TEMPLATE.jsonc",
+		"configs/roles/TEMPLATE.jsonc", "configs/policies/TEMPLATE.jsonc",
+		"deploy/ssh/users.template.jsonc", "deploy/console/users.template.jsonc",
+		"deploy/config-manager/resources.template.jsonc",
+	} {
+		if _, err := os.Stat(filepath.Join(repository, filepath.FromSlash(path))); err != nil {
+			t.Errorf("missing administrator template %s: %v", path, err)
+		}
+	}
+	creator := readText(t, filepath.Join(repository, "deploy", "package", "create-package.sh"))
+	for _, marker := range []string{"payload/templates", "resources.template.jsonc", "ssh-users.template.jsonc", "console-users.template.jsonc"} {
+		if !strings.Contains(creator, marker) {
+			t.Errorf("offline package omits administrator template %q", marker)
+		}
+	}
+	installer := readText(t, filepath.Join(repository, "deploy", "scripts", "install.sh"))
+	for _, marker := range []string{"--sudoers-plan", "visudo -cf", "/etc/sudoers.d/safeterm-service-manager", "safeterm-log-reader", "/var/log/safeterm-readable"} {
+		if !strings.Contains(installer, marker) {
+			t.Errorf("installer missing operator control %q", marker)
+		}
+	}
+	shell := readText(t, filepath.Join(repository, "internal", "broker", "shell.go"))
+	for _, marker := range []string{"help [run|config|keys|OPERATION]", "run log service_A", "simple positional values"} {
+		if !strings.Contains(shell, marker) {
+			t.Errorf("guided shell help missing %q", marker)
+		}
 	}
 }
 

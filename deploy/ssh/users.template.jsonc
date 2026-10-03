@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "user_id": "alice",
+      // Assign only catalog roles needed by this identity. service-operator is intentionally not a default.
+      "roles": ["viewer", "netops", "log-viewer", "service-viewer"],
+      "authorized_keys": ["ssh-ed25519 BASE64_KEY comment"]
+    }
+  ]
+}

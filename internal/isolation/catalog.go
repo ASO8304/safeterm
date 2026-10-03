@@ -51,6 +51,16 @@ func (s *Snapshot) Operation(name string) (config.OperationDefinition, bool) {
 	operation, ok := s.definitions[name]
 	operation.ArgsTemplate = append([]string(nil), operation.ArgsTemplate...)
 	operation.Parameters = append([]config.ParameterDefinition(nil), operation.Parameters...)
+	for index := range operation.Parameters {
+		if operation.Parameters[index].ValueMap == nil {
+			continue
+		}
+		cloned := make(map[string]string, len(operation.Parameters[index].ValueMap))
+		for alias, value := range operation.Parameters[index].ValueMap {
+			cloned[alias] = value
+		}
+		operation.Parameters[index].ValueMap = cloned
+	}
 	return operation, ok
 }
 
@@ -91,6 +101,7 @@ func (s *Snapshot) Profile(profile config.RunnerProfile) (config.ProfileDefiniti
 	}
 	value, ok := s.profiles[profile]
 	value.Capabilities = append([]string(nil), value.Capabilities...)
+	value.ControllerArgsPrefix = append([]string(nil), value.ControllerArgsPrefix...)
 	return value, ok
 }
 
@@ -106,6 +117,13 @@ func (s *Snapshot) ProfileConfig(profile config.RunnerProfile) (*config.Config, 
 	executableIDs := map[string]bool{}
 	if definition.ControllerExecutableRef != "" {
 		executableIDs[definition.ControllerExecutableRef] = true
+	}
+	// A privileged systemd controller has two independently pinned executable
+	// dependencies: sudo is the direct controller and systemctl is the first
+	// fixed prefix argument. Keep both bindings in the isolated profile view so
+	// config validation and runtime integrity checks remain fail closed.
+	if definition.ExecutorKind == config.ExecutorSystemd && len(definition.ControllerArgsPrefix) != 0 {
+		executableIDs["systemctl"] = true
 	}
 	for _, operation := range s.config.Operations {
 		if operation.RunnerProfile == profile {

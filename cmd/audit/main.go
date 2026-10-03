@@ -19,6 +19,7 @@ func main() {
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "Gateway event producer user")
 	diagnosticsUser := flag.String("diagnostics-user", "safeterm-diagnostics", "diagnostics Runner user")
 	networkUser := flag.String("network-user", "safeterm-network", "network-observer Runner user")
+	logReaderUser := flag.String("log-reader-user", "safeterm-log-reader", "log-reader Runner user")
 	serviceUser := flag.String("service-user", "safeterm-service-manager", "service-manager Runner user")
 	applicationConfigUser := flag.String("application-config-user", "safeterm-config-application", "application Config Manager user")
 	databaseConfigUser := flag.String("database-config-user", "safeterm-config-database", "database Config Manager user")
@@ -28,6 +29,7 @@ func main() {
 		{name: *gatewayUser, policy: audit.Producer{Component: audit.ComponentGateway}},
 		{name: *diagnosticsUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "diagnostics"}},
 		{name: *networkUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "network-observer"}},
+		{name: *logReaderUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "log-reader"}},
 		{name: *serviceUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "service-manager"}},
 		{name: *applicationConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "application"}},
 		{name: *databaseConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "database"}},

@@ -1,0 +1,9 @@
+[
+  {
+    "id": "example_binary",                   // referenced by process operations
+    "path": "/usr/bin/example",               // absolute, clean, native executable path
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    // catalog-prepare replaces sha256 using the exact target-host file.
+    "allowed_profiles": ["diagnostics"]        // one or more existing process profiles
+  }
+]
