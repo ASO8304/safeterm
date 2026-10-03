@@ -12,7 +12,7 @@ The target must already provide systemd and these Ubuntu tools and executable
 paths:
 
 ```text
-sha256sum install useradd usermod groupadd systemctl ssh-keygen awk grep sed
+sha256sum install useradd usermod groupadd systemctl ssh-keygen awk grep sed tar date find realpath
 /usr/bin/uname /usr/bin/tcpdump /usr/bin/systemctl
 ```
 
@@ -165,3 +165,45 @@ The package checksum is verified before catalog preparation or host mutation.
 The normal bundle preflight then verifies the signed catalog, identities,
 resource registry, binaries, units, and managed seed layout before the base
 installer changes the host.
+
+## Transactional installation rollback
+
+Every non-dry-run installation creates a root-only transaction before the first
+persistent installation change. The transaction records the previous SafeTerm
+files and directories, local signing-key directory, audit data, managed data,
+service unit files, service enabled/running states, and the affected local
+account databases. Its contents are protected by a SHA-256 manifest.
+
+The installer prints the transaction ID and exact rollback command. To restore
+the newest pre-install state, run:
+
+```bash
+sudo /usr/local/sbin/safeterm-install-rollback latest
+```
+
+To select a specific retained transaction:
+
+```bash
+sudo /usr/local/sbin/safeterm-install-rollback TRANSACTION_ID
+```
+
+Rollback verifies the snapshot before changing the host, stops and disables
+the installed SafeTerm services, removes the current SafeTerm installation
+footprint, restores the snapshot, reloads systemd, and returns each service to
+its previous enabled and active state. A fresh-install rollback therefore also
+removes the SafeTerm accounts, home directory, local signing key, configuration,
+managed data, audit data, binaries, units, and enablement links created by that
+installation. The consumed transaction is deleted after a successful restore.
+
+If installation stops after the transaction is created but before the rollback
+command is installed, run the copy shipped in the extracted package:
+
+```bash
+sudo ./payload/rollback.sh latest
+```
+
+Run rollback in a maintenance window before making unrelated user, group, or
+SafeTerm data changes. Returning to the exact pre-install state intentionally
+discards changes made inside the managed installation paths after the snapshot.
+System journal entries produced by installation remain part of the host's audit
+history and are not erased.

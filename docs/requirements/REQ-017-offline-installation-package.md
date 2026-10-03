@@ -34,3 +34,6 @@ or Internet connectivity.
 - [x] **AC-10:** Shell syntax and deployment-asset tests enforce package
   completeness, offline operation, preservation markers, and pre-mutation
   checksum verification.
+
+Transactional reversal of installation state is specified separately in
+[REQ-018](REQ-018-transactional-installation-rollback.md).

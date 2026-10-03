@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M17 — Online and Air-Gapped Installation Package (complete)**
+**Milestone: M18 — Transactional Installation Rollback (complete)**
 
 Available capabilities:
 
@@ -53,6 +53,8 @@ Available capabilities:
   and crosses the same signed-catalog, IPC, policy, Runner, config, and audit boundaries
 - A self-contained AMD64/ARM64 installation package that needs no Git, Go,
   module download, or Internet access on the target and preserves installed state on upgrade
+- A checksum-protected pre-install transaction and offline rollback command that
+  restores SafeTerm files, data, accounts, signing keys, and systemd state
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
@@ -221,6 +223,18 @@ Build a transferable AMD64 package on a connected Linux machine with:
 make offline-package OUTPUT="$HOME/safeterm-offline-amd64" ARCH=amd64
 ```
 
+M18 adds a verified transaction before every persistent package installation.
+Rollback removes the current SafeTerm footprint, restores the previous files,
+accounts, and service state, and works from either the installed administration
+command or the package copy. See
+[REQ-018](docs/requirements/REQ-018-transactional-installation-rollback.md),
+[ADR-020](docs/decisions/ADR-020-transactional-installation-rollback.md), and the
+[offline installation guide](docs/offline-installation.md).
+
+```bash
+sudo /usr/local/sbin/safeterm-install-rollback latest
+```
+
 ## Local Verification
 
 ```bash
@@ -285,3 +299,4 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M15 | End-to-End Deployment and Demo | ✅ Tagged: v0.16.0-m15 |
 | M16 | Interactive Terminal UX and Console Access | ✅ Tagged: v0.17.0-m16 |
 | M17 | Online and Air-Gapped Installation Package | ✅ Complete |
+| M18 | Transactional Installation Rollback | ✅ Complete |

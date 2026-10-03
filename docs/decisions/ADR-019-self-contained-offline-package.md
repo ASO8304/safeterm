@@ -39,3 +39,5 @@ checksums and bundle preflight precede persistent mutation.
   must come from Ubuntu media or an internal package mirror.
 - Production upgrades still require the offline catalog signing key whenever
   target executable hashes change.
+- Full pre-install state restoration is defined by
+  [ADR-020](ADR-020-transactional-installation-rollback.md).
