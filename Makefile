@@ -1,4 +1,4 @@
-.PHONY: build test e2e security vet fmt fmt-check verify clean
+.PHONY: build test e2e security vet fmt fmt-check verify offline-package clean
 
 build:
 	@echo "==> Building..."
@@ -39,6 +39,10 @@ fmt-check:
 verify: fmt-check vet build test
 	@echo ""
 	@echo "SafeTerm Verification: PASS"
+
+offline-package:
+	@test -n "$(OUTPUT)" || { echo "usage: make offline-package OUTPUT=/path/to/package [ARCH=amd64|arm64]"; exit 2; }
+	deploy/package/create-package.sh --output "$(OUTPUT)" $(if $(ARCH),--arch "$(ARCH)",)
 
 clean:
 	rm -rf bin/

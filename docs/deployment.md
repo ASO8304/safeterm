@@ -1,5 +1,9 @@
 # SafeTerm Deployment and End-to-End Demo
 
+For a package that is built on a connected machine and installed without Git,
+Go, or Internet access on the Ubuntu target, follow the
+[online and air-gapped installation guide](offline-installation.md).
+
 ## Fresh-host scope
 
 M15 targets a fresh, disposable Linux host with systemd. Run the full demo in

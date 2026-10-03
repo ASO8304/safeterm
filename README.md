@@ -4,7 +4,7 @@ A configurable platform for secure system command execution.
 
 ## Current Status
 
-**Milestone: M16 — Interactive Terminal UX and Console Access (complete)**
+**Milestone: M17 — Online and Air-Gapped Installation Package (complete)**
 
 Available capabilities:
 
@@ -51,6 +51,8 @@ Available capabilities:
   bounded history, secret-safe input, and authorization-aware Tab completion
 - A local `safeterm` console login that presents the same restricted terminal
   and crosses the same signed-catalog, IPC, policy, Runner, config, and audit boundaries
+- A self-contained AMD64/ARM64 installation package that needs no Git, Go,
+  module download, or Internet access on the target and preserves installed state on upgrade
 
 Policy does not authenticate users; it continues to authorize the roles carried
 by the contract (ADR-006). The SSH Broker now authenticates its remote user and
@@ -204,6 +206,21 @@ start Bash or expose arbitrary command execution. See
 [ADR-018](docs/decisions/ADR-018-shared-restricted-terminal-and-console-login.md),
 and the [deployment guide](docs/deployment.md).
 
+M17 packages prebuilt Linux services and catalog tools with all deployment
+assets and a checksum manifest. The target prepares executable hashes locally,
+then either consumes an externally signed production catalog or uses an
+explicit single-host evaluation key. Fresh install and upgrade are both
+supported; upgrades retain the SSH fingerprint, identities, resource registry,
+and managed values. See [REQ-017](docs/requirements/REQ-017-offline-installation-package.md),
+[ADR-019](docs/decisions/ADR-019-self-contained-offline-package.md), and the
+[offline installation guide](docs/offline-installation.md).
+
+Build a transferable AMD64 package on a connected Linux machine with:
+
+```bash
+make offline-package OUTPUT="$HOME/safeterm-offline-amd64" ARCH=amd64
+```
+
 ## Local Verification
 
 ```bash
@@ -266,4 +283,5 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M13 | Structured Configuration Management | ✅ Tagged: v0.14.0-m13 |
 | M14 | Adversarial Security Verification | ✅ Tagged: v0.15.1-m14 |
 | M15 | End-to-End Deployment and Demo | ✅ Tagged: v0.16.0-m15 |
-| M16 | Interactive Terminal UX and Console Access | ✅ Complete |
+| M16 | Interactive Terminal UX and Console Access | ✅ Tagged: v0.17.0-m16 |
+| M17 | Online and Air-Gapped Installation Package | ✅ Complete |
