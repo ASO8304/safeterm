@@ -20,6 +20,7 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 		filepath.Join(repository, "deploy", "demo", "run-demo.sh"),
 		filepath.Join(repository, "deploy", "package", "create-package.sh"),
 		filepath.Join(repository, "deploy", "package", "install-package.sh"),
+		filepath.Join(repository, "deploy", "package", "rollback-package.sh"),
 	}
 	for _, script := range scripts {
 		info, err := os.Stat(script)
@@ -51,9 +52,10 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 	repository := repositoryRoot(t)
 	creator := readText(t, filepath.Join(repository, "deploy", "package", "create-package.sh"))
 	installer := readText(t, filepath.Join(repository, "deploy", "package", "install-package.sh"))
+	rollback := readText(t, filepath.Join(repository, "deploy", "package", "rollback-package.sh"))
 	for _, marker := range []string{
 		"CGO_ENABLED=0 GOOS=linux", "amd64|arm64", "catalog-prepare catalog-sign",
-		"PACKAGE-SHA256SUMS", "payload/base-install.sh",
+		"PACKAGE-SHA256SUMS", "payload/base-install.sh", "payload/rollback.sh",
 	} {
 		if !strings.Contains(creator, marker) {
 			t.Errorf("offline package builder is missing %q", marker)
@@ -79,6 +81,29 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 		if strings.Contains(installer, forbidden) {
 			t.Errorf("offline target installer contains network/build dependency %q", forbidden)
 		}
+	}
+	for _, marker := range []string{
+		"/var/backups/safeterm-installer", "snapshot.tar", "replace-paths",
+		"service-state", "SNAPSHOT-SHA256SUMS", "/etc/passwd",
+		"/usr/local/sbin/safeterm-install-rollback",
+	} {
+		if !strings.Contains(installer, marker) {
+			t.Errorf("offline target installer is missing rollback marker %q", marker)
+		}
+	}
+	for _, marker := range []string{
+		"sha256sum -c SNAPSHOT-SHA256SUMS", "systemctl disable", "tar -C / -xpf",
+		"systemctl daemon-reload", "systemctl enable", "systemctl start",
+		"SafeTerm installation rollback: PASS",
+	} {
+		if !strings.Contains(rollback, marker) {
+			t.Errorf("installation rollback is missing %q", marker)
+		}
+	}
+	transaction := strings.LastIndex(installer, "\ncreate_install_transaction\n")
+	localKeyInstall := strings.Index(installer, `install -d -o root -g root -m 0700 "$local_key_dir"`)
+	if transaction < 0 || localKeyInstall < 0 || transaction > localKeyInstall {
+		t.Fatal("rollback transaction must precede persistent local signing-key creation")
 	}
 }
 

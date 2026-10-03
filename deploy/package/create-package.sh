@@ -48,7 +48,8 @@ cp "$repo_dir/deploy/console/users.example.json" "$staging/payload/console/users
 cp "$repo_dir/deploy/systemd/"*.service "$staging/payload/systemd/"
 cp "$repo_dir/deploy/scripts/install.sh" "$staging/payload/base-install.sh"
 cp "$repo_dir/deploy/package/install-package.sh" "$staging/install.sh"
-chmod 0555 "$staging/install.sh" "$staging/payload/base-install.sh"
+cp "$repo_dir/deploy/package/rollback-package.sh" "$staging/payload/rollback.sh"
+chmod 0555 "$staging/install.sh" "$staging/payload/base-install.sh" "$staging/payload/rollback.sh"
 printf '%s\n' "$target_arch" >"$staging/TARGET_ARCH"
 
 (cd "$staging" && find TARGET_ARCH install.sh payload -type f -print | LC_ALL=C sort | xargs sha256sum >PACKAGE-SHA256SUMS)

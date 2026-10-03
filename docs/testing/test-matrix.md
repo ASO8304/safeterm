@@ -152,6 +152,7 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-CONSOLE-001 | REQ-016 (AC-6..AC-7) | OS-user identity mapping and explicit console broker type | Security | PASS |
 | TEST-CONSOLE-002 | REQ-016 (AC-8..AC-9) | bundle, installer, peer groups, and preflight assets | Integration | PASS |
 | TEST-PACKAGE-001 | REQ-017 (AC-1..AC-10) | offline builder/installer syntax, completeness, pre-mutation checks, and upgrade preservation invariants | Integration | PASS |
+| TEST-PACKAGE-001 | REQ-018 (AC-1..AC-10) | transactional snapshot integrity, owned-path cleanup, account and systemd restoration, and packaged rollback command | Integration | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).

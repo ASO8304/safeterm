@@ -34,6 +34,9 @@ single_operator=false
 dry_run=false
 start_services=true
 local_key_dir=/root/.config/safeterm
+transaction_root=/var/backups/safeterm-installer
+transaction=
+units='safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -78,7 +81,7 @@ fi
 if [ -n "$signed_catalog" ] && [ "$local_signing" = true ]; then usage; fi
 if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then usage; fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
-for tool in sha256sum install useradd usermod groupadd systemctl ssh-keygen awk grep sed; do
+for tool in sha256sum install useradd usermod groupadd systemctl ssh-keygen awk grep sed tar date find realpath; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
 case "$ssh_user" in ''|*[!A-Za-z0-9_.@-]*) echo "invalid SSH identity" >&2; exit 1 ;; esac
@@ -88,14 +91,89 @@ work=$(mktemp -d "${TMPDIR:-/tmp}/safeterm-package-install.XXXXXX")
 cleanup() { rm -rf -- "$work"; }
 trap cleanup EXIT HUP INT TERM
 
+local_key_dir=$(realpath -m -- "$local_key_dir")
+case "$local_key_dir" in
+  /root/?*) ;;
+  *) echo "--local-key-dir must be an absolute child of /root" >&2; exit 1 ;;
+esac
+
+create_install_transaction() {
+  transaction_id=$(date -u +%Y%m%dT%H%M%SZ)-$$
+  transaction="$transaction_root/$transaction_id"
+  [ ! -e "$transaction" ] || { echo "rollback transaction already exists: $transaction_id" >&2; exit 1; }
+  install -d -o root -g root -m 0700 "$transaction_root" "$transaction"
+  : >"$transaction/present-paths"
+  : >"$transaction/absent-paths"
+  : >"$transaction/replace-paths"
+  : >"$transaction/service-state"
+
+  replace_paths='/usr/local/bin/safeterm-audit
+/usr/local/bin/safeterm-config-manager
+/usr/local/bin/safeterm-console
+/usr/local/bin/safeterm-gateway
+/usr/local/bin/safeterm-runner
+/usr/local/bin/safeterm-ssh-broker
+/usr/local/bin/safeterm-preflight
+/usr/local/sbin/safeterm-install-rollback
+/etc/safeterm
+/etc/safeterm-managed
+/etc/cat
+/etc/systemd/system/safeterm-audit.service
+/etc/systemd/system/safeterm-runner-diagnostics.service
+/etc/systemd/system/safeterm-runner-network-observer.service
+/etc/systemd/system/safeterm-runner-service-manager.service
+/etc/systemd/system/safeterm-gateway.service
+/etc/systemd/system/safeterm-config-manager-application.service
+/etc/systemd/system/safeterm-config-manager-database.service
+/etc/systemd/system/safeterm-config-manager-network.service
+/etc/systemd/system/safeterm-ssh-broker.service
+/var/lib/safeterm
+/var/lib/safeterm-installer
+/var/mail/safeterm
+/var/spool/mail/safeterm
+/home/safeterm'
+  printf '%s\n%s\n' "$replace_paths" "$local_key_dir" >"$transaction/replace-paths"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ -e "$path" ] || [ -L "$path" ]; then
+      printf '%s\n' "${path#/}" >>"$transaction/present-paths"
+    else
+      printf '%s\n' "$path" >>"$transaction/absent-paths"
+    fi
+  done <"$transaction/replace-paths"
+  for path in /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subuid /etc/subgid /etc/shells /var/log/lastlog /var/log/faillog; do
+    if [ -e "$path" ] || [ -L "$path" ]; then
+      printf '%s\n' "${path#/}" >>"$transaction/present-paths"
+    else
+      printf '%s\n' "$path" >>"$transaction/absent-paths"
+    fi
+  done
+  tar -C / -cSpf "$transaction/snapshot.tar" -T "$transaction/present-paths"
+  for unit in $units; do
+    enabled=$(systemctl is-enabled "$unit" 2>/dev/null || true)
+    active=$(systemctl is-active "$unit" 2>/dev/null || true)
+    [ -n "$enabled" ] || enabled=not-found
+    [ -n "$active" ] || active=inactive
+    printf '%s %s %s\n' "$unit" "$enabled" "$active" >>"$transaction/service-state"
+  done
+  (cd "$transaction" && sha256sum snapshot.tar present-paths absent-paths replace-paths service-state >SNAPSHOT-SHA256SUMS)
+  printf '%s\n' "$transaction_id" >"$transaction_root/latest"
+  install -d -o root -g root -m 0755 /usr/local/sbin
+  install -o root -g root -m 0555 "$payload/rollback.sh" /usr/local/sbin/safeterm-install-rollback
+  echo "Installation rollback transaction: $transaction_id"
+  echo "Rollback command: sudo /usr/local/sbin/safeterm-install-rollback $transaction_id"
+}
+
 if [ "$local_signing" = true ]; then
   "$payload/bin/safeterm-catalog-prepare" --source "$payload/catalog-source" --output "$work/catalog"
-  if [ "$dry_run" = true ]; then
-    key_dir="$work/local-key"
-  else
-    key_dir=$local_key_dir
-  fi
+  key_dir="$work/local-key"
   install -d -o root -g root -m 0700 "$key_dir"
+  if [ -f "$local_key_dir/catalog-ed25519.key" ] && [ -f "$local_key_dir/catalog-ed25519.pub" ]; then
+    install -m 0600 "$local_key_dir/catalog-ed25519.key" "$key_dir/catalog-ed25519.key"
+    install -m 0644 "$local_key_dir/catalog-ed25519.pub" "$key_dir/catalog-ed25519.pub"
+  else
+    [ ! -e "$local_key_dir/catalog-ed25519.key" ] && [ ! -e "$local_key_dir/catalog-ed25519.pub" ] || { echo "local signing key pair is incomplete" >&2; exit 1; }
+  fi
   private_key="$key_dir/catalog-ed25519.key"
   public_key="$key_dir/catalog-ed25519.pub"
   if [ ! -f "$private_key" ] || [ ! -f "$public_key" ]; then
@@ -105,7 +183,6 @@ if [ "$local_signing" = true ]; then
   install -m 0644 "$public_key" "$work/catalog/trust/catalog-ed25519.pub"
   "$payload/bin/safeterm-catalog-sign" -config "$work/catalog" -private-key "$private_key" -signature "$work/catalog/catalog.sig"
   signed_catalog="$work/catalog"
-  echo "WARNING: local signing key retained at $private_key; use offline signing for production."
 fi
 
 [ -d "$signed_catalog" ] || { echo "signed catalog directory is missing" >&2; exit 1; }
@@ -169,6 +246,14 @@ if [ "$dry_run" = true ]; then
   exit 0
 fi
 
+create_install_transaction
+if [ "$local_signing" = true ]; then
+  install -d -o root -g root -m 0700 "$local_key_dir"
+  install -o root -g root -m 0600 "$private_key" "$local_key_dir/catalog-ed25519.key"
+  install -o root -g root -m 0644 "$public_key" "$local_key_dir/catalog-ed25519.pub"
+  echo "WARNING: local signing key retained at $local_key_dir/catalog-ed25519.key; use offline signing for production."
+fi
+
 if [ -d /etc/safeterm-managed ]; then
   cp -a /etc/safeterm-managed "$work/preserved-managed"
 fi
@@ -195,3 +280,4 @@ if [ "$start_services" = true ]; then
   systemctl --quiet is-active safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 echo "SafeTerm package installation: PASS"
+echo "Rollback remains available with: sudo /usr/local/sbin/safeterm-install-rollback $(basename "$transaction")"

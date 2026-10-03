@@ -1,3 +1,4 @@
 # Keep gofmt inputs identical on Windows and Linux checkouts.
 *.go text eol=lf
+*.sh text eol=lf
 Makefile text eol=lf
