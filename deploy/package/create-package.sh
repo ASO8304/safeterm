@@ -1,0 +1,59 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  echo "usage: $0 --output DIR [--arch amd64|arm64]" >&2
+  exit 2
+}
+
+output=
+target_arch=
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output) [ "$#" -ge 2 ] || usage; output=$2; shift 2 ;;
+    --arch) [ "$#" -ge 2 ] || usage; target_arch=$2; shift 2 ;;
+    *) usage ;;
+  esac
+done
+
+[ -n "$output" ] || usage
+[ ! -e "$output" ] || { echo "output already exists: $output" >&2; exit 1; }
+command -v go >/dev/null 2>&1 || { echo "go is required on the package-building machine" >&2; exit 1; }
+command -v sha256sum >/dev/null 2>&1 || { echo "sha256sum is required" >&2; exit 1; }
+[ "$(go env GOOS)" = linux ] || { echo "packages must be built on Linux" >&2; exit 1; }
+[ -n "$target_arch" ] || target_arch=$(go env GOARCH)
+case "$target_arch" in amd64|arm64) ;; *) echo "unsupported architecture: $target_arch" >&2; exit 1 ;; esac
+
+repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+output=$(realpath -m -- "$output")
+parent=$(dirname -- "$output")
+mkdir -p "$parent"
+staging=$(mktemp -d "$parent/.safeterm-package.XXXXXX")
+cleanup() { rm -rf -- "$staging"; }
+trap cleanup EXIT HUP INT TERM
+
+mkdir -p "$staging/payload/bin" "$staging/payload/catalog-source" "$staging/payload/managed" \
+  "$staging/payload/config-manager" "$staging/payload/console" "$staging/payload/systemd"
+
+for entry in audit config-manager console gateway runner ssh-broker preflight catalog-prepare catalog-sign; do
+  (cd "$repo_dir" && CGO_ENABLED=0 GOOS=linux GOARCH="$target_arch" \
+    go build -trimpath -o "$staging/payload/bin/safeterm-$entry" "./cmd/$entry")
+  chmod 0555 "$staging/payload/bin/safeterm-$entry"
+done
+
+cp -R "$repo_dir/configs/." "$staging/payload/catalog-source/"
+cp -R "$repo_dir/deploy/demo/managed/." "$staging/payload/managed/"
+cp "$repo_dir/deploy/config-manager/resources.example.json" "$staging/payload/config-manager/resources.json"
+cp "$repo_dir/deploy/console/users.example.json" "$staging/payload/console/users.json"
+cp "$repo_dir/deploy/systemd/"*.service "$staging/payload/systemd/"
+cp "$repo_dir/deploy/scripts/install.sh" "$staging/payload/base-install.sh"
+cp "$repo_dir/deploy/package/install-package.sh" "$staging/install.sh"
+chmod 0555 "$staging/install.sh" "$staging/payload/base-install.sh"
+printf '%s\n' "$target_arch" >"$staging/TARGET_ARCH"
+
+(cd "$staging" && find TARGET_ARCH install.sh payload -type f -print | LC_ALL=C sort | xargs sha256sum >PACKAGE-SHA256SUMS)
+chmod 0444 "$staging/PACKAGE-SHA256SUMS"
+mv -- "$staging" "$output"
+trap - EXIT HUP INT TERM
+echo "SafeTerm offline installation package created: $output"
+echo "Transfer this directory to the target host and run: sudo ./install.sh --help"

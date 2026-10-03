@@ -18,6 +18,8 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 		filepath.Join(repository, "deploy", "scripts", "build-bundle.sh"),
 		filepath.Join(repository, "deploy", "scripts", "install.sh"),
 		filepath.Join(repository, "deploy", "demo", "run-demo.sh"),
+		filepath.Join(repository, "deploy", "package", "create-package.sh"),
+		filepath.Join(repository, "deploy", "package", "install-package.sh"),
 	}
 	for _, script := range scripts {
 		info, err := os.Stat(script)
@@ -40,6 +42,42 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 	} {
 		if !strings.Contains(builder, artifact) {
 			t.Errorf("bundle builder does not include %s", artifact)
+		}
+	}
+}
+
+// TEST-PACKAGE-001: REQ-017 AC-1 through AC-10.
+func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
+	repository := repositoryRoot(t)
+	creator := readText(t, filepath.Join(repository, "deploy", "package", "create-package.sh"))
+	installer := readText(t, filepath.Join(repository, "deploy", "package", "install-package.sh"))
+	for _, marker := range []string{
+		"CGO_ENABLED=0 GOOS=linux", "amd64|arm64", "catalog-prepare catalog-sign",
+		"PACKAGE-SHA256SUMS", "payload/base-install.sh",
+	} {
+		if !strings.Contains(creator, marker) {
+			t.Errorf("offline package builder is missing %q", marker)
+		}
+	}
+	for _, marker := range []string{
+		"sha256sum -c PACKAGE-SHA256SUMS", "--prepare-catalog", "--signed-catalog",
+		"--local-signing", "--ssh-public-key", "--single-operator", "--dry-run",
+		"/etc/safeterm/ssh/ssh_host_ed25519_key", "/etc/safeterm/ssh/users.json",
+		"/etc/safeterm/console/users.json", "/etc/safeterm/config-manager/resources.json",
+		"preserved-managed", "safeterm-preflight", "--no-start",
+	} {
+		if !strings.Contains(installer, marker) {
+			t.Errorf("offline target installer is missing %q", marker)
+		}
+	}
+	checksum := strings.Index(installer, "sha256sum -c PACKAGE-SHA256SUMS")
+	rootCheck := strings.Index(installer, `"$(id -u)" -eq 0`)
+	if checksum < 0 || rootCheck < 0 || checksum > rootCheck {
+		t.Fatal("package checksum verification must precede privileged installation")
+	}
+	for _, forbidden := range []string{"git clone", "go build", "apt install", "curl ", "wget "} {
+		if strings.Contains(installer, forbidden) {
+			t.Errorf("offline target installer contains network/build dependency %q", forbidden)
 		}
 	}
 }
