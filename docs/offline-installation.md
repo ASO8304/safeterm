@@ -34,7 +34,7 @@ ship and build a package for the target architecture:
 git clone https://github.com/ASO8304/safeterm.git
 cd safeterm
 git fetch --tags
-git checkout v0.20.0-m19
+git checkout v0.20.1-m19
 
 deploy/package/create-package.sh \
   --arch amd64 \
