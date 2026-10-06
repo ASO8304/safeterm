@@ -1,0 +1,54 @@
+---
+safeterm_package_archive: ""
+safeterm_package_root_name: safeterm-offline-amd64
+safeterm_package_checksum: ""
+safeterm_remote_stage_root: /var/tmp/safeterm-ansible
+safeterm_force_install: false
+
+safeterm_apt_mode: online
+safeterm_apt_repository: ""
+safeterm_apt_repository_filename: safeterm-offline
+safeterm_apt_update_cache: true
+safeterm_apt_cache_valid_time: 3600
+safeterm_required_packages:
+  - ca-certificates
+  - coreutils
+  - findutils
+  - gawk
+  - grep
+  - gzip
+  - libc-bin
+  - openssh-client
+  - passwd
+  - python3
+  - python3-apt
+  - sed
+  - sudo
+  - systemd
+  - tar
+  - tcpdump
+  - util-linux
+
+safeterm_signing_mode: local
+safeterm_signed_catalog_archive: ""
+safeterm_signed_catalog_root_name: signed-catalog
+safeterm_local_key_dir: /root/.config/safeterm
+safeterm_bootstrap_ssh_user: alice
+safeterm_bootstrap_ssh_public_key_file: ""
+safeterm_single_operator: false
+
+safeterm_ssh_users: []
+safeterm_console_users: []
+safeterm_config_registry_file: ""
+
+safeterm_services:
+  - safeterm-audit.service
+  - safeterm-runner-diagnostics.service
+  - safeterm-runner-network-observer.service
+  - safeterm-runner-log-reader.service
+  - safeterm-runner-service-manager.service
+  - safeterm-gateway.service
+  - safeterm-config-manager-application.service
+  - safeterm-config-manager-database.service
+  - safeterm-config-manager-network.service
+  - safeterm-ssh-broker.service

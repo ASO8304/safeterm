@@ -155,6 +155,7 @@ Its purpose is to show which tests cover every requirement from a single file.
 | TEST-PACKAGE-001 | REQ-018 (AC-1..AC-10) | transactional snapshot integrity, owned-path cleanup, account and systemd restoration, and packaged rollback command | Integration | PASS |
 | TEST-OPERATOR-001 | REQ-019 (AC-1..AC-4) | mapped log alias validation, fixed-path translation, positional shell syntax, and streaming profile assets | Unit / Integration | PASS |
 | TEST-OPERATOR-002 | REQ-019 (AC-5..AC-9) | typed systemd actions, fixed sudo prefix, generated sudoers policy, role split, templates, and guided help | Security / Integration | PASS |
+| TEST-ANSIBLE-001 | REQ-020 (AC-1..AC-11) | one-command wrapper, dependency modes, transferred package checksums, dry-run ordering, idempotence, configuration, verification, and rollback assets | Integration | PASS |
 
 Local M5 evidence: [complete make verify output](../../evidence/M5/make-verify.log).
 Local M6 evidence: [complete make verify output](../../evidence/M6/make-verify.log).

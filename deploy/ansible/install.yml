@@ -1,0 +1,36 @@
+---
+- name: Bootstrap Python for Ansible
+  hosts: safeterm
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Detect Python without assuming a Python module
+      ansible.builtin.raw: command -v python3
+      register: safeterm_python_probe
+      changed_when: false
+      failed_when: false
+
+    - name: Bootstrap Python from configured APT sources
+      ansible.builtin.raw: |
+        set -eu
+        export DEBIAN_FRONTEND=noninteractive
+        apt-get update
+        apt-get install -y python3
+        echo SAFETERM_PYTHON_BOOTSTRAPPED
+      register: safeterm_python_bootstrap
+      changed_when: "'SAFETERM_PYTHON_BOOTSTRAPPED' in safeterm_python_bootstrap.stdout"
+      when:
+        - safeterm_python_probe.rc != 0
+        - safeterm_apt_mode | default('online') in ['online', 'repository']
+
+    - name: Require Python in preinstalled or invalid dependency mode
+      ansible.builtin.raw: command -v python3
+      changed_when: false
+      when: safeterm_python_probe.rc != 0
+
+- name: Install and configure SafeTerm
+  hosts: safeterm
+  gather_facts: true
+  become: true
+  roles:
+    - role: safeterm

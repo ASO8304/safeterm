@@ -17,3 +17,8 @@ Thumbs.db
 *.local
 catalog-signing.key
 *.private-key
+
+# Local Ansible inventory, deployment variables, and release artifacts
+/deploy/ansible/inventory.yml
+/deploy/ansible/group_vars/all.yml
+/deploy/ansible/files/

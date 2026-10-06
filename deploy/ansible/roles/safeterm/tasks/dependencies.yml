@@ -1,0 +1,44 @@
+---
+- name: Require a repository definition in repository mode
+  ansible.builtin.assert:
+    that: safeterm_apt_repository | length > 0
+    fail_msg: safeterm_apt_repository is required when safeterm_apt_mode=repository.
+  when: safeterm_apt_mode == 'repository'
+
+- name: Configure the selected APT repository
+  ansible.builtin.apt_repository:
+    repo: "{{ safeterm_apt_repository }}"
+    filename: "{{ safeterm_apt_repository_filename }}"
+    state: present
+    update_cache: false
+  when: safeterm_apt_mode == 'repository'
+
+- name: Install missing target dependencies
+  ansible.builtin.apt:
+    name: "{{ safeterm_required_packages }}"
+    state: present
+    update_cache: "{{ safeterm_apt_update_cache }}"
+    cache_valid_time: "{{ safeterm_apt_cache_valid_time }}"
+  when: safeterm_apt_mode != 'preinstalled'
+
+- name: Locate executables required by the target installer
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /usr/bin/uname
+    - /usr/bin/tcpdump
+    - /usr/bin/tail
+    - /usr/bin/systemctl
+    - /usr/bin/sudo
+    - /usr/bin/sha256sum
+    - /usr/bin/ssh-keygen
+    - /usr/sbin/visudo
+  register: safeterm_required_executables
+
+- name: Refuse installation when a target dependency is absent
+  ansible.builtin.assert:
+    that: item.stat.executable | default(false)
+    fail_msg: "Required target executable is missing: {{ item.item }}"
+  loop: "{{ safeterm_required_executables.results }}"
+  loop_control:
+    label: "{{ item.item }}"

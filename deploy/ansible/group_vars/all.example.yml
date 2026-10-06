@@ -1,0 +1,49 @@
+---
+# Archive produced from an official SafeTerm offline package directory:
+#   tar -C "$HOME" -czf safeterm-offline-amd64.tar.gz safeterm-offline-amd64
+safeterm_package_archive: "{{ playbook_dir }}/files/safeterm-offline-amd64.tar.gz"
+safeterm_package_root_name: safeterm-offline-amd64
+# Optional expected SHA-256 of the archive. Internal files are always checked
+# against PACKAGE-SHA256SUMS by the target installer.
+safeterm_package_checksum: ""
+
+# online: use configured Ubuntu repositories; repository: first add the APT
+# repository below; preinstalled: never contact APT and verify commands only.
+safeterm_apt_mode: online
+safeterm_apt_repository: ""
+safeterm_apt_repository_filename: safeterm-offline
+safeterm_apt_update_cache: true
+
+# local is convenient for a demo or one managed host. Production should use an
+# offline-signed catalog archive and set safeterm_signing_mode to offline.
+safeterm_signing_mode: local
+safeterm_signed_catalog_archive: ""
+safeterm_signed_catalog_root_name: signed-catalog
+safeterm_local_key_dir: /root/.config/safeterm
+
+# A fresh installation needs one SSH public key. Upgrades preserve the installed
+# identity map and do not require this value.
+safeterm_bootstrap_ssh_user: alice
+safeterm_bootstrap_ssh_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519.pub"
+safeterm_single_operator: true
+safeterm_force_install: false
+
+# Empty lists preserve the identity maps installed by the package. Define a
+# complete list to manage that file with Ansible after installation.
+safeterm_ssh_users: []
+# Example:
+# safeterm_ssh_users:
+#   - user_id: alice
+#     roles: [viewer, netops, log-viewer, service-viewer, config-viewer, config-operator]
+#     authorized_keys:
+#       - "ssh-ed25519 AAAA... alice@safeterm"
+
+safeterm_console_users: []
+# Example:
+# safeterm_console_users:
+#   - os_user: safeterm
+#     user_id: alice
+#     roles: [viewer, netops, log-viewer, service-viewer]
+
+# Optional controller-side replacement for the complete Config Manager registry.
+safeterm_config_registry_file: ""
