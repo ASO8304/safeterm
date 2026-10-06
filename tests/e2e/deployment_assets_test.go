@@ -21,6 +21,8 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 		filepath.Join(repository, "deploy", "package", "create-package.sh"),
 		filepath.Join(repository, "deploy", "package", "install-package.sh"),
 		filepath.Join(repository, "deploy", "package", "rollback-package.sh"),
+		filepath.Join(repository, "deploy", "ansible", "install.sh"),
+		filepath.Join(repository, "deploy", "ansible", "rollback.sh"),
 	}
 	for _, script := range scripts {
 		info, err := os.Stat(script)
@@ -44,6 +46,54 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 		if !strings.Contains(builder, artifact) {
 			t.Errorf("bundle builder does not include %s", artifact)
 		}
+	}
+}
+
+// TEST-ANSIBLE-001: REQ-020 AC-1 through AC-11.
+func TestAnsibleInstallerOrchestratesVerifiedTransactionalPackage(t *testing.T) {
+	repository := repositoryRoot(t)
+	files := []string{
+		"deploy/ansible/install.yml",
+		"deploy/ansible/verify.yml",
+		"deploy/ansible/rollback.yml",
+		"deploy/ansible/group_vars/all.example.yml",
+		"deploy/ansible/roles/safeterm/defaults/main.yml",
+		"deploy/ansible/roles/safeterm/tasks/main.yml",
+		"deploy/ansible/roles/safeterm/tasks/dependencies.yml",
+		"deploy/ansible/roles/safeterm/tasks/package.yml",
+		"deploy/ansible/roles/safeterm/tasks/configuration.yml",
+		"deploy/ansible/roles/safeterm/handlers/main.yml",
+	}
+	var combined strings.Builder
+	for _, relative := range files {
+		combined.WriteString(readText(t, filepath.Join(repository, filepath.FromSlash(relative))))
+		combined.WriteByte('\n')
+	}
+	content := combined.String()
+	for _, marker := range []string{
+		"SAFETERM_PYTHON_BOOTSTRAPPED",
+		"safeterm_apt_mode in ['online', 'repository', 'preinstalled']",
+		"ansible.builtin.apt_repository",
+		"ansible.builtin.apt:",
+		"checksum_algorithm: sha256",
+		"Refuse a damaged package transfer",
+		"--dry-run",
+		"ansible-deployment",
+		"safeterm-preflight --installed",
+		"systemctl, is-active",
+		"safeterm-install-rollback",
+		"Restart SafeTerm control plane",
+	} {
+		if !strings.Contains(content, marker) {
+			t.Errorf("Ansible deployment assets are missing %q", marker)
+		}
+	}
+
+	packageTasks := readText(t, filepath.Join(repository, "deploy", "ansible", "roles", "safeterm", "tasks", "package.yml"))
+	dryRun := strings.Index(packageTasks, "Dry-run the verified package installer before mutation")
+	install := strings.Index(packageTasks, "Install or upgrade SafeTerm transactionally")
+	if dryRun < 0 || install < 0 || dryRun > install {
+		t.Fatal("Ansible must dry-run the package installer before host mutation")
 	}
 }
 

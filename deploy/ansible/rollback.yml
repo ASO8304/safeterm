@@ -1,0 +1,29 @@
+---
+- name: Roll back a SafeTerm installation transaction
+  hosts: safeterm
+  gather_facts: false
+  become: true
+  vars:
+    safeterm_rollback_transaction: latest
+  tasks:
+    - name: Ensure the installed rollback command exists
+      ansible.builtin.stat:
+        path: /usr/local/sbin/safeterm-install-rollback
+      register: safeterm_rollback_binary
+
+    - name: Refuse rollback without a transaction-aware installation
+      ansible.builtin.assert:
+        that: safeterm_rollback_binary.stat.executable | default(false)
+        fail_msg: No installed SafeTerm rollback command is available.
+
+    - name: Restore the selected installation transaction
+      ansible.builtin.command:
+        argv:
+          - /usr/local/sbin/safeterm-install-rollback
+          - "{{ safeterm_rollback_transaction }}"
+      register: safeterm_rollback_result
+      changed_when: true
+
+    - name: Report rollback result
+      ansible.builtin.debug:
+        var: safeterm_rollback_result.stdout_lines

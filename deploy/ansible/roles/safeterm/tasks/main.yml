@@ -1,0 +1,49 @@
+---
+- name: Validate target and deployment variables
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.system == 'Linux'
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version is version('24.04', '==')
+      - ansible_facts.service_mgr == 'systemd'
+      - ansible_version.full is version('2.15', '>=')
+      - safeterm_apt_mode in ['online', 'repository', 'preinstalled']
+      - safeterm_signing_mode in ['local', 'offline']
+      - safeterm_package_archive | length > 0
+      - safeterm_package_root_name is match('^[A-Za-z0-9._-]+$')
+      - safeterm_bootstrap_ssh_user is match('^[A-Za-z0-9_.@-]+$')
+    fail_msg: SafeTerm requires Ubuntu 24.04 with systemd and valid installer variables.
+
+- name: Install and verify host dependencies
+  ansible.builtin.import_tasks: dependencies.yml
+
+- name: Install the verified SafeTerm package
+  ansible.builtin.import_tasks: package.yml
+
+- name: Apply optional administrator-managed configuration
+  ansible.builtin.import_tasks: configuration.yml
+
+- name: Restart services after managed configuration changes
+  ansible.builtin.meta: flush_handlers
+
+- name: Run installed SafeTerm preflight
+  ansible.builtin.command: /usr/local/bin/safeterm-preflight --installed
+  changed_when: false
+
+- name: Verify all SafeTerm services are active
+  ansible.builtin.command:
+    argv: [systemctl, is-active, "{{ item }}"]
+  loop: "{{ safeterm_services }}"
+  changed_when: false
+
+- name: Read newest rollback transaction
+  ansible.builtin.command: cat /var/backups/safeterm-installer/latest
+  register: safeterm_latest_transaction
+  changed_when: false
+  failed_when: false
+
+- name: Report installation and rollback command
+  ansible.builtin.debug:
+    msg:
+      - SafeTerm installation and verification passed.
+      - "Rollback: ansible-playbook rollback.yml -e safeterm_rollback_transaction={{ safeterm_latest_transaction.stdout | default('latest', true) }}"

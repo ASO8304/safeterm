@@ -1,0 +1,198 @@
+---
+- name: Inspect package archive on the controller
+  ansible.builtin.stat:
+    path: "{{ safeterm_package_archive }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: safeterm_controller_package
+
+- name: Validate controller package and optional checksum pin
+  ansible.builtin.assert:
+    that:
+      - safeterm_controller_package.stat.isreg | default(false)
+      - safeterm_package_checksum | length == 0 or safeterm_controller_package.stat.checksum == safeterm_package_checksum
+    fail_msg: The SafeTerm package archive is missing or its SHA-256 does not match.
+
+- name: Inspect offline-signed catalog archive on the controller
+  ansible.builtin.stat:
+    path: "{{ safeterm_signed_catalog_archive }}"
+    checksum_algorithm: sha256
+  delegate_to: localhost
+  become: false
+  register: safeterm_controller_catalog
+  when: safeterm_signing_mode == 'offline'
+
+- name: Validate production signing input
+  ansible.builtin.assert:
+    that:
+      - safeterm_signed_catalog_archive | length > 0
+      - safeterm_controller_catalog.stat.isreg | default(false)
+      - safeterm_signed_catalog_root_name is match('^[A-Za-z0-9._-]+$')
+    fail_msg: Offline signing mode requires a signed catalog archive and its root directory name.
+  when: safeterm_signing_mode == 'offline'
+
+- name: Define immutable staging paths and deployment fingerprint
+  ansible.builtin.set_fact:
+    safeterm_release_id: "{{ safeterm_controller_package.stat.checksum }}"
+    safeterm_deployment_fingerprint: >-
+      {{ safeterm_controller_package.stat.checksum }}:{{ safeterm_signing_mode }}:{{ (safeterm_controller_catalog.stat.checksum if safeterm_signing_mode == 'offline' else 'local') }}:{{ safeterm_single_operator | bool }}
+    safeterm_stage_dir: "{{ safeterm_remote_stage_root }}/{{ safeterm_controller_package.stat.checksum }}"
+
+- name: Create protected staging directory
+  ansible.builtin.file:
+    path: "{{ safeterm_stage_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Transfer the release archive
+  ansible.builtin.copy:
+    src: "{{ safeterm_package_archive }}"
+    dest: "{{ safeterm_stage_dir }}/package.tar.gz"
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Verify the transferred release archive SHA-256
+  ansible.builtin.stat:
+    path: "{{ safeterm_stage_dir }}/package.tar.gz"
+    checksum_algorithm: sha256
+  register: safeterm_remote_package
+
+- name: Refuse a damaged package transfer
+  ansible.builtin.assert:
+    that: safeterm_remote_package.stat.checksum == safeterm_controller_package.stat.checksum
+    fail_msg: SafeTerm package checksum changed during transfer.
+
+- name: Extract the release package
+  ansible.builtin.unarchive:
+    src: "{{ safeterm_stage_dir }}/package.tar.gz"
+    dest: "{{ safeterm_stage_dir }}"
+    remote_src: true
+    creates: "{{ safeterm_stage_dir }}/{{ safeterm_package_root_name }}/PACKAGE-SHA256SUMS"
+
+- name: Transfer the offline-signed catalog archive
+  ansible.builtin.copy:
+    src: "{{ safeterm_signed_catalog_archive }}"
+    dest: "{{ safeterm_stage_dir }}/signed-catalog.tar.gz"
+    owner: root
+    group: root
+    mode: '0600'
+  when: safeterm_signing_mode == 'offline'
+
+- name: Verify the transferred signed catalog archive SHA-256
+  ansible.builtin.stat:
+    path: "{{ safeterm_stage_dir }}/signed-catalog.tar.gz"
+    checksum_algorithm: sha256
+  register: safeterm_remote_catalog
+  when: safeterm_signing_mode == 'offline'
+
+- name: Refuse a damaged signed catalog transfer
+  ansible.builtin.assert:
+    that: safeterm_remote_catalog.stat.checksum == safeterm_controller_catalog.stat.checksum
+    fail_msg: Signed catalog checksum changed during transfer.
+  when: safeterm_signing_mode == 'offline'
+
+- name: Extract the offline-signed catalog
+  ansible.builtin.unarchive:
+    src: "{{ safeterm_stage_dir }}/signed-catalog.tar.gz"
+    dest: "{{ safeterm_stage_dir }}"
+    remote_src: true
+    creates: "{{ safeterm_stage_dir }}/{{ safeterm_signed_catalog_root_name }}/catalog.sig"
+  when: safeterm_signing_mode == 'offline'
+
+- name: Validate extracted installer assets
+  ansible.builtin.stat:
+    path: "{{ safeterm_stage_dir }}/{{ safeterm_package_root_name }}/install.sh"
+  register: safeterm_package_installer
+
+- name: Refuse an archive with an unexpected root
+  ansible.builtin.assert:
+    that: safeterm_package_installer.stat.executable | default(false)
+    fail_msg: "Expected executable {{ safeterm_package_root_name }}/install.sh was not found in the package archive."
+
+- name: Detect an existing SafeTerm identity map
+  ansible.builtin.stat:
+    path: /etc/safeterm/ssh/users.json
+  register: safeterm_existing_identity_map
+
+- name: Inspect bootstrap public key on the controller
+  ansible.builtin.stat:
+    path: "{{ safeterm_bootstrap_ssh_public_key_file }}"
+  delegate_to: localhost
+  become: false
+  register: safeterm_controller_bootstrap_key
+  when: safeterm_bootstrap_ssh_public_key_file | length > 0
+
+- name: Record bootstrap public-key availability
+  ansible.builtin.set_fact:
+    safeterm_bootstrap_key_available: >-
+      {{ false if safeterm_bootstrap_ssh_public_key_file | length == 0
+         else (safeterm_controller_bootstrap_key.stat.isreg | default(false)) }}
+
+- name: Require a public key for a fresh installation
+  ansible.builtin.assert:
+    that:
+      - safeterm_bootstrap_ssh_public_key_file | length > 0
+      - safeterm_bootstrap_key_available | bool
+    fail_msg: A fresh installation requires safeterm_bootstrap_ssh_public_key_file on the controller.
+  when: not safeterm_existing_identity_map.stat.exists
+
+- name: Transfer bootstrap public key
+  ansible.builtin.copy:
+    src: "{{ safeterm_bootstrap_ssh_public_key_file }}"
+    dest: "{{ safeterm_stage_dir }}/bootstrap.pub"
+    owner: root
+    group: root
+    mode: '0600'
+  when: safeterm_bootstrap_key_available | bool
+
+- name: Read prior Ansible deployment marker
+  ansible.builtin.slurp:
+    src: /var/lib/safeterm-installer/ansible-deployment
+  register: safeterm_prior_marker
+  failed_when: false
+
+- name: Decide whether package installation is required
+  ansible.builtin.set_fact:
+    safeterm_install_required: >-
+      {{ safeterm_force_install | bool or
+         safeterm_prior_marker.content is not defined or
+         (safeterm_prior_marker.content | b64decode | trim) != safeterm_deployment_fingerprint }}
+    safeterm_install_args: >-
+      {{ ['./install.sh']
+         + (['--local-signing', '--local-key-dir', safeterm_local_key_dir] if safeterm_signing_mode == 'local' else ['--signed-catalog', safeterm_stage_dir + '/' + safeterm_signed_catalog_root_name])
+         + ['--ssh-user', safeterm_bootstrap_ssh_user]
+         + (['--ssh-public-key', safeterm_stage_dir + '/bootstrap.pub'] if safeterm_bootstrap_key_available | bool else [])
+         + (['--single-operator'] if safeterm_single_operator | bool else []) }}
+
+- name: Dry-run the verified package installer before mutation
+  ansible.builtin.command:
+    argv: "{{ safeterm_install_args + ['--dry-run'] }}"
+    chdir: "{{ safeterm_stage_dir }}/{{ safeterm_package_root_name }}"
+  changed_when: false
+  when: safeterm_install_required | bool
+
+- name: Install or upgrade SafeTerm transactionally
+  ansible.builtin.command:
+    argv: "{{ safeterm_install_args }}"
+    chdir: "{{ safeterm_stage_dir }}/{{ safeterm_package_root_name }}"
+  register: safeterm_package_install
+  changed_when: true
+  when: safeterm_install_required | bool
+
+- name: Persist successful deployment fingerprint
+  ansible.builtin.copy:
+    content: "{{ safeterm_deployment_fingerprint }}\n"
+    dest: /var/lib/safeterm-installer/ansible-deployment
+    owner: root
+    group: root
+    mode: '0600'
+  when: safeterm_install_required | bool
+
+- name: Report package installer output
+  ansible.builtin.debug:
+    var: safeterm_package_install.stdout_lines
+  when: safeterm_package_install is not skipped

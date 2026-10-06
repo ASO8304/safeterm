@@ -1,0 +1,72 @@
+---
+- name: Validate managed SSH identity list
+  ansible.builtin.assert:
+    that:
+      - safeterm_ssh_users | map(attribute='user_id') | list | unique | length == safeterm_ssh_users | length
+      - item.user_id is match('^[A-Za-z0-9_.@-]+$')
+      - item.roles | length > 0
+      - item.authorized_keys | length > 0
+    fail_msg: Managed SSH users require unique safe IDs, roles, and authorized keys.
+  loop: "{{ safeterm_ssh_users }}"
+  loop_control:
+    label: "{{ item.user_id | default('invalid') }}"
+  when: safeterm_ssh_users | length > 0
+
+- name: Manage complete SSH broker identity map
+  ansible.builtin.template:
+    src: ssh-users.json.j2
+    dest: /etc/safeterm/ssh/users.json
+    owner: root
+    group: safeterm-broker
+    mode: '0640'
+    validate: /usr/bin/python3 -m json.tool %s
+  notify: Restart SafeTerm SSH broker
+  when: safeterm_ssh_users | length > 0
+
+- name: Validate managed console identity list
+  ansible.builtin.assert:
+    that:
+      - safeterm_console_users | map(attribute='os_user') | list | unique | length == safeterm_console_users | length
+      - item.os_user is match('^[a-z_][a-z0-9_-]*[$]?$')
+      - item.user_id is match('^[A-Za-z0-9_.@-]+$')
+      - item.roles | length > 0
+    fail_msg: Managed console users require unique safe OS users, SafeTerm IDs, and roles.
+  loop: "{{ safeterm_console_users }}"
+  loop_control:
+    label: "{{ item.os_user | default('invalid') }}"
+  when: safeterm_console_users | length > 0
+
+- name: Manage complete console identity map
+  ansible.builtin.template:
+    src: console-users.json.j2
+    dest: /etc/safeterm/console/users.json
+    owner: root
+    group: safeterm
+    mode: '0640'
+    validate: /usr/bin/python3 -m json.tool %s
+  when: safeterm_console_users | length > 0
+
+- name: Inspect Config Manager registry on the controller
+  ansible.builtin.stat:
+    path: "{{ safeterm_config_registry_file }}"
+  delegate_to: localhost
+  become: false
+  register: safeterm_controller_registry
+  when: safeterm_config_registry_file | length > 0
+
+- name: Validate requested Config Manager registry
+  ansible.builtin.assert:
+    that: safeterm_controller_registry.stat.isreg | default(false)
+    fail_msg: safeterm_config_registry_file must name a controller-side regular file.
+  when: safeterm_config_registry_file | length > 0
+
+- name: Manage complete Config Manager registry
+  ansible.builtin.copy:
+    src: "{{ safeterm_config_registry_file }}"
+    dest: /etc/safeterm/config-manager/resources.json
+    owner: root
+    group: root
+    mode: '0644'
+    validate: /usr/bin/python3 -m json.tool %s
+  notify: Restart SafeTerm control plane
+  when: safeterm_config_registry_file | length > 0
