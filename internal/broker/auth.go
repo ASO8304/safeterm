@@ -156,7 +156,6 @@ type passwordIdentity struct {
 }
 
 var passwordHashPattern = regexp.MustCompile(`^\$2[ab]\$(10|11|12|13|14)\$[./A-Za-z0-9]{53}$`)
-var passwordComplexityPattern = regexp.MustCompile(`^[A-Za-z0-9]+$`)
 
 // ValidatePasswordComplexity enforces the interactive password policy used by
 // the administrator tools. Bcrypt still limits the encoded input to 72 bytes.
@@ -164,11 +163,15 @@ func ValidatePasswordComplexity(password []byte) error {
 	if len(password) < 8 || len(password) > 72 {
 		return fmt.Errorf("password must contain 8 through 72 bytes")
 	}
-	if !passwordComplexityPattern.Match(password) ||
-		!regexp.MustCompile(`[A-Z]`).Match(password) ||
+	if !regexp.MustCompile(`[A-Z]`).Match(password) ||
 		!regexp.MustCompile(`[a-z]`).Match(password) ||
 		!regexp.MustCompile(`[0-9]`).Match(password) {
 		return fmt.Errorf("password must contain uppercase, lowercase, and numeric characters")
+	}
+	for _, value := range string(password) {
+		if value < 0x20 || value == 0x7f {
+			return fmt.Errorf("password must not contain control characters")
+		}
 	}
 	return nil
 }

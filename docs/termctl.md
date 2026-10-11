@@ -42,8 +42,8 @@ termctl user password console --os-user safeterm
 ```
 
 The password command prompts twice without echo. It enforces at least eight
-ASCII characters, including an uppercase letter, a lowercase letter, and a
-number. The SSH password is stored as bcrypt; the console password is passed
+characters, including an uppercase letter, a lowercase letter, and a number;
+printable symbols are allowed and control characters are rejected. The SSH password is stored as bcrypt; the console password is passed
 to the Linux account password database through `chpasswd` and is never stored
 in the SafeTerm identity map.
 
