@@ -23,7 +23,7 @@ func main() {
 	configDir := flag.String("config", "/etc/safeterm", "signed catalog directory")
 	listenAddress := flag.String("listen", ":2222", "SSH listen address")
 	hostKey := flag.String("host-key", "/etc/safeterm/ssh/ssh_host_ed25519_key", "SSH host private key")
-	identities := flag.String("identities", "/etc/safeterm/ssh/users.json", "SSH public-key identity mapping")
+	identities := flag.String("identities", "/etc/safeterm/ssh/users.json", "SSH password-hash and optional public-key identity mapping")
 	gatewaySocket := flag.String("gateway-socket", "/run/safeterm-gateway/gateway.sock", "Node Gateway socket")
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "trusted Node Gateway user")
 	runAsUser := flag.String("run-as-user", "safeterm-broker", "required Broker operating-system user")

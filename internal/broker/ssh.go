@@ -44,8 +44,14 @@ func NewSSHServerWithConfig(address string, hostKey ssh.Signer, authenticator *S
 			ssh.KeyAlgoECDSA256, ssh.KeyAlgoECDSA384, ssh.KeyAlgoECDSA521,
 			ssh.KeyAlgoRSASHA256, ssh.KeyAlgoRSASHA512,
 		},
-		PublicKeyCallback: authenticator.Authenticate,
-		ServerVersion:     "SSH-2.0-SafeTerm",
+
+		ServerVersion: "SSH-2.0-SafeTerm",
+	}
+	if len(authenticator.byFingerprint) > 0 {
+		serverConfig.PublicKeyCallback = authenticator.Authenticate
+	}
+	if len(authenticator.byPassword) > 0 {
+		serverConfig.PasswordCallback = authenticator.AuthenticatePassword
 	}
 	serverConfig.AddHostKey(hostKey)
 	return &SSHServer{address: address, config: serverConfig, client: client, catalog: catalog, configs: configs, active: map[net.Conn]bool{}, slots: make(chan struct{}, maxSSHConnections)}, nil

@@ -3,9 +3,7 @@
     {
       "user_id": "alice",
       "roles": ["viewer", "netops", "log-viewer", "service-viewer", "config-viewer", "config-operator", "config-approver"],
-      "authorized_keys": [
-        "ssh-ed25519 REPLACE_WITH_THE_BASE64_PUBLIC_KEY alice@example"
-      ]
+      "password_hash": "$2a$12$REPLACE_WITH_GENERATED_BCRYPT_HASH"
     }
   ]
 }

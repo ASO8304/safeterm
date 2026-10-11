@@ -21,10 +21,12 @@ safeterm_signed_catalog_archive: ""
 safeterm_signed_catalog_root_name: signed-catalog
 safeterm_local_key_dir: /root/.config/safeterm
 
-# A fresh installation needs one SSH public key. Upgrades preserve the installed
-# identity map and do not require this value.
+# A fresh installation needs a bcrypt hash file. Public keys are optional.
+# Upgrades preserve the installed identity map. Generate the hash with:
+# ./payload/bin/safeterm-password-hash -output /secure/alice.hash
 safeterm_bootstrap_ssh_user: alice
-safeterm_bootstrap_ssh_public_key_file: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519.pub"
+safeterm_bootstrap_ssh_password_hash_file: /secure/alice.hash
+safeterm_bootstrap_ssh_public_key_file: ""
 safeterm_single_operator: true
 safeterm_force_install: false
 
@@ -35,7 +37,8 @@ safeterm_ssh_users: []
 # safeterm_ssh_users:
 #   - user_id: alice
 #     roles: [viewer, netops, log-viewer, service-viewer, config-viewer, config-operator]
-#     authorized_keys:
+#     password_hash: "$2a$12$REPLACE_WITH_GENERATED_HASH"
+#     authorized_keys: # optional
 #       - "ssh-ed25519 AAAA... alice@safeterm"
 
 safeterm_console_users: []

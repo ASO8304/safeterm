@@ -18,6 +18,9 @@ For an INI resource such as:
 [cats]
 Cat_Path = "/etc/cat"
 Cat_Port = "99"
+Enabled = "true"
+Mode = "safe"
+Retry_Limit = "3"
 ```
 
 a caller may select the registered `cats` section and `Cat_Port` key and submit

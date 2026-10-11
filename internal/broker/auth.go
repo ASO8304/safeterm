@@ -2,8 +2,10 @@ package broker
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/crypto/bcrypt"
 	"io"
 	"regexp"
 	"sort"
@@ -16,7 +18,7 @@ const maxIdentityFileBytes = 1 << 20
 
 var identityPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$`)
 
-// Principal is the identity established by SSH public-key authentication.
+// Principal is the identity established by SSH authentication.
 // Roles are loaded by the Broker and never accepted from the remote client.
 type Principal struct {
 	UserID     string
@@ -27,7 +29,8 @@ type Principal struct {
 type SSHUser struct {
 	UserID         string   `json:"user_id"`
 	Roles          []string `json:"roles"`
-	AuthorizedKeys []string `json:"authorized_keys"`
+	AuthorizedKeys []string `json:"authorized_keys,omitempty"`
+	PasswordHash   string   `json:"password_hash,omitempty"`
 }
 
 type SSHIdentityConfig struct {
@@ -36,10 +39,13 @@ type SSHIdentityConfig struct {
 
 type SSHAuthenticator struct {
 	byFingerprint map[string]Principal
+	byPassword    map[string]passwordIdentity
+	passwordSlots chan struct{}
+	dummyHash     []byte
 }
 
 func LoadSSHAuthenticator(path string, knownRoles map[string]bool) (*SSHAuthenticator, error) {
-	data, err := readSecurityFile(path, "SSH identity file", maxIdentityFileBytes, 0o022)
+	data, err := readSecurityFile(path, "SSH identity file", maxIdentityFileBytes, 0o027)
 	if err != nil {
 		return nil, err
 	}
@@ -60,15 +66,15 @@ func NewSSHAuthenticator(config SSHIdentityConfig, knownRoles map[string]bool) (
 	if len(config.Users) == 0 || len(knownRoles) == 0 {
 		return nil, fmt.Errorf("broker: at least one SSH user and known role are required")
 	}
-	result := &SSHAuthenticator{byFingerprint: map[string]Principal{}}
+	result := &SSHAuthenticator{byFingerprint: map[string]Principal{}, byPassword: map[string]passwordIdentity{}, passwordSlots: make(chan struct{}, 4)}
 	seenUsers := map[string]bool{}
 	for _, user := range config.Users {
 		if !identityPattern.MatchString(user.UserID) || seenUsers[user.UserID] {
 			return nil, fmt.Errorf("broker: invalid or duplicate SSH user %q", user.UserID)
 		}
 		seenUsers[user.UserID] = true
-		if len(user.Roles) == 0 || len(user.AuthorizedKeys) == 0 {
-			return nil, fmt.Errorf("broker: SSH user %q requires roles and authorized keys", user.UserID)
+		if len(user.Roles) == 0 || (len(user.AuthorizedKeys) == 0 && user.PasswordHash == "") {
+			return nil, fmt.Errorf("broker: SSH user %q requires roles and a password hash or authorized keys", user.UserID)
 		}
 		roleSet := map[string]bool{}
 		roles := make([]string, 0, len(user.Roles))
@@ -80,6 +86,12 @@ func NewSSHAuthenticator(config SSHIdentityConfig, knownRoles map[string]bool) (
 			roles = append(roles, role)
 		}
 		sort.Strings(roles)
+		if user.PasswordHash != "" {
+			if err := ValidatePasswordHash(user.PasswordHash); err != nil {
+				return nil, fmt.Errorf("broker: SSH user %q has an invalid password hash", user.UserID)
+			}
+			result.byPassword[user.UserID] = passwordIdentity{principal: Principal{UserID: user.UserID, Roles: append([]string(nil), roles...), BrokerType: "ssh"}, hash: []byte(user.PasswordHash)}
+		}
 		for _, encoded := range user.AuthorizedKeys {
 			key, _, options, rest, err := ssh.ParseAuthorizedKey([]byte(strings.TrimSpace(encoded)))
 			if err != nil || len(options) != 0 || len(bytes.TrimSpace(rest)) != 0 {
@@ -90,6 +102,18 @@ func NewSSHAuthenticator(config SSHIdentityConfig, knownRoles map[string]bool) (
 				return nil, fmt.Errorf("broker: authorized key %q is assigned more than once", fingerprint)
 			}
 			result.byFingerprint[fingerprint] = Principal{UserID: user.UserID, Roles: append([]string(nil), roles...), BrokerType: "ssh"}
+		}
+	}
+	if len(result.byPassword) > 0 {
+		dummy := make([]byte, 32)
+		if _, err := rand.Read(dummy); err != nil {
+			return nil, fmt.Errorf("broker: initialize password authentication")
+		}
+		var err error
+		result.dummyHash, err = bcrypt.GenerateFromPassword(dummy, PasswordHashCost)
+		clear(dummy)
+		if err != nil {
+			return nil, fmt.Errorf("broker: initialize password authentication")
 		}
 	}
 	return result, nil
@@ -121,4 +145,53 @@ func principalFromPermissions(permissions *ssh.Permissions) (Principal, error) {
 		return Principal{}, fmt.Errorf("broker: authenticated principal is invalid")
 	}
 	return principal, nil
+}
+
+// PasswordHashCost is the work factor used for newly generated salted bcrypt hashes.
+const PasswordHashCost = 12
+
+type passwordIdentity struct {
+	principal Principal
+	hash      []byte
+}
+
+var passwordHashPattern = regexp.MustCompile(`^\$2[ab]\$(10|11|12|13|14)\$[./A-Za-z0-9]{53}$`)
+
+// ValidatePasswordHash rejects plaintext, malformed hashes and unbounded work factors.
+func ValidatePasswordHash(encoded string) error {
+	if !passwordHashPattern.MatchString(encoded) {
+		return fmt.Errorf("broker: expected bcrypt hash with cost 10 through 14")
+	}
+	if _, err := bcrypt.Cost([]byte(encoded)); err != nil {
+		return fmt.Errorf("broker: invalid bcrypt hash")
+	}
+	return nil
+}
+
+// AuthenticatePassword uses only the configured SafeTerm identity, never OS passwords.
+func (a *SSHAuthenticator) AuthenticatePassword(metadata ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+	failed := fmt.Errorf("broker: password authentication failed")
+	if a == nil || metadata == nil || len(password) == 0 || len(password) > 72 {
+		return nil, failed
+	}
+	// Bound expensive password work independently of established SSH sessions.
+	select {
+	case a.passwordSlots <- struct{}{}:
+	default:
+		return nil, failed
+	}
+	defer func() { <-a.passwordSlots }()
+	identity, exists := a.byPassword[metadata.User()]
+	hash := a.dummyHash
+	if exists {
+		hash = identity.hash
+	}
+	err := bcrypt.CompareHashAndPassword(hash, password)
+	if err != nil || !exists {
+		return nil, failed
+	}
+	return &ssh.Permissions{Extensions: map[string]string{
+		"safeterm.user_id": identity.principal.UserID,
+		"safeterm.roles":   strings.Join(identity.principal.Roles, "\x1f"),
+	}}, nil
 }

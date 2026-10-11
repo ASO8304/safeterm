@@ -1,7 +1,7 @@
 [
   { "role": "viewer", "operations": ["system_info"] },
-  { "role": "netops", "operations": ["system_info", "trace"] },
+  { "role": "netops", "operations": ["system_info", "trace", "ping"] },
   { "role": "log-viewer", "operations": ["log"] },
   { "role": "service-viewer", "operations": ["status_safeterm_audit", "status_safeterm_gateway", "status_safeterm_ssh"] },
-  { "role": "service-operator", "operations": ["status_safeterm_audit", "status_safeterm_gateway", "status_safeterm_ssh", "start_safeterm_ssh", "stop_safeterm_ssh", "restart_safeterm_ssh", "enable_safeterm_ssh", "disable_safeterm_ssh"] }
+  { "role": "service-operator", "operations": ["status_safeterm_audit", "status_safeterm_gateway", "status_safeterm_ssh", "restart_safeterm_audit", "restart_safeterm_gateway", "start_safeterm_ssh", "stop_safeterm_ssh", "restart_safeterm_ssh", "enable_safeterm_ssh", "disable_safeterm_ssh"] }
 ]

@@ -11,7 +11,10 @@
       "fields": [
         { "section": "cats", "key": "Cat_Path", "type": "path", "required": true, "secret": false, "read_only": false, "path": { "allowed_prefixes": ["/etc/cat"], "must_exist": true, "file_type": "directory", "allow_symlink": false, "expected_mode": "0750" } },
         { "section": "cats", "key": "Cat_Port", "type": "integer", "required": true, "secret": false, "read_only": false, "min": 1, "max": 65535 },
-        { "section": "cats", "key": "Api_Token", "type": "string", "required": true, "secret": true, "read_only": false, "min_length": 16, "max_length": 256 }
+        { "section": "cats", "key": "Api_Token", "type": "string", "required": true, "secret": true, "read_only": false, "min_length": 16, "max_length": 256, "pattern": "^[A-Za-z0-9_-]+$" },
+        { "section": "cats", "key": "Enabled", "type": "boolean", "required": true, "secret": false, "read_only": false },
+        { "section": "cats", "key": "Mode", "type": "enum", "required": true, "secret": false, "read_only": false, "enum": ["safe", "active", "audit"] },
+        { "section": "cats", "key": "Retry_Limit", "type": "integer", "required": true, "secret": false, "read_only": false, "min": 0, "max": 10 }
       ],
       "rollback_on_failure": false,
       "require_separate_approval": true,

@@ -73,6 +73,15 @@ func TestTranslate_ExactTraceExample(t *testing.T) {
 	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/tcpdump", []string{"-i", "any", "port", "999", "and", "host", "192.168.10.20"})
 }
 
+func TestTranslate_ShippedPingUsesBoundedFixedArguments(t *testing.T) {
+	cfg := shippedConfig(t)
+	req := &contract.ExecutionRequest{Command: "ping", Arguments: map[string]string{"host": "192.168.10.20"}}
+	if err := validation.New(cfg).Validate(req); err != nil {
+		t.Fatal(err)
+	}
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "3", "-W", "2", "--", "192.168.10.20"})
+}
+
 func TestTranslate_MappedLogAliasNeverUsesCallerPath(t *testing.T) {
 	cfg := shippedConfig(t)
 	req := &contract.ExecutionRequest{Command: "log", Arguments: map[string]string{"source": "service_A"}}

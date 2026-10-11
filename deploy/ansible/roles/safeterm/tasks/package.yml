@@ -132,13 +132,37 @@
       {{ false if safeterm_bootstrap_ssh_public_key_file | length == 0
          else (safeterm_controller_bootstrap_key.stat.isreg | default(false)) }}
 
-- name: Require a public key for a fresh installation
+- name: Inspect bootstrap password hash on the controller
+  ansible.builtin.stat:
+    path: "{{ safeterm_bootstrap_ssh_password_hash_file }}"
+  delegate_to: localhost
+  become: false
+  register: safeterm_controller_password_hash
+  when: safeterm_bootstrap_ssh_password_hash_file | length > 0
+
+- name: Record bootstrap password-hash availability
+  ansible.builtin.set_fact:
+    safeterm_bootstrap_password_available: >-
+      {{ false if safeterm_bootstrap_ssh_password_hash_file | length == 0
+         else (safeterm_controller_password_hash.stat.isreg | default(false)) }}
+
+- name: Require authentication credentials for a fresh installation
   ansible.builtin.assert:
     that:
-      - safeterm_bootstrap_ssh_public_key_file | length > 0
-      - safeterm_bootstrap_key_available | bool
-    fail_msg: A fresh installation requires safeterm_bootstrap_ssh_public_key_file on the controller.
+      - (safeterm_bootstrap_password_available | bool) or (safeterm_bootstrap_key_available | bool)
+    fail_msg: A fresh installation requires a password hash file or optional SSH public key.
   when: not safeterm_existing_identity_map.stat.exists
+
+- name: Transfer bootstrap password hash
+  ansible.builtin.copy:
+    src: "{{ safeterm_bootstrap_ssh_password_hash_file }}"
+    dest: "{{ safeterm_stage_dir }}/bootstrap.hash"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  diff: false
+  when: safeterm_bootstrap_password_available | bool
 
 - name: Transfer bootstrap public key
   ansible.builtin.copy:
@@ -165,6 +189,7 @@
       {{ ['./install.sh']
          + (['--local-signing', '--local-key-dir', safeterm_local_key_dir] if safeterm_signing_mode == 'local' else ['--signed-catalog', safeterm_stage_dir + '/' + safeterm_signed_catalog_root_name])
          + ['--ssh-user', safeterm_bootstrap_ssh_user]
+         + (['--ssh-password-hash-file', safeterm_stage_dir + '/bootstrap.hash'] if safeterm_bootstrap_password_available | bool else [])
          + (['--ssh-public-key', safeterm_stage_dir + '/bootstrap.pub'] if safeterm_bootstrap_key_available | bool else [])
          + (['--single-operator'] if safeterm_single_operator | bool else []) }}
 
@@ -181,6 +206,15 @@
     chdir: "{{ safeterm_stage_dir }}/{{ safeterm_package_root_name }}"
   register: safeterm_package_install
   changed_when: true
+  when: safeterm_install_required | bool
+
+- name: Create protected deployment marker directory
+  ansible.builtin.file:
+    path: /var/lib/safeterm-installer
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
   when: safeterm_install_required | bool
 
 - name: Persist successful deployment fingerprint

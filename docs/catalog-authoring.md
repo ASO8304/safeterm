@@ -47,6 +47,20 @@ The log-reader service belongs to `adm`, has no Linux capabilities, and can
 execute only the signed `tail` operation. A narrower deployment may replace
 `adm` with a dedicated site group in the unit and file rotation policy.
 
+## Add bounded network diagnostics
+
+The shipped `ping` operation is intentionally fixed to three IPv4 echo
+requests with a two-second per-packet timeout. Only the validated host value
+is accepted, and it is passed as one argument to `/usr/bin/ping`:
+
+```text
+run ping host=192.168.45.140
+```
+
+Grant `ping` through the `netops` policy. Keep the executable in the
+`network-observer` profile so its `CAP_NET_RAW` boundary is separate from
+diagnostic and service-manager processes.
+
 ## Add typed systemd control
 
 Create one argument-free operation for every approved unit/action pair:

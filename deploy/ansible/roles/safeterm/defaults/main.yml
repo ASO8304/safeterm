@@ -35,6 +35,7 @@ safeterm_signed_catalog_root_name: signed-catalog
 safeterm_local_key_dir: /root/.config/safeterm
 safeterm_bootstrap_ssh_user: alice
 safeterm_bootstrap_ssh_public_key_file: ""
+safeterm_bootstrap_ssh_password_hash_file: ""
 safeterm_single_operator: false
 
 safeterm_ssh_users: []

@@ -4,6 +4,9 @@
       "user_id": "alice",
       // Assign only catalog roles needed by this identity. service-operator is intentionally not a default.
       "roles": ["viewer", "netops", "log-viewer", "service-viewer"],
+      // Generate with safeterm-password-hash; omit password_hash for key-only login.
+      "password_hash": "$2a$12$REPLACE_WITH_GENERATED_BCRYPT_HASH",
+      // Optional: omit this field for password-only login.
       "authorized_keys": ["ssh-ed25519 BASE64_KEY comment"]
     }
   ]

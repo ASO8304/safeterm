@@ -27,7 +27,7 @@ Available capabilities:
 - Opaque session routing and semantic termination with owner checks,
   idempotent states, dedicated process groups, graceful interrupt/terminate
   escalation, forced-kill fallback, and sanitized lifecycle audit events
-- A hardened SSH Broker with public-key identity, server-owned catalog roles,
+- A hardened SSH Broker with hashed-password identity and optional public keys, server-owned catalog roles,
   an authorization-filtered operation menu, a fixed custom-shell grammar, PTY
   terminal behavior, streamed output, and Ctrl+C semantic termination
 - Three least-privilege Config Manager profiles with authenticated Unix IPC,
@@ -157,8 +157,9 @@ cleanup and signal escalation; M11 does not expose a PTY or general shell. See
 
 M12 provides a real SSH server whose session channel is the SafeTerm restricted
 terminal. It does not invoke a login shell and rejects raw SSH exec, subsystem,
-forwarding, environment, and non-session requests. Public keys map a username
-to catalog roles in a root-managed identity file. Connect through any SSH PTY
+forwarding, environment, and non-session requests. A username and password authenticate against a salted bcrypt hash in a
+root-managed identity file; public keys are optional per user. Both methods use
+the same server-owned catalog roles. See [SSH authentication](docs/ssh-authentication.md). Connect through any SSH PTY
 client, including OpenSSH or an Xterm-based frontend:
 
 ```bash

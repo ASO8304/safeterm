@@ -67,7 +67,8 @@ chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key
 install -o root -g safeterm-broker -m 0640 deploy/ssh/users.example.json /etc/safeterm/ssh/users.json
 ```
 
-Replace the example public key before startup. The identity file maps each key
+Replace the example password hash before startup, or configure an optional public key.
+See [SSH authentication](../../docs/ssh-authentication.md). The identity file maps each credential
 and matching SSH username to roles that exist in the signed catalog. A key may
 belong to only one user. Connect with `ssh -t -p 2222 alice@HOST`; the PTY runs
 the SafeTerm command menu and never starts an operating-system shell.

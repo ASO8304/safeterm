@@ -15,7 +15,7 @@ separation between profiles.
 
 ```text
 Untrusted SSH client
-  -> SSH public-key authentication / restricted terminal
+  -> SSH bcrypt-password or optional public-key authentication / restricted terminal
   -> Broker UID
      -> peer-scoped Gateway socket -> operation-specific Runner UID
      -> profile-specific Config Manager socket -> exact managed directory
@@ -63,3 +63,18 @@ prove that root did not replace or truncate the complete audit store; external
 checkpoints remain a deployment responsibility. Availability still depends on
 systemd/cgroup limits and host capacity. Independent penetration testing and
 production monitoring remain required before high-assurance deployment.
+
+## SSH password authentication
+
+The root-managed SSH identity map stores salted bcrypt hashes, never plaintext
+passwords. New hashes use cost 12; accepted work factors are bounded to 10–14.
+Password input is limited to 72 bytes and is never included in errors, terminal
+output, operation requests, or audit events. The identity map must not be
+world-accessible (installed mode 0640, root:safeterm-broker). The same configured
+roles apply to password and key authentication; neither method reads OS passwords.
+An unknown username performs a dummy bcrypt comparison. Expensive password
+comparisons are capped at four concurrent requests, SSH allows three attempts
+per connection, and the existing connection ceiling and handshake deadline apply.
+These bounds limit CPU work; they are not a per-source rate limiter or an account
+lockout policy. Deployments exposed to untrusted networks should apply network
+access controls. Public keys are offered only when a user has configured them.

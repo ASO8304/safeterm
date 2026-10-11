@@ -26,7 +26,7 @@ cp /path/to/safeterm-offline-amd64.tar.gz files/
 ```
 
 At minimum, set the target address and SSH account in `inventory.yml`, and set
-`safeterm_package_archive` plus the bootstrap public-key path in
+`safeterm_package_archive` plus the bootstrap password-hash path (or an optional public-key path) in
 `group_vars/all.yml`. The SSH account must be able to use `sudo`/Ansible become.
 
 Run the complete installation:
@@ -114,3 +114,21 @@ Rollback restores the exact pre-install owned paths, account databases, and
 service enable/active state captured by the package installer. Packages added
 by Ansible as host prerequisites remain installed; removing shared OS packages
 automatically could damage other applications on the server.
+
+## SSH username/password authentication
+
+Generate a protected bcrypt hash file using the new package utility:
+
+```sh
+./payload/bin/safeterm-password-hash -output /secure/alice.hash
+```
+
+Set `safeterm_bootstrap_ssh_password_hash_file: /secure/alice.hash` and leave
+`safeterm_bootstrap_ssh_public_key_file: ""` for password-only fresh installation.
+To update an existing identity, define the complete managed `safeterm_ssh_users`
+list with `user_id`, `roles`, and `password_hash`. The hash may be read with a
+controller-side file lookup. `authorized_keys` is optional; omit it to disable
+key login for that user. Password-bearing template tasks suppress logs and diffs.
+Existing identity files are preserved during package upgrades, so bootstrap
+options alone do not change an existing user's authentication methods.
+See [SSH authentication](../../docs/ssh-authentication.md).

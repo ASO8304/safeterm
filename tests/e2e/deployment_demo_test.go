@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/crypto/ssh"
 
 	"safeterm/internal/agent"
@@ -35,6 +36,11 @@ import (
 // This test crosses the real SSH, authenticated Unix IPC, Gateway, Runner,
 // integrity, execution, and Audit boundaries and executes /usr/bin/uname.
 func TestDeployedDataPathFromSSHToVerifiedExecutionAndAudit(t *testing.T) {
+	t.Run("public_key", func(t *testing.T) { deployedDataPath(t, false) })
+	t.Run("password_only", func(t *testing.T) { deployedDataPath(t, true) })
+}
+
+func deployedDataPath(t *testing.T, passwordOnly bool) {
 	cfg := demoConfig(t)
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -141,10 +147,18 @@ func TestDeployedDataPathFromSSHToVerifiedExecutionAndAudit(t *testing.T) {
 	}
 	hostSigner := newSigner(t)
 	clientSigner := newSigner(t)
-	authenticator, err := broker.NewSSHAuthenticator(broker.SSHIdentityConfig{Users: []broker.SSHUser{{
-		UserID: "alice", Roles: []string{"viewer"},
-		AuthorizedKeys: []string{strings.TrimSpace(string(ssh.MarshalAuthorizedKey(clientSigner.PublicKey())))},
-	}}}, catalog.KnownRoles())
+	identity := broker.SSHUser{UserID: "alice", Roles: []string{"viewer"}, AuthorizedKeys: []string{strings.TrimSpace(string(ssh.MarshalAuthorizedKey(clientSigner.PublicKey())))}}
+	authMethod := ssh.PublicKeys(clientSigner)
+	if passwordOnly {
+		hash, err := bcrypt.GenerateFromPassword([]byte("e2e-only-password"), broker.PasswordHashCost)
+		if err != nil {
+			t.Fatal(err)
+		}
+		identity.AuthorizedKeys = nil
+		identity.PasswordHash = string(hash)
+		authMethod = ssh.Password("e2e-only-password")
+	}
+	authenticator, err := broker.NewSSHAuthenticator(broker.SSHIdentityConfig{Users: []broker.SSHUser{identity}}, catalog.KnownRoles())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,8 +182,19 @@ func TestDeployedDataPathFromSSHToVerifiedExecutionAndAudit(t *testing.T) {
 	})
 
 	clientConfig := &ssh.ClientConfig{
-		User: "alice", Auth: []ssh.AuthMethod{ssh.PublicKeys(clientSigner)},
+		User: "alice", Auth: []ssh.AuthMethod{authMethod},
 		HostKeyCallback: ssh.FixedHostKey(hostSigner.PublicKey()), Timeout: 5 * time.Second,
+	}
+	if passwordOnly {
+		for _, rejected := range []ssh.AuthMethod{ssh.Password("incorrect-password"), ssh.PublicKeys(clientSigner)} {
+			bad := *clientConfig
+			bad.Auth = []ssh.AuthMethod{rejected}
+			client, err := ssh.Dial("tcp", listener.Addr().String(), &bad)
+			if err == nil {
+				client.Close()
+				t.Fatal("password-only server accepted invalid credentials or an unconfigured key")
+			}
+		}
 	}
 	output := runRestrictedShell(t, listener.Addr().String(), clientConfig, "whoami\rlist\rrun system_info\rexit\r")
 	for _, expected := range []string{"Authenticated as alice", "roles: viewer", "system_info", "result: success", "Linux"} {

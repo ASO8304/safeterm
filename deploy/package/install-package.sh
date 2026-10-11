@@ -10,7 +10,8 @@ Usage:
 
 Install options:
   --ssh-user USER             SafeTerm SSH identity for a fresh install (default: alice)
-  --ssh-public-key FILE       authorized public key; optional when upgrading an existing install
+  --ssh-password-hash-file FILE  bcrypt hash for a fresh SSH identity
+  --ssh-public-key FILE       optional authorized public key
   --single-operator           let proposing roles apply their own config changes
   --dry-run                   verify and print the base installation plan without host mutation
   --no-start                  install but do not enable or start services
@@ -30,6 +31,7 @@ signed_catalog=
 local_signing=false
 ssh_user=alice
 ssh_public_key=
+ssh_password_hash_file=
 single_operator=false
 dry_run=false
 start_services=true
@@ -54,6 +56,7 @@ while [ "$#" -gt 0 ]; do
     --signed-catalog) [ "$#" -ge 2 ] || usage; signed_catalog=$2; shift 2 ;;
     --local-signing) local_signing=true; shift ;;
     --ssh-user) [ "$#" -ge 2 ] || usage; ssh_user=$2; shift 2 ;;
+    --ssh-password-hash-file) [ "$#" -ge 2 ] || usage; ssh_password_hash_file=$2; shift 2 ;;
     --ssh-public-key) [ "$#" -ge 2 ] || usage; ssh_public_key=$2; shift 2 ;;
     --single-operator) single_operator=true; shift ;;
     --dry-run) dry_run=true; shift ;;
@@ -125,6 +128,7 @@ create_install_transaction() {
 /usr/local/bin/safeterm-runner
 /usr/local/bin/safeterm-ssh-broker
 /usr/local/bin/safeterm-preflight
+/usr/local/bin/safeterm-password-hash
 /usr/local/sbin/safeterm-install-rollback
 /etc/safeterm
 /etc/safeterm-managed
@@ -213,13 +217,25 @@ fi
 if [ -f /etc/safeterm/ssh/users.json ]; then
   install -m 0600 /etc/safeterm/ssh/users.json "$work/config/ssh/users.json"
 else
-  [ -n "$ssh_public_key" ] && [ -f "$ssh_public_key" ] || { echo "--ssh-public-key is required for a fresh install" >&2; exit 1; }
-  ssh-keygen -lf "$ssh_public_key" >/dev/null
-  key_type=$(awk 'NR==1 {print $1}' "$ssh_public_key")
-  key_data=$(awk 'NR==1 {print $2}' "$ssh_public_key")
-  case "$key_type" in ssh-ed25519|ecdsa-sha2-*|ssh-rsa) ;; *) echo "unsupported SSH public key" >&2; exit 1 ;; esac
+  password_hash=
+  if [ -n "$ssh_password_hash_file" ]; then
+    [ -f "$ssh_password_hash_file" ] || { echo "password hash file is missing" >&2; exit 1; }
+    password_hash=$(cat "$ssh_password_hash_file")
+    [ "${#password_hash}" -eq 60 ] || { echo "invalid bcrypt password hash" >&2; exit 1; }
+    printf '%s\n' "$password_hash" | LC_ALL=C grep -Eq '^\$2[ab]\$(10|11|12|13|14)\$[./A-Za-z0-9]{53}$' || { echo "invalid bcrypt password hash" >&2; exit 1; }
+  fi
+  keys='[]'
+  if [ -n "$ssh_public_key" ]; then
+    [ -f "$ssh_public_key" ] || { echo "SSH public key file is missing" >&2; exit 1; }
+    ssh-keygen -lf "$ssh_public_key" >/dev/null
+    key_type=$(awk 'NR==1 {print $1}' "$ssh_public_key")
+    key_data=$(awk 'NR==1 {print $2}' "$ssh_public_key")
+    case "$key_type" in ssh-ed25519|ecdsa-sha2-*|ssh-rsa) ;; *) echo "unsupported SSH public key" >&2; exit 1 ;; esac
+    keys="[\"$key_type $key_data\"]"
+  fi
+  [ -n "$password_hash" ] || [ "$keys" != '[]' ] || { echo "--ssh-password-hash-file or --ssh-public-key is required for a fresh install" >&2; exit 1; }
   cat >"$work/config/ssh/users.json" <<EOF
-{"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"authorized_keys":["$key_type $key_data"]}]}
+{"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"password_hash":"$password_hash","authorized_keys":$keys}]}
 EOF
   chmod 0600 "$work/config/ssh/users.json"
 fi
@@ -242,7 +258,7 @@ if [ "$single_operator" = true ]; then
 fi
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
-for name in audit config-manager console gateway runner ssh-broker preflight; do
+for name in audit config-manager console gateway runner ssh-broker preflight password-hash; do
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"

@@ -12,6 +12,12 @@
     "allowed_profiles": ["network-observer"]
   },
   {
+    "id": "ping",
+    "path": "/usr/bin/ping",
+    "sha256": "2369424506d87f336f41e6df9ebb07cee14e93dfff9b526f04c55bd1aebc937f",
+    "allowed_profiles": ["network-observer"]
+  },
+  {
     "id": "systemctl",
     "path": "/usr/bin/systemctl",
     "sha256": "e0d3d0e9444da1b2b58c792c3f5028b69f049b77d5ca17b3ec0d09f89117225b",
@@ -26,7 +32,7 @@
   {
     "id": "tail",
     "path": "/usr/bin/tail",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "sha256": "03806be6481b4232405b9a16cb6d2a615977f12b2fd49fc6eabcefc6c6abbbdc",
     "allowed_profiles": ["log-reader"]
   }
 ]

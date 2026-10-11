@@ -70,23 +70,25 @@ catalogs can be generated on the same isolated host. It is suitable for demos
 and single-host evaluation. Production should use the two-stage offline signing
 workflow below.
 
-Create or provide an SSH client public key, then run a dry run and installation:
+Generate a password hash without echoing the password, then run a dry run and installation:
 
 ```bash
 tar -xzf safeterm-offline-amd64.tar.gz
 cd safeterm-offline-amd64
 
+./payload/bin/safeterm-password-hash -output /secure/alice.hash
+
 sudo ./install.sh \
   --local-signing \
   --ssh-user alice \
-  --ssh-public-key /home/keyhan/safeterm-demo-client/alice_ed25519.pub \
+  --ssh-password-hash-file /secure/alice.hash \
   --single-operator \
   --dry-run
 
 sudo ./install.sh \
   --local-signing \
   --ssh-user alice \
-  --ssh-public-key /home/keyhan/safeterm-demo-client/alice_ed25519.pub \
+  --ssh-password-hash-file /secure/alice.hash \
   --single-operator
 ```
 
@@ -137,14 +139,14 @@ catalog directory and install it on the target:
 sudo ./install.sh \
   --signed-catalog /media/transfer/safeterm-target-catalog \
   --ssh-user alice \
-  --ssh-public-key /home/keyhan/safeterm-demo-client/alice_ed25519.pub \
+  --ssh-password-hash-file /secure/alice.hash \
   --single-operator \
   --dry-run
 
 sudo ./install.sh \
   --signed-catalog /media/transfer/safeterm-target-catalog \
   --ssh-user alice \
-  --ssh-public-key /home/keyhan/safeterm-demo-client/alice_ed25519.pub \
+  --ssh-password-hash-file /secure/alice.hash \
   --single-operator
 ```
 
@@ -212,3 +214,5 @@ SafeTerm data changes. Returning to the exact pre-install state intentionally
 discards changes made inside the managed installation paths after the snapshot.
 System journal entries produced by installation remain part of the host's audit
 history and are not erased.
+
+Public-key authentication is optional. See [SSH authentication](ssh-authentication.md) for enrollment and upgrade behavior.

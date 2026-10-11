@@ -48,7 +48,7 @@ catalog-sign -config /tmp/safeterm-catalog \
 ```
 
 Add the root-managed SSH host private key at
-`ssh/ssh_host_ed25519_key`, the public-key identity map at `ssh/users.json`,
+`ssh/ssh_host_ed25519_key`, the password-hash and optional public-key identity map at `ssh/users.json`,
 the local-login identity map at `console/users.json`, and the resource registry
 at `config-manager/resources.json`. A production console map can start from
 `deploy/console/users.example.json`; keep only the roles that operator needs.
@@ -141,3 +141,5 @@ catalog or signature in place. If a service fails, inspect its journal and fix
 the owning file, account, group, capability, or catalog boundary; do not add the
 service to broader groups or grant a general shell. The Audit store remains at
 `/var/lib/safeterm/audit.jsonl` and must not be copied into public bug reports.
+
+SSH password enrollment and optional keys are documented in [SSH authentication](ssh-authentication.md).

@@ -5,8 +5,9 @@
       - safeterm_ssh_users | map(attribute='user_id') | list | unique | length == safeterm_ssh_users | length
       - item.user_id is match('^[A-Za-z0-9_.@-]+$')
       - item.roles | length > 0
-      - item.authorized_keys | length > 0
-    fail_msg: Managed SSH users require unique safe IDs, roles, and authorized keys.
+      - (item.password_hash | default('') | length > 0) or (item.authorized_keys | default([]) | length > 0)
+    fail_msg: Managed SSH users require unique safe IDs, roles, and a password hash or authorized keys.
+  no_log: true
   loop: "{{ safeterm_ssh_users }}"
   loop_control:
     label: "{{ item.user_id | default('invalid') }}"
@@ -20,6 +21,8 @@
     group: safeterm-broker
     mode: '0640'
     validate: /usr/bin/python3 -m json.tool %s
+  no_log: true
+  diff: false
   notify: Restart SafeTerm SSH broker
   when: safeterm_ssh_users | length > 0
 
