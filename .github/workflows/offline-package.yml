@@ -1,0 +1,73 @@
+name: SafeTerm Offline Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify SafeTerm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Run full verification
+        run: make verify
+
+      - name: Run deployment and SSH end-to-end tests
+        run: make e2e
+
+  package:
+    name: Build offline package (${{ matrix.arch }})
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+          cache: true
+
+      - name: Build offline package
+        run: |
+          make offline-package \
+            OUTPUT="$RUNNER_TEMP/safeterm-offline-${{ matrix.arch }}" \
+            ARCH="${{ matrix.arch }}"
+
+      - name: Archive package and create checksum
+        run: |
+          cd "$RUNNER_TEMP"
+          tar -czf "safeterm-offline-${{ matrix.arch }}.tar.gz" \
+            "safeterm-offline-${{ matrix.arch }}"
+          sha256sum "safeterm-offline-${{ matrix.arch }}.tar.gz" \
+            > "safeterm-offline-${{ matrix.arch }}.tar.gz.sha256"
+
+      - name: Upload offline package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: safeterm-offline-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/safeterm-offline-${{ matrix.arch }}.tar.gz
+            ${{ runner.temp }}/safeterm-offline-${{ matrix.arch }}.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
