@@ -56,8 +56,8 @@ func run(stdin bool, output string) error {
 		}
 	}
 	defer clear(password)
-	if len(password) == 0 || len(password) > 72 {
-		return fmt.Errorf("password-hash: password must contain 1 through 72 bytes")
+	if err := broker.ValidatePasswordComplexity(password); err != nil {
+		return fmt.Errorf("password-hash: %w", err)
 	}
 	hash, err := bcrypt.GenerateFromPassword(password, broker.PasswordHashCost)
 	if err != nil {

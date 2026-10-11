@@ -27,7 +27,7 @@ func TestStdinCreatesProtectedSaltedHashAndRefusesOverwrite(t *testing.T) {
 		os.Stdin = input
 	}
 	path := filepath.Join(t.TempDir(), "password.hash")
-	feed(" test password \n")
+	feed("StrongPass9\n")
 	if err := run(true, path); err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ func TestStdinCreatesProtectedSaltedHashAndRefusesOverwrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(strings.TrimSpace(string(data))), []byte(" test password ")); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(strings.TrimSpace(string(data))), []byte("StrongPass9")); err != nil {
 		t.Fatal("hash does not preserve password spaces")
 	}
 	info, err := os.Stat(path)
@@ -45,11 +45,11 @@ func TestStdinCreatesProtectedSaltedHashAndRefusesOverwrite(t *testing.T) {
 	if info.Mode().Perm()&0077 != 0 {
 		t.Fatal("hash file is accessible by other users")
 	}
-	feed("replacement\n")
+	feed("Replacement9\n")
 	if err := run(true, path); err == nil {
 		t.Fatal("existing hash overwritten")
 	}
-	for _, value := range []string{"\n", strings.Repeat("x", 73) + "\n"} {
+	for _, value := range []string{"weakpass\n", "\n", strings.Repeat("x", 73) + "\n"} {
 		feed(value)
 		if err := run(true, filepath.Join(t.TempDir(), "invalid.hash")); err == nil {
 			t.Fatal("invalid password accepted")

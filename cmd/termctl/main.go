@@ -11,6 +11,9 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/term"
+
 	"safeterm/internal/broker"
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
@@ -72,6 +75,8 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl user list")
 	fmt.Fprintln(out, "  termctl user add ssh|console [--id ID] [--os-user OS_USER] --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
 	fmt.Fprintln(out, "  termctl user auth ssh|console [--id ID] [--os-user OS_USER] [--password-hash-file FILE] [--authorized-key-file FILE]")
+	fmt.Fprintln(out, "  termctl user password ssh --id ID")
+	fmt.Fprintln(out, "  termctl user password console --os-user OS_USER")
 	fmt.Fprintln(out, "  termctl user del ssh|console --id ID|--os-user OS_USER")
 	fmt.Fprintln(out, "  termctl shell")
 	fmt.Fprintln(out, "  termctl completion bash|zsh")
@@ -178,6 +183,16 @@ func configCommand(dir string, args []string, out io.Writer) error {
 func userCommand(dir string, args []string, out io.Writer) error {
 	if len(args) == 0 || args[0] == "list" {
 		return listUsers(dir, out)
+	}
+	if args[0] == "password" {
+		if len(args) < 2 || (args[1] != "ssh" && args[1] != "console") {
+			return fmt.Errorf("usage: termctl user password ssh|console --id ID|--os-user OS_USER")
+		}
+		o, err := parseUserOptions(args[2:])
+		if err != nil {
+			return err
+		}
+		return setUserPassword(dir, args[1], o, out)
 	}
 	if args[0] != "add" && args[0] != "del" && args[0] != "auth" {
 		return fmt.Errorf("usage: termctl user list | add|del|auth ssh|console [options]")
@@ -472,6 +487,99 @@ func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writ
 	}
 	fmt.Fprintf(out, "console user %s deleted\n", o.osUser)
 	return nil
+}
+
+func setUserPassword(dir, kind string, o userOptions, out io.Writer) error {
+	if kind == "ssh" && o.id == "" {
+		return fmt.Errorf("--id is required")
+	}
+	if kind == "console" && o.osUser == "" {
+		return fmt.Errorf("--os-user is required")
+	}
+	password, err := readInteractivePassword()
+	if err != nil {
+		return err
+	}
+	defer clear(password)
+	if err := broker.ValidatePasswordComplexity(password); err != nil {
+		return err
+	}
+	if kind == "console" {
+		cmd := exec.Command("/usr/sbin/chpasswd", "-c", "SHA512")
+		cmd.Stdin = strings.NewReader(o.osUser + ":" + string(password) + "\n")
+		cmd.Stdout, cmd.Stderr = out, out
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("set console password: %w", err)
+		}
+		fmt.Fprintf(out, "console password updated for %s\n", o.osUser)
+		return nil
+	}
+	path := filepath.Join(dir, "ssh", "users.json")
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var data broker.SSHIdentityConfig
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return err
+	}
+	found := false
+	hash, err := bcrypt.GenerateFromPassword(password, broker.PasswordHashCost)
+	if err != nil {
+		return err
+	}
+	for i := range data.Users {
+		if data.Users[i].UserID == o.id {
+			data.Users[i].PasswordHash = string(hash)
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("SSH user %q does not exist", o.id)
+	}
+	cfg, err := config.LoadConfig(dir)
+	if err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, role := range cfg.Roles {
+		known[role.Name] = true
+	}
+	if _, err := broker.NewSSHAuthenticator(data, known); err != nil {
+		return err
+	}
+	if err := writeJSONAtomic(path, data, 0640); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "SSH password updated for %s\n", o.id)
+	return nil
+}
+
+func readInteractivePassword() ([]byte, error) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		return nil, fmt.Errorf("an interactive terminal is required to set a password")
+	}
+	fmt.Fprint(os.Stderr, "New password: ")
+	first, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Fprint(os.Stderr, "Confirm password: ")
+	second, err := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		clear(first)
+		return nil, err
+	}
+	if string(first) != string(second) {
+		clear(first)
+		clear(second)
+		return nil, fmt.Errorf("passwords do not match")
+	}
+	clear(second)
+	return first, nil
 }
 
 func splitRoles(value string) []string {

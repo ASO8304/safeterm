@@ -26,6 +26,7 @@ termctl user add ssh --id alice --roles viewer,netops \
   --authorized-key-file /secure/alice.pub
 termctl user auth ssh --id alice --password-hash-file /secure/alice.hash
 termctl user del ssh --id alice
+termctl user password ssh --id alice
 ```
 
 Local console mappings use the operating-system account and a SafeTerm user
@@ -37,7 +38,14 @@ termctl user add console --os-user safeterm --id console \
   --roles viewer,config-viewer
 termctl user auth console --os-user safeterm --roles viewer,netops
 termctl user del console --os-user safeterm
+termctl user password console --os-user safeterm
 ```
+
+The password command prompts twice without echo. It enforces at least eight
+ASCII characters, including an uppercase letter, a lowercase letter, and a
+number. The SSH password is stored as bcrypt; the console password is passed
+to the Linux account password database through `chpasswd` and is never stored
+in the SafeTerm identity map.
 
 The command validates roles, password hashes, keys, duplicate identities, and
 the rule that at least one valid identity remains in each map. It writes the
