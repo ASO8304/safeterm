@@ -122,7 +122,7 @@ never remove the bounds.
 
 The Broker accepts only one session channel per connection and rejects SSH
 exec, subsystems, forwarding, agent forwarding, and environment changes. Its
-fixed shell grammar is `help`, `list`, `describe`, `run`, `whoami`, `clear`,
+fixed shell grammar is `help`, `list`, `describe`, `execute`, `whoami`, `clear`,
 and `exit`, plus the structured `config` subcommands. Long-running output uses M11 streaming; Ctrl+C sends the semantic
 termination request to Gateway. Tab completion is derived from authorized
 catalog/config views, and history remains in memory only for the session.

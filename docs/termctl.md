@@ -60,5 +60,5 @@ termctl completion bash > ~/.local/share/bash-completion/completions/termctl
 termctl completion zsh > ~/.zfunc/_termctl
 ```
 
-`termctl shell` opens the existing restricted SafeTerm terminal, where `run`
+`termctl shell` opens the existing restricted SafeTerm terminal, where `execute`
 and `config` workflows use the authenticated local-console identity.

@@ -42,14 +42,14 @@ func TestEditorSupportsCursorDeleteHistoryAndPrompt(t *testing.T) {
 func TestEditorCompletesAuthorizedOperationsAndParameters(t *testing.T) {
 	catalog, _ := NewCatalog(brokerTestConfig())
 	shell, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"netops"}}, bytes.NewReader(nil), &bytes.Buffer{})
-	if got := shell.completionCandidates(context.Background(), "run tr", "tr"); len(got) != 1 || got[0] != "trace" {
+	if got := shell.completionCandidates(context.Background(), "execute tr", "tr"); len(got) != 1 || got[0] != "trace" {
 		t.Fatalf("operations=%v", got)
 	}
-	if got := shell.completionCandidates(context.Background(), "run trace po", "po"); len(got) != 1 || got[0] != "port=" {
+	if got := shell.completionCandidates(context.Background(), "execute trace po", "po"); len(got) != 1 || got[0] != "port=" {
 		t.Fatalf("parameters=%v", got)
 	}
 	viewer, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, bytes.NewReader(nil), &bytes.Buffer{})
-	if got := viewer.completionCandidates(context.Background(), "run tr", "tr"); len(got) != 0 {
+	if got := viewer.completionCandidates(context.Background(), "execute tr", "tr"); len(got) != 0 {
 		t.Fatalf("unauthorized completion=%v", got)
 	}
 }
@@ -71,7 +71,7 @@ func TestPositionalMappedArgumentAndHelpExample(t *testing.T) {
 	if err != nil || arguments["source"] != "service_A" {
 		t.Fatalf("arguments=%v err=%v", arguments, err)
 	}
-	if got := operationExample(operation); got != "run log source=service_A" {
+	if got := operationExample(operation); got != "execute log source=service_A" {
 		t.Fatalf("example=%q", got)
 	}
 }

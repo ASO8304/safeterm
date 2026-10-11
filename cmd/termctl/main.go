@@ -17,6 +17,7 @@ import (
 	"safeterm/internal/broker"
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/deployment"
 )
 
 const defaultConfigDir = "/etc/safeterm"
@@ -52,6 +53,8 @@ func run(args []string, out, errOut io.Writer) error {
 		return writeCompletion(out, args[1:])
 	case "catalog":
 		return catalogCommand(configDir, args[1:], out)
+	case "role", "roles":
+		return roleCommand(configDir, args[1:], out)
 	case "service":
 		return serviceCommand(args[1:], out, errOut)
 	case "config":
@@ -69,6 +72,8 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "SafeTerm control utility")
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  termctl catalog list|describe OPERATION")
+	fmt.Fprintln(out, "  termctl catalog prepare --source DIR --output DIR")
+	fmt.Fprintln(out, "  termctl role list|describe ROLE")
 	fmt.Fprintln(out, "  termctl service status [NAME|all]")
 	fmt.Fprintln(out, "  termctl service restart|start|stop NAME")
 	fmt.Fprintln(out, "  termctl config list|describe RESOURCE")
@@ -84,6 +89,31 @@ func writeHelp(out io.Writer) {
 }
 
 func catalogCommand(dir string, args []string, out io.Writer) error {
+	if len(args) > 0 && (args[0] == "prepare" || args[0] == "regenerate-hashes") {
+		source, output := dir, ""
+		for i := 1; i < len(args); i++ {
+			if i+1 >= len(args) {
+				return fmt.Errorf("catalog %s option %q requires a value", args[0], args[i])
+			}
+			switch args[i] {
+			case "--source":
+				source = args[i+1]
+			case "--output":
+				output = args[i+1]
+			default:
+				return fmt.Errorf("unknown catalog option %q", args[i])
+			}
+			i++
+		}
+		if output == "" {
+			return fmt.Errorf("usage: termctl catalog prepare --source DIR --output DIR")
+		}
+		if err := deployment.PrepareConfig(source, output); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "prepared unsigned catalog with refreshed executable hashes: %s\n", output)
+		return nil
+	}
 	if len(args) == 0 || args[0] == "list" {
 		cfg, err := config.LoadConfig(dir)
 		if err != nil {
@@ -115,6 +145,37 @@ func catalogCommand(dir string, args []string, out io.Writer) error {
 		return nil
 	}
 	return fmt.Errorf("operation %q was not found", args[1])
+}
+
+func roleCommand(dir string, args []string, out io.Writer) error {
+	cfg, err := config.LoadConfig(dir)
+	if err != nil {
+		return err
+	}
+	policies := map[string][]string{}
+	for _, policy := range cfg.Policies {
+		policies[policy.Role] = append(policies[policy.Role], policy.Operations...)
+	}
+	if len(args) == 0 || args[0] == "list" {
+		for _, role := range cfg.Roles {
+			fmt.Fprintf(out, "%-20s operations=%d\n", role.Name, len(policies[role.Name]))
+		}
+		return nil
+	}
+	if args[0] != "describe" || len(args) != 2 {
+		return fmt.Errorf("usage: termctl role list|describe ROLE")
+	}
+	for _, role := range cfg.Roles {
+		if role.Name == args[1] {
+			sort.Strings(policies[role.Name])
+			fmt.Fprintf(out, "%s: %s\n", role.Name, role.Description)
+			for _, operation := range policies[role.Name] {
+				fmt.Fprintf(out, "  - %s\n", operation)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("role %q was not found", args[1])
 }
 
 func serviceCommand(args []string, out, errOut io.Writer) error {

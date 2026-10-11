@@ -25,8 +25,8 @@ The shipped `log` operation maps a public alias to a catalog-owned path:
 Users run either form:
 
 ```text
-run log service_A
-run log source=service_A
+execute log service_A
+execute log source=service_A
 ```
 
 They cannot submit a path. Validation accepts only a `value_map` key and
@@ -55,7 +55,7 @@ the `-c` alias or `count=VALUE` to override that default. Only the validated
 host value is accepted:
 
 ```text
-run ping host=192.168.45.140 -c 5
+execute ping host=192.168.45.140 -c 5
 ```
 
 Grant `ping` through the `netops` policy. Keep the executable in the

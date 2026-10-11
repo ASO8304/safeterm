@@ -169,7 +169,7 @@ ssh -t -p 2222 alice@safeterm.example
 ```
 
 Inside the terminal, use `list`, `describe NAME`, and
-`run NAME KEY=VALUE`. See [REQ-012](docs/requirements/REQ-012-ssh-broker-and-authentication.md),
+`execute NAME KEY=VALUE`. See [REQ-012](docs/requirements/REQ-012-ssh-broker-and-authentication.md),
 [ADR-015](docs/decisions/ADR-015-restricted-ssh-broker.md), and the deployment
 instructions in [deploy/systemd](deploy/systemd/README.md).
 
@@ -245,7 +245,7 @@ sudo /usr/local/sbin/safeterm-install-rollback latest
 M19 adds administrator-facing `TEMPLATE.jsonc` files, mapped parameters that
 turn public aliases into fixed catalog values, an isolated streaming Log Reader,
 and exact typed systemd controls backed by a generated no-wildcard sudoers
-policy. The terminal accepts `run log service_A`, completes mapped values, and
+policy. The terminal accepts `execute log service_A`, completes mapped values, and
 provides topic and operation help. See
 [REQ-019](docs/requirements/REQ-019-operator-catalog-and-terminal-ux.md),
 [ADR-021](docs/decisions/ADR-021-mapped-parameters-and-typed-service-control.md),

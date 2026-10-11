@@ -245,10 +245,10 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 		index++
 	}
 	if index <= 0 {
-		return matching([]string{"clear", "config", "describe", "exit", "help", "list", "run", "whoami"}, prefix)
+		return matching([]string{"clear", "config", "describe", "exit", "help", "list", "execute", "whoami"}, prefix)
 	}
 	command := fields[0]
-	if (command == "run" || command == "describe") && index == 1 {
+	if (command == "execute" || command == "describe") && index == 1 {
 		names := []string{}
 		for _, operation := range s.catalog.AuthorizedOperations(s.principal.Roles) {
 			names = append(names, operation.Name)
@@ -256,13 +256,13 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 		return matching(names, prefix)
 	}
 	if command == "help" && index == 1 {
-		values := []string{"config", "keys", "run"}
+		values := []string{"config", "keys", "execute"}
 		for _, operation := range s.catalog.AuthorizedOperations(s.principal.Roles) {
 			values = append(values, operation.Name)
 		}
 		return matching(values, prefix)
 	}
-	if command == "run" && index >= 2 && len(fields) >= 2 {
+	if command == "execute" && index >= 2 && len(fields) >= 2 {
 		operation, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
 		if !ok {
 			return nil

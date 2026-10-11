@@ -27,7 +27,7 @@ semantic `terminate` action defined by REQ-011.
 - [x] **AC-3:** The terminal lists and describes only operations authorized by
   the authenticated user's roles.
 - [x] **AC-4:** The accepted grammar is limited to `help`, `list`, `describe`,
-  `run`, `whoami`, `clear`, and session-exit commands. Operation arguments use
+  `execute`, `whoami`, `clear`, and session-exit commands. Operation arguments use
   bounded `KEY=VALUE` tokens and still pass Core validation.
 - [x] **AC-5:** SSH `exec`, subsystem, forwarding, environment, agent-forwarding,
   and non-session channels are rejected. One PTY terminal is allowed per SSH

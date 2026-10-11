@@ -17,7 +17,7 @@ terminal teaches valid workflows and supports simple positional values.
 - [x] String parameters may define an alias-to-fixed-value map; validation
   accepts only map keys and translation never forwards the caller's alias as a
   filesystem path.
-- [x] `run log service_A` invokes fixed `tail -n 50 -F -- PATH` through an
+- [x] `execute log service_A` invokes fixed `tail -n 50 -F -- PATH` through an
   independent unprivileged log-reader Runner and supports semantic Ctrl+C.
 - [x] The installer creates the log-reader identity, unit, readable demo log,
   audit producer binding, and target integrity entry.

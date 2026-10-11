@@ -72,7 +72,7 @@ func TestRestrictedShellRoutesAuthenticatedIdentityThroughGateway(t *testing.T) 
 		t.Fatal(err)
 	}
 	terminal := &bytes.Buffer{}
-	shell, err := broker.NewShell(gateway, catalog, broker.Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader("run system_info\rexit\r"), terminal)
+	shell, err := broker.NewShell(gateway, catalog, broker.Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader("execute system_info\rexit\r"), terminal)
 	if err != nil {
 		t.Fatal(err)
 	}

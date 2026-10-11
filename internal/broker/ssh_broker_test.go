@@ -159,7 +159,7 @@ func TestRestrictedShellFiltersCatalogInjectsIdentityAndMapsInterrupt(t *testing
 	input := make(chan byte, 1)
 	done := make(chan error, 1)
 	go func() {
-		_, err := shell.executeLine(context.Background(), "run trace port=53", input)
+		_, err := shell.executeLine(context.Background(), "execute trace port=53", input)
 		done <- err
 	}()
 	input <- 0x03
@@ -176,7 +176,7 @@ func TestRestrictedShellFiltersCatalogInjectsIdentityAndMapsInterrupt(t *testing
 		t.Fatalf("terminal control sequence reached client output: %q", output.String())
 	}
 	viewer, _ := NewShell(client, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, strings.NewReader(""), io.Discard)
-	if _, err := viewer.executeLine(context.Background(), "run trace port=53", input); err == nil {
+	if _, err := viewer.executeLine(context.Background(), "execute trace port=53", input); err == nil {
 		t.Fatal("unauthorized operation was accepted by the Broker catalog")
 	}
 }

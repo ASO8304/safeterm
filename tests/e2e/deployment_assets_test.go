@@ -188,7 +188,7 @@ func TestOperatorCatalogTemplatesAndPrivilegeAssets(t *testing.T) {
 		}
 	}
 	shell := readText(t, filepath.Join(repository, "internal", "broker", "shell.go"))
-	for _, marker := range []string{"help [run|config|keys|OPERATION]", "run log service_A", "simple positional values"} {
+	for _, marker := range []string{"help [execute|config|keys|OPERATION]", "execute log service_A", "simple positional values"} {
 		if !strings.Contains(shell, marker) {
 			t.Errorf("guided shell help missing %q", marker)
 		}
@@ -236,7 +236,7 @@ func TestOperatorDemoExercisesPublicWorkflowAndReportsPass(t *testing.T) {
 	demo := readText(t, filepath.Join(repository, "deploy", "demo", "run-demo.sh"))
 	for _, required := range []string{
 		"ssh-keygen", "ssh-keyscan", "StrictHostKeyChecking=yes",
-		"whoami", "list", "run system_info", "config list",
+		"whoami", "list", "execute system_info", "config list",
 		"result: success", "safeterm-preflight --installed",
 		"SafeTerm end-to-end demo: PASS",
 	} {
