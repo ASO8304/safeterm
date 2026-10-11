@@ -81,6 +81,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout tag
+        uses: actions/checkout@v7
+
       - name: Download package artifacts
         uses: actions/download-artifact@v7
         with:
