@@ -50,6 +50,8 @@ Available capabilities:
 - A full restricted-shell line editor with cursor movement, insertion/deletion,
   bounded history, secret-safe input, and authorization-aware Tab completion
 - A local `safeterm` console login that presents the same restricted terminal
+- A `termctl` administration command with catalog, service, config, user, and
+  shell-completion workflows
   and crosses the same signed-catalog, IPC, policy, Runner, config, and audit boundaries
 - A self-contained AMD64/ARM64 installation package that needs no Git, Go,
   module download, or Internet access on the target and preserves installed state on upgrade

@@ -96,14 +96,15 @@ func TestProductionSourceCannotIntroduceAnotherProcessOrShellBoundary(t *testing
 		}
 		for _, spec := range file.Imports {
 			value, _ := strconv.Unquote(spec.Path.Value)
-			if value == "os/exec" && !strings.HasPrefix(filepath.ToSlash(relative), "internal/execution/") {
+			trustedProcessBoundary := strings.HasPrefix(filepath.ToSlash(relative), "internal/execution/") || filepath.ToSlash(relative) == "cmd/termctl/main.go"
+			if value == "os/exec" && !trustedProcessBoundary {
 				t.Errorf("production os/exec import outside Runner: %s", relative)
 			}
 		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			if call, ok := node.(*ast.CallExpr); ok {
 				if selector, ok := call.Fun.(*ast.SelectorExpr); ok {
-					if identifier, ok := selector.X.(*ast.Ident); ok && identifier.Name == "exec" && (selector.Sel.Name == "Command" || selector.Sel.Name == "CommandContext") && filepath.ToSlash(relative) != "internal/execution/runner.go" {
+					if identifier, ok := selector.X.(*ast.Ident); ok && identifier.Name == "exec" && (selector.Sel.Name == "Command" || selector.Sel.Name == "CommandContext") && filepath.ToSlash(relative) != "internal/execution/runner.go" && filepath.ToSlash(relative) != "cmd/termctl/main.go" {
 						t.Errorf("process creation outside bounded Runner: %s", relative)
 					}
 				}

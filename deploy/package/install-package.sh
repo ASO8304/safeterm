@@ -129,6 +129,8 @@ create_install_transaction() {
 /usr/local/bin/safeterm-ssh-broker
 /usr/local/bin/safeterm-preflight
 /usr/local/bin/safeterm-password-hash
+/usr/local/bin/safeterm-termctl
+/usr/local/bin/termctl
 /usr/local/sbin/safeterm-install-rollback
 /etc/safeterm
 /etc/safeterm-managed
@@ -258,7 +260,7 @@ if [ "$single_operator" = true ]; then
 fi
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
-for name in audit config-manager console gateway runner ssh-broker preflight password-hash; do
+for name in audit config-manager console gateway runner ssh-broker preflight termctl password-hash; do
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"

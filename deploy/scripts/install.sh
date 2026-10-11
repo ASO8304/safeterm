@@ -76,6 +76,7 @@ done
 for binary in "$bundle"/bin/safeterm-*; do
   install -o root -g root -m 0555 "$binary" "/usr/local/bin/$(basename -- "$binary")"
 done
+install -o root -g root -m 0555 "$bundle/bin/safeterm-termctl" /usr/local/bin/termctl
 usermod --shell /usr/local/bin/safeterm-console safeterm
 if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
   echo /usr/local/bin/safeterm-console >>/etc/shells

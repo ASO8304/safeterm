@@ -18,6 +18,7 @@ import (
 var RuntimeBinaries = []string{
 	"safeterm-audit", "safeterm-config-manager", "safeterm-gateway",
 	"safeterm-console", "safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight",
+	"safeterm-termctl",
 }
 
 var SystemdUnits = []string{
