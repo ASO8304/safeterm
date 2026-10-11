@@ -79,7 +79,9 @@ func TestTranslate_ShippedPingUsesBoundedFixedArguments(t *testing.T) {
 	if err := validation.New(cfg).Validate(req); err != nil {
 		t.Fatal(err)
 	}
-	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "3", "-W", "2", "--", "192.168.10.20"})
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "100", "-W", "2", "--", "192.168.10.20"})
+	req.Arguments["count"] = "5"
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "5", "-W", "2", "--", "192.168.10.20"})
 }
 
 func TestTranslate_MappedLogAliasNeverUsesCallerPath(t *testing.T) {

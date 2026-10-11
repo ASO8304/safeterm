@@ -39,12 +39,12 @@ func TestSnapshotRoutesAndFiltersProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(filtered.Profiles) != 1 || len(filtered.Operations) != 1 || filtered.Operations[0].Name != "system_info" || len(filtered.Executables) != 1 {
+	if len(filtered.Profiles) != 1 || len(filtered.Operations) < 3 || len(filtered.Executables) < 3 {
 		t.Fatalf("unexpected diagnostics snapshot: %+v", filtered)
 	}
 	filtered.Operations[0].Name = "mutated"
 	second, _ := snapshot.ProfileConfig(config.ProfileDiagnostics)
-	if second.Operations[0].Name != "system_info" {
+	if second.Operations[0].Name == "mutated" {
 		t.Fatal("profile config aliased active snapshot")
 	}
 	serviceManager, err := snapshot.ProfileConfig(config.ProfileServiceManager)

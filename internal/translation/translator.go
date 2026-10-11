@@ -12,9 +12,10 @@ import (
 )
 
 type argument struct {
-	literal   string
-	parameter string
-	valueMap  map[string]string
+	literal      string
+	parameter    string
+	valueMap     map[string]string
+	defaultValue string
 }
 
 type operation struct {
@@ -70,6 +71,7 @@ func New(cfg *config.Config) (*Translator, error) {
 			}
 			args[i].parameter = name
 			args[i].valueMap = cloneMap(parameter.ValueMap)
+			args[i].defaultValue = parameter.Default
 		}
 		ops[op.Name] = operation{command: executablePaths[op.ExecutableRef], args: args}
 	}
@@ -96,7 +98,10 @@ func (t *Translator) Translate(req *contract.ExecutionRequest) (string, []string
 		}
 		value, present := req.Arguments[token.parameter]
 		if !present {
-			return "", nil, fmt.Errorf("translation: operation %q: missing argument %q required by template", req.Command, token.parameter)
+			if token.defaultValue == "" {
+				return "", nil, fmt.Errorf("translation: operation %q: missing argument %q required by template", req.Command, token.parameter)
+			}
+			value = token.defaultValue
 		}
 		if len(token.valueMap) != 0 {
 			mapped, allowed := token.valueMap[value]

@@ -49,17 +49,27 @@ execute only the signed `tail` operation. A narrower deployment may replace
 
 ## Add bounded network diagnostics
 
-The shipped `ping` operation is intentionally fixed to three IPv4 echo
-requests with a two-second per-packet timeout. Only the validated host value
-is accepted, and it is passed as one argument to `/usr/bin/ping`:
+The shipped `ping` operation sends bounded IPv4 echo requests with a
+two-second per-packet timeout. It defaults to 100 requests; operators can use
+the `-c` alias or `count=VALUE` to override that default. Only the validated
+host value is accepted:
 
 ```text
-run ping host=192.168.45.140
+run ping host=192.168.45.140 -c 5
 ```
 
 Grant `ping` through the `netops` policy. Keep the executable in the
 `network-observer` profile so its `CAP_NET_RAW` boundary is separate from
 diagnostic and service-manager processes.
+
+The catalog uses separate typed operations for tcpdump filter combinations:
+`trace_host`, `trace_port`, and `trace_filtered` (host, port, and one of the
+approved `tcp`, `udp`, `icmp`, `arp`, or `ip` protocols). This keeps omitted
+filters explicit and prevents an empty or caller-built tcpdump expression.
+
+The shipped `traceroute` operation requires `/usr/bin/traceroute` on the
+target. Refresh its executable digest during catalog preparation before
+signing a production catalog.
 
 ## Add typed systemd control
 

@@ -289,6 +289,12 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 					values = append(values, parameter.Name+"="+alias)
 				}
 			}
+			if parameter.Default != "" && !strings.Contains(prefix, "=") {
+				values = append(values, parameter.Name+"="+parameter.Default)
+			}
+			if !strings.Contains(prefix, "=") {
+				values = append(values, parameter.Aliases...)
+			}
 		}
 		sort.Strings(values)
 		return matching(values, prefix)

@@ -39,9 +39,12 @@ type ParameterDefinition struct {
 	Name     string        `json:"name"`
 	Type     ParameterType `json:"type"`
 	Required bool          `json:"required"`
-	Min      *int          `json:"min,omitempty"`
-	Max      *int          `json:"max,omitempty"`
-	Pattern  string        `json:"pattern,omitempty"`
+	// Default is used when an optional parameter is omitted.
+	Default string   `json:"default,omitempty"`
+	Aliases []string `json:"aliases,omitempty"`
+	Min     *int     `json:"min,omitempty"`
+	Max     *int     `json:"max,omitempty"`
+	Pattern string   `json:"pattern,omitempty"`
 	// ValueMap exposes stable operator-facing aliases while translating them
 	// to fixed, catalog-owned argv values such as approved log paths.
 	ValueMap map[string]string `json:"value_map,omitempty"`

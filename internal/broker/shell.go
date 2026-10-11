@@ -359,6 +359,9 @@ func (s *Shell) describe(operation config.OperationDefinition) {
 		if parameter.Pattern != "" {
 			constraints += " pattern=" + parameter.Pattern
 		}
+		if parameter.Default != "" {
+			constraints += " default=" + parameter.Default
+		}
 		if len(parameter.ValueMap) != 0 {
 			aliases := make([]string, 0, len(parameter.ValueMap))
 			for alias := range parameter.ValueMap {
@@ -374,8 +377,30 @@ func (s *Shell) describe(operation config.OperationDefinition) {
 
 func parseOperationArguments(operation config.OperationDefinition, fields []string) (map[string]string, error) {
 	arguments := make(map[string]string, len(fields))
+	canonical := func(name string) string {
+		for _, parameter := range operation.Parameters {
+			if parameter.Name == name {
+				return name
+			}
+			for _, alias := range parameter.Aliases {
+				if alias == name {
+					return parameter.Name
+				}
+			}
+		}
+		return name
+	}
 	positional := false
-	for _, field := range fields {
+	for index := 0; index < len(fields); index++ {
+		field := fields[index]
+		if canonical(field) != field && !strings.Contains(field, "=") {
+			if index+1 >= len(fields) || strings.Contains(fields[index+1], "=") {
+				return nil, fmt.Errorf("option %q requires a value", field)
+			}
+			arguments[canonical(field)] = fields[index+1]
+			index++
+			continue
+		}
 		parts := strings.SplitN(field, "=", 2)
 		if len(parts) != 2 {
 			positional = true
@@ -384,10 +409,7 @@ func parseOperationArguments(operation config.OperationDefinition, fields []stri
 		if parts[0] == "" || parts[1] == "" {
 			return nil, fmt.Errorf("argument %q must use KEY=VALUE syntax", field)
 		}
-		if _, exists := arguments[parts[0]]; exists {
-			return nil, fmt.Errorf("argument %q was supplied more than once", parts[0])
-		}
-		arguments[parts[0]] = parts[1]
+		arguments[canonical(parts[0])] = parts[1]
 	}
 	if positional {
 		if len(arguments) != 0 {
@@ -411,7 +433,7 @@ func (s *Shell) writeHelp(topic string) error {
 	case "":
 		fmt.Fprint(s.output, "Getting started\r\n  1. list                         see what you may run\r\n  2. describe NAME                see parameters and an example\r\n  3. run NAME [VALUE ...]         run with simple positional values\r\n     run NAME [KEY=VALUE ...]     run with explicit named values\r\n\r\nConfiguration\r\n  config list                    list resources you may access\r\n  config describe ID             show editable fields and types\r\n  config show ID                 read current non-secret values\r\n  config edit ID SECTION KEY     validate, preview, and propose/apply a value\r\n  config apply TOKEN             apply an approved proposal\r\n  config rollback ID             restore the newest retained backup\r\n\r\nSession\r\n  whoami                         show your identity and roles\r\n  clear                          clear the screen\r\n  exit                           close this session\r\n\r\nTry: 'help run', 'help config', 'help keys', or 'help OPERATION'.\r\n")
 	case "run":
-		fmt.Fprint(s.output, "Run operations\r\n  list\r\n  describe ping\r\n  run ping host=192.168.45.140\r\n  run trace host=192.168.45.140 port=999\r\n  run log service_A\r\n  run status_safeterm_gateway\r\n  run restart_safeterm_gateway\r\n\r\nLong-running operations stream output. Press Ctrl+C once to request a safe terminate.\r\nArguments are values, never shell text; pipes, redirects, and command substitution are unavailable.\r\n")
+		fmt.Fprint(s.output, "Run operations\r\n  list\r\n  describe ping\r\n  run ping host=192.168.45.140       (default -c 100)\r\n  run ping host=192.168.45.140 -c 5  (override the count)\r\n  run trace_host host=192.168.45.140\r\n  run trace_port port=999\r\n  run trace_filtered host=192.168.45.140 port=999 protocol=tcp\r\n  run nslookup host=example.com\r\n  run traceroute host=192.168.45.140\r\n  run memory_info\r\n  run disk_usage\r\n  run log service_A\r\n  run status_safeterm_gateway\r\n  run restart_safeterm_gateway\r\n\r\nLong-running operations stream output. Press Ctrl+C once to request a safe terminate.\r\nArguments are values, never shell text; pipes, redirects, and command substitution are unavailable.\r\n")
 	case "config":
 		fmt.Fprint(s.output, "Configuration workflow\r\n  config list\r\n  config describe cats-options\r\n  config show cats-options\r\n  config edit cats-options cats Cat_Port\r\n\r\nThe editor validates the new value and shows a preview before applying it. Tab completes resource, section, and field names.\r\n")
 	case "keys":

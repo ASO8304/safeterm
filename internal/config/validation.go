@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -224,6 +225,16 @@ func validateParameterDefinition(opName string, parameter ParameterDefinition) e
 	if parameter.Name == "" {
 		return fmt.Errorf("config: operation %q: a parameter has an empty name", opName)
 	}
+	if parameter.Required && parameter.Default != "" {
+		return fmt.Errorf("config: operation %q: required parameter %q cannot define a default", opName, parameter.Name)
+	}
+	seenAliases := map[string]bool{}
+	for _, alias := range parameter.Aliases {
+		if !regexp.MustCompile(`^-[A-Za-z][A-Za-z0-9-]*$`).MatchString(alias) || seenAliases[alias] {
+			return fmt.Errorf("config: operation %q: parameter %q has invalid or duplicate alias %q", opName, parameter.Name, alias)
+		}
+		seenAliases[alias] = true
+	}
 	switch parameter.Type {
 	case ParamTypeInt:
 		if parameter.Pattern != "" || len(parameter.ValueMap) != 0 {
@@ -232,9 +243,31 @@ func validateParameterDefinition(opName string, parameter ParameterDefinition) e
 		if parameter.Min != nil && parameter.Max != nil && *parameter.Min > *parameter.Max {
 			return fmt.Errorf("config: operation %q: parameter %q: min (%d) is greater than max (%d)", opName, parameter.Name, *parameter.Min, *parameter.Max)
 		}
+		if parameter.Default != "" {
+			value, err := strconv.Atoi(parameter.Default)
+			if err != nil || parameter.Min != nil && value < *parameter.Min || parameter.Max != nil && value > *parameter.Max {
+				return fmt.Errorf("config: operation %q: parameter %q has an invalid default", opName, parameter.Name)
+			}
+		}
 	case ParamTypeString:
 		if parameter.Min != nil || parameter.Max != nil {
 			return fmt.Errorf("config: operation %q: parameter %q: min/max is not valid for type %q", opName, parameter.Name, ParamTypeString)
+		}
+		if parameter.Default != "" {
+			if strings.ContainsAny(parameter.Default, ";&|`$(){}<>\n\r'\"") {
+				return fmt.Errorf("config: operation %q: parameter %q default contains forbidden characters", opName, parameter.Name)
+			}
+			if parameter.Pattern != "" {
+				matched, err := regexp.MatchString(parameter.Pattern, parameter.Default)
+				if err != nil || !matched {
+					return fmt.Errorf("config: operation %q: parameter %q has an invalid default", opName, parameter.Name)
+				}
+			}
+			if len(parameter.ValueMap) != 0 {
+				if _, ok := parameter.ValueMap[parameter.Default]; !ok {
+					return fmt.Errorf("config: operation %q: parameter %q default is not allowed", opName, parameter.Name)
+				}
+			}
 		}
 	default:
 		return fmt.Errorf("config: operation %q: parameter %q: unknown type %q", opName, parameter.Name, parameter.Type)

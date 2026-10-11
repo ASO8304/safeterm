@@ -28,7 +28,7 @@ func TestShippedCatalogIncludesDiagnosticsAndServiceOperations(t *testing.T) {
 	}
 
 	ping := operations["ping"]
-	if ping.ExecutableRef != "ping" || len(ping.Parameters) != 1 || ping.Parameters[0].Name != "host" {
+	if ping.ExecutableRef != "ping" || len(ping.Parameters) != 2 || ping.Parameters[0].Name != "host" || ping.Parameters[1].Default != "100" {
 		t.Fatalf("ping definition is not the expected bounded host operation: %+v", ping)
 	}
 	if len(ping.ArgsTemplate) == 0 || ping.ArgsTemplate[len(ping.ArgsTemplate)-1] != "{host}" {

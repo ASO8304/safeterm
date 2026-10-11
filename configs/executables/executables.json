@@ -18,6 +18,30 @@
     "allowed_profiles": ["network-observer"]
   },
   {
+    "id": "nslookup",
+    "path": "/usr/bin/nslookup",
+    "sha256": "c831307d1dcb3ccf32b2c8d1b61710f379d4c757cfd733e171a829e4511b5343",
+    "allowed_profiles": ["network-observer"]
+  },
+  {
+    "id": "traceroute",
+    "path": "/usr/bin/traceroute",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "allowed_profiles": ["network-observer"]
+  },
+  {
+    "id": "free",
+    "path": "/usr/bin/free",
+    "sha256": "985e0ca296fa1ffd274cbbebe0c49844ee9a3ce09a389e9b8527777b395cd4a1",
+    "allowed_profiles": ["diagnostics"]
+  },
+  {
+    "id": "df",
+    "path": "/usr/bin/df",
+    "sha256": "83dbe7428a5c042b6199c2ee147684fa578b71e9fd4b83e7d1bdb03b9510bba8",
+    "allowed_profiles": ["diagnostics"]
+  },
+  {
     "id": "systemctl",
     "path": "/usr/bin/systemctl",
     "sha256": "e0d3d0e9444da1b2b58c792c3f5028b69f049b77d5ca17b3ec0d09f89117225b",

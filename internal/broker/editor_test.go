@@ -54,6 +54,15 @@ func TestEditorCompletesAuthorizedOperationsAndParameters(t *testing.T) {
 	}
 }
 
+func TestParseOperationArgumentsAllowsAliasOverride(t *testing.T) {
+	minimum, maximum := 1, 1000
+	operation := config.OperationDefinition{Parameters: []config.ParameterDefinition{{Name: "count", Type: config.ParamTypeInt, Default: "100", Min: &minimum, Max: &maximum, Aliases: []string{"-c"}}}}
+	arguments, err := parseOperationArguments(operation, []string{"-c", "5", "count=7"})
+	if err != nil || arguments["count"] != "7" {
+		t.Fatalf("arguments=%v err=%v, want final count=7", arguments, err)
+	}
+}
+
 func TestPositionalMappedArgumentAndHelpExample(t *testing.T) {
 	operation := config.OperationDefinition{
 		Name: "log", Parameters: []config.ParameterDefinition{{Name: "source", Type: config.ParamTypeString, Required: true, ValueMap: map[string]string{"service_A": "/var/log/service-a.log"}}},
