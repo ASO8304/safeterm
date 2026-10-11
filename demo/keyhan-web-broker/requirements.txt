@@ -1,0 +1,8 @@
+ariadne>=0.25,<1
+graphql-core>=3.2,<3.3
+starlette>=0.46,<1
+uvicorn[standard]>=0.34,<1
+gunicorn>=23,<24
+pytest>=8,<9
+httpx>=0.28,<1
+websockets>=15,<16

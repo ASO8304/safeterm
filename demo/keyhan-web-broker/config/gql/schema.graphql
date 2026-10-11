@@ -1,0 +1,18 @@
+scalar JSON
+
+type Query { health: String! }
+
+type WebEvent {
+  id: ID!
+  topic: String!
+  payload: JSON!
+  createdAt: String!
+}
+
+type Mutation {
+  publishWebEvent(topic: String!, payload: JSON!): WebEvent!
+}
+
+type Subscription {
+  webEvent(topic: String!): WebEvent!
+}
