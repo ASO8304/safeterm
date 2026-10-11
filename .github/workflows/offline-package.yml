@@ -71,3 +71,33 @@ jobs:
             ${{ runner.temp }}/safeterm-offline-${{ matrix.arch }}.tar.gz.sha256
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish release packages
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download package artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: safeterm-offline-*
+          merge-multiple: true
+          path: release-assets
+
+      - name: Publish package assets to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release upload "$TAG_NAME" release-assets/* --clobber
+          else
+            gh release create "$TAG_NAME" release-assets/* \
+              --verify-tag \
+              --generate-notes \
+              --title "SafeTerm $TAG_NAME"
+          fi

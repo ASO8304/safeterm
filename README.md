@@ -269,6 +269,53 @@ When every check passes, the final output is:
 SafeTerm Verification: PASS
 ```
 
+## Installation Packages
+
+GitHub Actions builds self-contained offline installation packages for Linux
+AMD64 and ARM64. Tagged builds publish the latest packages as GitHub Release
+assets:
+
+- [Download AMD64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-amd64.tar.gz)
+- [Download AMD64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-amd64.tar.gz.sha256)
+- [Download ARM64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz)
+- [Download ARM64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz.sha256)
+
+On the target host, verify and extract the package before installation:
+
+```bash
+sha256sum -c safeterm-offline-amd64.tar.gz.sha256
+tar -xzf safeterm-offline-amd64.tar.gz
+cd safeterm-offline-amd64
+sudo ./install.sh --help
+```
+
+For a single-host evaluation, create a bcrypt password hash and run the local
+signing installation:
+
+```bash
+sudo install -d -m 700 /root/safeterm-secrets
+sudo ./payload/bin/safeterm-password-hash \
+  -output /root/safeterm-secrets/alice.hash
+
+sudo ./install.sh \
+  --local-signing \
+  --ssh-user alice \
+  --ssh-password-hash-file /root/safeterm-secrets/alice.hash \
+  --single-operator \
+  --dry-run
+
+sudo ./install.sh \
+  --local-signing \
+  --ssh-user alice \
+  --ssh-password-hash-file /root/safeterm-secrets/alice.hash \
+  --single-operator
+```
+
+The complete air-gapped and production signing procedure is documented in
+[docs/offline-installation.md](docs/offline-installation.md). Manual workflow
+runs retain the same files as Actions artifacts; tagged runs additionally
+publish them as release assets for the stable links above.
+
 ## Project Structure
 
 ```text
