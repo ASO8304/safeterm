@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"safeterm/internal/broker"
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
 )
@@ -69,6 +70,9 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl service restart|start|stop NAME")
 	fmt.Fprintln(out, "  termctl config list|describe RESOURCE")
 	fmt.Fprintln(out, "  termctl user list")
+	fmt.Fprintln(out, "  termctl user add ssh|console [--id ID] [--os-user OS_USER] --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
+	fmt.Fprintln(out, "  termctl user auth ssh|console [--id ID] [--os-user OS_USER] [--password-hash-file FILE] [--authorized-key-file FILE]")
+	fmt.Fprintln(out, "  termctl user del ssh|console --id ID|--os-user OS_USER")
 	fmt.Fprintln(out, "  termctl shell")
 	fmt.Fprintln(out, "  termctl completion bash|zsh")
 	fmt.Fprintln(out, "Use Tab completion for commands, services, and catalog operations.")
@@ -172,35 +176,355 @@ func configCommand(dir string, args []string, out io.Writer) error {
 }
 
 func userCommand(dir string, args []string, out io.Writer) error {
-	if len(args) != 1 || args[0] != "list" {
-		return fmt.Errorf("usage: termctl user list")
+	if len(args) == 0 || args[0] == "list" {
+		return listUsers(dir, out)
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "ssh", "users.json"))
+	if args[0] != "add" && args[0] != "del" && args[0] != "auth" {
+		return fmt.Errorf("usage: termctl user list | add|del|auth ssh|console [options]")
+	}
+	if len(args) < 2 || (args[1] != "ssh" && args[1] != "console") {
+		return fmt.Errorf("user type must be ssh or console")
+	}
+	kind := args[1]
+	options, err := parseUserOptions(args[2:])
 	if err != nil {
 		return err
 	}
-	var users struct {
-		Users []struct {
-			UserID         string   `json:"user_id"`
-			Roles          []string `json:"roles"`
-			PasswordHash   string   `json:"password_hash"`
-			AuthorizedKeys []string `json:"authorized_keys"`
-		} `json:"users"`
-	}
-	if err := json.Unmarshal(data, &users); err != nil {
+	cfg, err := config.LoadConfig(dir)
+	if err != nil {
 		return err
 	}
-	for _, u := range users.Users {
-		methods := []string{}
-		if u.PasswordHash != "" {
-			methods = append(methods, "password")
+	if options.id == "" && kind == "ssh" {
+		return fmt.Errorf("--id is required")
+	}
+	if kind == "console" && options.osUser == "" {
+		return fmt.Errorf("--os-user is required")
+	}
+	if args[0] == "del" {
+		return deleteUser(dir, kind, options, cfg, out)
+	}
+	if args[0] == "add" && options.roles == "" {
+		return fmt.Errorf("--roles is required")
+	}
+	return upsertUser(dir, kind, args[0] == "auth", options, cfg, out)
+}
+
+type userOptions struct{ id, osUser, roles, hashFile, keyFile string }
+
+func parseUserOptions(args []string) (userOptions, error) {
+	var o userOptions
+	for i := 0; i < len(args); i++ {
+		if i+1 >= len(args) {
+			return o, fmt.Errorf("option %q requires a value", args[i])
 		}
-		if len(u.AuthorizedKeys) > 0 {
-			methods = append(methods, "key")
+		value := args[i+1]
+		switch args[i] {
+		case "--id":
+			o.id = value
+		case "--os-user":
+			o.osUser = value
+		case "--roles":
+			o.roles = value
+		case "--password-hash-file":
+			o.hashFile = value
+		case "--authorized-key-file":
+			o.keyFile = value
+		default:
+			return o, fmt.Errorf("unknown user option %q", args[i])
 		}
-		fmt.Fprintf(out, "%-20s roles=%s auth=%s\n", u.UserID, strings.Join(u.Roles, ","), strings.Join(methods, "+"))
+		i++
+	}
+	return o, nil
+}
+
+func listUsers(dir string, out io.Writer) error {
+	var ssh broker.SSHIdentityConfig
+	if data, err := os.ReadFile(filepath.Join(dir, "ssh", "users.json")); err == nil {
+		if err := json.Unmarshal(data, &ssh); err != nil {
+			return err
+		}
+		for _, u := range ssh.Users {
+			methods := []string{}
+			if u.PasswordHash != "" {
+				methods = append(methods, "password")
+			}
+			if len(u.AuthorizedKeys) > 0 {
+				methods = append(methods, "key")
+			}
+			fmt.Fprintf(out, "ssh/%-16s roles=%s auth=%s\n", u.UserID, strings.Join(u.Roles, ","), strings.Join(methods, "+"))
+		}
+	}
+	var console broker.ConsoleIdentityConfig
+	if data, err := os.ReadFile(filepath.Join(dir, "console", "users.json")); err == nil {
+		if err := json.Unmarshal(data, &console); err != nil {
+			return err
+		}
+		for _, u := range console.Users {
+			fmt.Fprintf(out, "console/%-11s os-user=%s roles=%s\n", u.UserID, u.OSUser, strings.Join(u.Roles, ","))
+		}
 	}
 	return nil
+}
+
+func upsertUser(dir string, kind string, auth bool, o userOptions, cfg *config.Config, out io.Writer) error {
+	roles := splitRoles(o.roles)
+	known := map[string]bool{}
+	for _, role := range cfg.Roles {
+		known[role.Name] = true
+	}
+	for _, role := range roles {
+		if !known[role] {
+			return fmt.Errorf("unknown role %q", role)
+		}
+	}
+	if kind == "ssh" {
+		path := filepath.Join(dir, "ssh", "users.json")
+		var data broker.SSHIdentityConfig
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return err
+		}
+		index := -1
+		for i := range data.Users {
+			if data.Users[i].UserID == o.id {
+				index = i
+				break
+			}
+		}
+		if !auth && index >= 0 {
+			return fmt.Errorf("SSH user %q already exists", o.id)
+		}
+		if auth && index < 0 {
+			return fmt.Errorf("SSH user %q does not exist", o.id)
+		}
+		user := broker.SSHUser{UserID: o.id, Roles: roles}
+		if index >= 0 {
+			user = data.Users[index]
+		}
+		if len(roles) > 0 {
+			user.Roles = roles
+		}
+		if o.hashFile != "" {
+			hash, err := readSingleLine(o.hashFile)
+			if err != nil {
+				return err
+			}
+			if err := broker.ValidatePasswordHash(hash); err != nil {
+				return err
+			}
+			user.PasswordHash = hash
+		}
+		if o.keyFile != "" {
+			key, err := os.ReadFile(o.keyFile)
+			if err != nil {
+				return err
+			}
+			user.AuthorizedKeys = nonEmptyLines(string(key))
+		}
+		if user.PasswordHash == "" && len(user.AuthorizedKeys) == 0 {
+			return fmt.Errorf("SSH user requires --password-hash-file or --authorized-key-file")
+		}
+		if index < 0 {
+			data.Users = append(data.Users, user)
+		} else {
+			data.Users[index] = user
+		}
+		if _, err := broker.NewSSHAuthenticator(data, known); err != nil {
+			return err
+		}
+		if err := writeJSONAtomic(path, data, 0640); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "SSH user %s updated\n", o.id)
+		return nil
+	}
+	path := filepath.Join(dir, "console", "users.json")
+	var data broker.ConsoleIdentityConfig
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return err
+	}
+	index := -1
+	for i := range data.Users {
+		if data.Users[i].OSUser == o.osUser {
+			index = i
+			break
+		}
+	}
+	if !auth && index >= 0 {
+		return fmt.Errorf("console user %q already exists", o.osUser)
+	}
+	if auth && index < 0 {
+		return fmt.Errorf("console user %q does not exist", o.osUser)
+	}
+	entry := broker.ConsoleIdentity{OSUser: o.osUser, UserID: o.id, Roles: roles}
+	if index >= 0 {
+		entry = data.Users[index]
+	}
+	if o.id != "" {
+		entry.UserID = o.id
+	}
+	if len(roles) > 0 {
+		entry.Roles = roles
+	}
+	if index < 0 {
+		data.Users = append(data.Users, entry)
+	} else {
+		data.Users[index] = entry
+	}
+	encoded, _ := json.Marshal(data)
+	for _, u := range data.Users {
+		if _, err := broker.ParseConsolePrincipal(encoded, u.OSUser, known); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONAtomic(path, data, 0640); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "console user %s updated\n", o.osUser)
+	return nil
+}
+
+func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writer) error {
+	_ = cfg
+	if kind == "ssh" {
+		path := filepath.Join(dir, "ssh", "users.json")
+		var data broker.SSHIdentityConfig
+		raw, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return err
+		}
+		next := data.Users[:0]
+		found := false
+		for _, u := range data.Users {
+			if u.UserID == o.id {
+				found = true
+				continue
+			}
+			next = append(next, u)
+		}
+		if !found {
+			return fmt.Errorf("SSH user %q does not exist", o.id)
+		}
+		data.Users = next
+		if len(data.Users) == 0 {
+			return fmt.Errorf("cannot delete the last SSH user")
+		}
+		known := map[string]bool{}
+		for _, role := range cfg.Roles {
+			known[role.Name] = true
+		}
+		if _, err := broker.NewSSHAuthenticator(data, known); err != nil {
+			return err
+		}
+		if err := writeJSONAtomic(path, data, 0640); err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "SSH user %s deleted\n", o.id)
+		return nil
+	}
+	path := filepath.Join(dir, "console", "users.json")
+	var data broker.ConsoleIdentityConfig
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return err
+	}
+	next := data.Users[:0]
+	found := false
+	for _, u := range data.Users {
+		if u.OSUser == o.osUser {
+			found = true
+			continue
+		}
+		next = append(next, u)
+	}
+	if !found {
+		return fmt.Errorf("console user %q does not exist", o.osUser)
+	}
+	if len(next) == 0 {
+		return fmt.Errorf("cannot delete the last console user")
+	}
+	data.Users = next
+	known := map[string]bool{}
+	for _, role := range cfg.Roles {
+		known[role.Name] = true
+	}
+	encoded, _ := json.Marshal(data)
+	for _, u := range data.Users {
+		if _, err := broker.ParseConsolePrincipal(encoded, u.OSUser, known); err != nil {
+			return err
+		}
+	}
+	if err := writeJSONAtomic(path, data, 0640); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "console user %s deleted\n", o.osUser)
+	return nil
+}
+
+func splitRoles(value string) []string {
+	var roles []string
+	for _, item := range strings.Split(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			roles = append(roles, item)
+		}
+	}
+	sort.Strings(roles)
+	return roles
+}
+func readSingleLine(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
+}
+func nonEmptyLines(value string) []string {
+	var lines []string
+	for _, line := range strings.Split(value, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+func writeJSONAtomic(path string, value any, mode os.FileMode) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".termctl-*")
+	if err != nil {
+		return err
+	}
+	name := tmp.Name()
+	defer os.Remove(name)
+	if err := tmp.Chmod(mode); err != nil {
+		tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(name, path)
 }
 
 func execCommand(path string, args ...string) error {
