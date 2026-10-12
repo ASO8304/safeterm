@@ -300,6 +300,12 @@ fi
 if [ -d "$work/preserved-managed" ]; then
   cp -a "$work/preserved-managed/." /etc/safeterm-managed/
 fi
+# Keep the administrator entry point explicit even if a custom base installer
+# is supplied with a locally rebuilt package.
+install -o root -g root -m 0555 "$work/bundle/bin/safeterm-termctl" /usr/local/bin/safeterm-termctl
+install -o root -g root -m 0555 "$work/bundle/bin/safeterm-termctl" /usr/local/bin/termctl
+[ -x /usr/local/bin/safeterm-termctl ] || { echo "termctl installation failed" >&2; exit 1; }
+[ -x /usr/local/bin/termctl ] || { echo "termctl alias installation failed" >&2; exit 1; }
 /usr/local/bin/safeterm-preflight --installed
 
 if [ "$start_services" = true ]; then
