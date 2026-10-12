@@ -50,10 +50,16 @@ shows the operations authorized by one role. These commands read the signed
 deployment configuration and do not change authorization.
 
 SSH identities can be added, updated, or removed without editing JSON by
-hand. Passwords are supplied through a bcrypt hash file, never as a command
-line argument:
+hand. When an SSH user is added without an authorized key or a hash file,
+`termctl` prompts for the password twice without echo, validates its complexity,
+generates a bcrypt hash, and stores only the hash. A hash file remains available
+for unattended provisioning:
 
 ```sh
+termctl user add ssh --id alice --roles viewer,netops
+# New password: (hidden)
+# Confirm password: (hidden)
+
 termctl user add ssh --id alice --roles viewer,netops \
   --password-hash-file /secure/alice.hash \
   --authorized-key-file /secure/alice.pub

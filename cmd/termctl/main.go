@@ -434,7 +434,15 @@ func upsertUser(dir string, kind string, auth bool, o userOptions, cfg *config.C
 			user.AuthorizedKeys = nonEmptyLines(string(key))
 		}
 		if user.PasswordHash == "" && len(user.AuthorizedKeys) == 0 {
-			return fmt.Errorf("SSH user requires --password-hash-file or --authorized-key-file")
+			if !auth {
+				hash, err := readInteractivePasswordHash()
+				if err != nil {
+					return err
+				}
+				user.PasswordHash = hash
+			} else {
+				return fmt.Errorf("SSH user requires --password-hash-file or --authorized-key-file")
+			}
 		}
 		if index < 0 {
 			data.Users = append(data.Users, user)
@@ -674,6 +682,22 @@ func readInteractivePassword() ([]byte, error) {
 	}
 	clear(second)
 	return first, nil
+}
+
+func readInteractivePasswordHash() (string, error) {
+	password, err := readInteractivePassword()
+	if err != nil {
+		return "", err
+	}
+	defer clear(password)
+	if err := broker.ValidatePasswordComplexity(password); err != nil {
+		return "", err
+	}
+	hash, err := bcrypt.GenerateFromPassword(password, broker.PasswordHashCost)
+	if err != nil {
+		return "", fmt.Errorf("password hashing failed")
+	}
+	return string(hash), nil
 }
 
 func splitRoles(value string) []string {
