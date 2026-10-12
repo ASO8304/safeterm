@@ -26,7 +26,7 @@ var serviceUnits = map[string]string{
 	"audit": "safeterm-audit.service", "gateway": "safeterm-gateway.service",
 	"ssh": "safeterm-ssh-broker.service", "diagnostics": "safeterm-runner-diagnostics.service",
 	"network": "safeterm-runner-network-observer.service", "logs": "safeterm-runner-log-reader.service",
-	"services": "safeterm-runner-service-manager.service",
+	"services":           "safeterm-runner-service-manager.service",
 	"config-application": "safeterm-config-manager-application.service",
 	"config-database":    "safeterm-config-manager-database.service",
 	"config-network":     "safeterm-config-manager-network.service",
