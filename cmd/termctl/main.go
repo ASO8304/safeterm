@@ -27,6 +27,16 @@ var serviceUnits = map[string]string{
 	"ssh": "safeterm-ssh-broker.service", "diagnostics": "safeterm-runner-diagnostics.service",
 	"network": "safeterm-runner-network-observer.service", "logs": "safeterm-runner-log-reader.service",
 	"services": "safeterm-runner-service-manager.service",
+	"config-application": "safeterm-config-manager-application.service",
+	"config-database":    "safeterm-config-manager-database.service",
+	"config-network":     "safeterm-config-manager-network.service",
+}
+
+// serviceOrder is the dependency order used for bulk lifecycle operations.
+// Stopping and disabling use the reverse order so dependents leave first.
+var serviceOrder = []string{
+	"audit", "diagnostics", "network", "logs", "services", "gateway",
+	"config-application", "config-database", "config-network", "ssh",
 }
 
 func main() {
@@ -75,7 +85,7 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl catalog prepare --source DIR --output DIR")
 	fmt.Fprintln(out, "  termctl role list|describe ROLE")
 	fmt.Fprintln(out, "  termctl service status [NAME|all]")
-	fmt.Fprintln(out, "  termctl service restart|start|stop NAME")
+	fmt.Fprintln(out, "  termctl service start|stop|restart|enable|disable [NAME|all]")
 	fmt.Fprintln(out, "  termctl config list|describe RESOURCE")
 	fmt.Fprintln(out, "  termctl user list")
 	fmt.Fprintln(out, "  termctl user add ssh|console [--id ID] [--os-user OS_USER] --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
@@ -179,33 +189,56 @@ func roleCommand(dir string, args []string, out io.Writer) error {
 }
 
 func serviceCommand(args []string, out, errOut io.Writer) error {
-	if len(args) < 1 || (args[0] != "status" && args[0] != "start" && args[0] != "stop" && args[0] != "restart") {
-		return fmt.Errorf("usage: termctl service status [NAME|all] | restart|start|stop NAME")
+	if len(args) < 1 || !isServiceAction(args[0]) || len(args) > 2 {
+		return fmt.Errorf("usage: termctl service status|start|stop|restart|enable|disable [NAME|all]")
 	}
 	name := "all"
 	if len(args) > 1 {
 		name = args[1]
 	}
-	names := []string{name}
-	if name == "all" {
-		names = names[:0]
-		for n := range serviceUnits {
-			names = append(names, n)
-		}
-		sort.Strings(names)
+	names, err := selectedServices(name, args[0])
+	if err != nil {
+		return err
 	}
+	var failures []string
 	for _, item := range names {
-		unit, ok := serviceUnits[item]
-		if !ok {
-			return fmt.Errorf("unknown service %q; use tab completion", item)
-		}
+		unit := serviceUnits[item]
 		cmd := exec.Command("/usr/bin/systemctl", "--no-pager", args[0], unit)
 		cmd.Stdout, cmd.Stderr = out, errOut
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("%s %s: %w", args[0], item, err)
+			fmt.Fprintf(errOut, "termctl service %s %s failed: %v\n", args[0], item, err)
+			failures = append(failures, item)
 		}
 	}
+	if len(failures) > 0 {
+		return fmt.Errorf("service action %s failed for: %s", args[0], strings.Join(failures, ", "))
+	}
 	return nil
+}
+
+func isServiceAction(action string) bool {
+	switch action {
+	case "status", "start", "stop", "restart", "enable", "disable":
+		return true
+	default:
+		return false
+	}
+}
+
+func selectedServices(name, action string) ([]string, error) {
+	if name != "all" {
+		if _, ok := serviceUnits[name]; !ok {
+			return nil, fmt.Errorf("unknown service %q; use termctl help", name)
+		}
+		return []string{name}, nil
+	}
+	names := append([]string(nil), serviceOrder...)
+	if action == "stop" || action == "disable" {
+		for left, right := 0, len(names)-1; left < right; left, right = left+1, right-1 {
+			names[left], names[right] = names[right], names[left]
+		}
+	}
+	return names, nil
 }
 
 func configCommand(dir string, args []string, out io.Writer) error {
@@ -707,12 +740,13 @@ func writeCompletion(out io.Writer, args []string) error {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
 	commands := "catalog service config user shell completion help"
-	services := "audit gateway ssh diagnostics network logs services all"
+	services := "audit gateway ssh diagnostics network logs services config-application config-database config-network all"
+	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
-		fmt.Fprintf(out, "_termctl_complete() { local cur prev; cur=\"${COMP_WORDS[COMP_CWORD]}\"; prev=\"${COMP_WORDS[COMP_CWORD-1]}\"; if [[ \\\"$prev\\\" == service ]]; then COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == catalog || \\\"$prev\\\" == config ]]; then COMPREPLY=($(compgen -W \\\"list describe\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == user ]]; then COMPREPLY=($(compgen -W \\\"list\\\" -- \\\"$cur\\\")); else COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); fi; }; complete -F _termctl_complete termctl\n", services, commands)
+		fmt.Fprintf(out, "_termctl_complete() { local cur prev; cur=\"${COMP_WORDS[COMP_CWORD]}\"; prev=\"${COMP_WORDS[COMP_CWORD-1]}\"; if [[ \\\"$prev\\\" == service ]]; then COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == status || \\\"$prev\\\" == start || \\\"$prev\\\" == stop || \\\"$prev\\\" == restart || \\\"$prev\\\" == enable || \\\"$prev\\\" == disable ]]; then COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == catalog || \\\"$prev\\\" == config ]]; then COMPREPLY=($(compgen -W \\\"list describe\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == user ]]; then COMPREPLY=($(compgen -W \\\"list add auth del password\\\" -- \\\"$cur\\\")); else COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); fi; }; complete -F _termctl_complete termctl\n", serviceActions, services, commands)
 		return nil
 	}
 	fmt.Fprintln(out, "#compdef termctl")
-	fmt.Fprintln(out, "_arguments '1:command:(catalog service config user shell completion help)'")
+	fmt.Fprintf(out, "_arguments '1:command:(%s)' '2:service action:(%s)' '3:service:(%s)'\n", commands, serviceActions, services)
 	return nil
 }

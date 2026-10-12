@@ -10,6 +10,10 @@ termctl catalog list
 termctl catalog describe ping
 termctl service status all
 termctl service restart gateway
+termctl service start all
+termctl service stop all
+termctl service enable all
+termctl service disable ssh
 termctl config list
 termctl config describe cats-options
 termctl user list
@@ -51,9 +55,10 @@ The command validates roles, password hashes, keys, duplicate identities, and
 the rule that at least one valid identity remains in each map. It writes the
 root-managed files atomically.
 
-The command accepts only catalog-owned operation names and a fixed service
-name map. It never accepts a raw executable path, arbitrary systemd unit, or
-shell expression. Generate shell completion with:
+Service lifecycle commands use a fixed map of SafeTerm units. `all` starts and
+enables services in dependency order, and stops or disables them in reverse
+order. The wrapper never accepts a raw executable path, arbitrary systemd unit,
+or shell expression. Generate shell completion with:
 
 ```sh
 termctl completion bash > ~/.local/share/bash-completion/completions/termctl

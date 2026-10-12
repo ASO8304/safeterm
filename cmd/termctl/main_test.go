@@ -49,3 +49,23 @@ func TestCatalogListUsesShippedConfig(t *testing.T) {
 		t.Fatalf("catalog output missing new operations: %q", out.String())
 	}
 }
+
+func TestSelectedServicesUsesSafeBulkOrder(t *testing.T) {
+	started, err := selectedServices("all", "start")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(started) != len(serviceOrder) || started[0] != "audit" || started[len(started)-1] != "ssh" {
+		t.Fatalf("start order=%v", started)
+	}
+	stopped, err := selectedServices("all", "stop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stopped[0] != "ssh" || stopped[len(stopped)-1] != "audit" {
+		t.Fatalf("stop order=%v", stopped)
+	}
+	if _, err := selectedServices("unknown", "status"); err == nil {
+		t.Fatal("unknown service was accepted")
+	}
+}
