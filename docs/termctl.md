@@ -6,8 +6,13 @@ status/lifecycle commands, SSH identity inspection, and access to the full
 restricted terminal.
 
 ```text
+termctl help
 termctl catalog list
 termctl catalog describe ping
+termctl catalog prepare --source ./configs --output /tmp/safeterm-catalog
+termctl catalog regenerate-hashes --source ./configs --output /tmp/safeterm-catalog
+termctl role list
+termctl role describe netops
 termctl service status all
 termctl service restart gateway
 termctl service start all
@@ -19,6 +24,30 @@ termctl config describe cats-options
 termctl user list
 termctl shell
 ```
+
+The optional `--config-dir DIR` prefix selects a configuration tree other than
+`/etc/safeterm`; it is useful when preparing or inspecting an offline catalog:
+
+```sh
+termctl --config-dir /tmp/safeterm-catalog catalog list
+termctl --config-dir /tmp/safeterm-catalog role describe viewer
+```
+
+`catalog prepare` and its `regenerate-hashes` alias create an unsigned catalog
+with SHA-256 digests refreshed from the executable paths registered in the
+source configuration. After review, sign the resulting catalog with the
+offline signing tool:
+
+```sh
+safeterm-catalog-sign \
+  -config /tmp/safeterm-catalog \
+  -private-key /secure/safeterm/catalog.key \
+  -signature /tmp/safeterm-catalog/catalog.sig
+```
+
+`role list` shows every configured role and its operation count. `role describe`
+shows the operations authorized by one role. These commands read the signed
+deployment configuration and do not change authorization.
 
 SSH identities can be added, updated, or removed without editing JSON by
 hand. Passwords are supplied through a bcrypt hash file, never as a command
@@ -67,3 +96,35 @@ termctl completion zsh > ~/.zfunc/_termctl
 
 `termctl shell` opens the existing restricted SafeTerm terminal, where `execute`
 and `config` workflows use the authenticated local-console identity.
+
+All service actions require the operating-system permissions needed by
+`systemctl`; administrators normally invoke them with `sudo`:
+
+```sh
+sudo termctl service status all
+sudo termctl service start all
+sudo termctl service stop all
+sudo termctl service restart ssh
+sudo termctl service enable all
+sudo termctl service disable config-network
+```
+
+The fixed service names are `audit`, `gateway`, `ssh`, `diagnostics`,
+`network`, `logs`, `services`, `config-application`, `config-database`, and
+`config-network`. `termctl service status` without a name is equivalent to
+`termctl service status all`.
+
+Configuration discovery is read-only:
+
+```sh
+termctl config list
+termctl config describe RESOURCE_ID
+```
+
+For shell completion, install one generated script for the current user:
+
+```sh
+mkdir -p ~/.local/share/bash-completion/completions
+termctl completion bash > ~/.local/share/bash-completion/completions/termctl
+termctl completion zsh > ~/.zfunc/_termctl
+```
