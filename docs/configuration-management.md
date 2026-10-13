@@ -49,6 +49,14 @@ encoder, and one trailing newline, so the same document renders identically.
 
 ## Validation and commit
 
+Managed seed files are owned by the corresponding Config Manager user and
+private group. Each systemd manager runs with primary group `safeterm-clients`
+for IPC and explicitly includes its own private group in `SupplementaryGroups`.
+This allows an unprivileged manager to preserve the target GID when creating
+backups and replacement files. It does not require `CAP_CHOWN`. If an older
+installation reports `preserve backup owner: operation not permitted`, verify
+the target UID/GID and the service's supplementary groups before retrying.
+
 Validation parses strings, integers, booleans, enums, and paths before applying
 range, length, anchored-pattern, required-state, path, and cross-field rules.
 Paths are absolute and clean, resolve under an allowed canonical prefix, and

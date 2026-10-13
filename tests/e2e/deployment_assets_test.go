@@ -12,6 +12,29 @@ import (
 )
 
 // TEST-DEPLOY-003: REQ-015 AC-3, AC-5, and AC-7.
+func TestConfigManagerUnitsCanPreserveManagedGroupWithoutPrivileges(t *testing.T) {
+	for _, profile := range []string{"application", "database", "network"} {
+		unit := readText(t, filepath.Join(repositoryRoot(t), "deploy", "systemd", "safeterm-config-manager-"+profile+".service"))
+		settings := map[string]string{}
+		for _, line := range strings.Split(unit, "\n") {
+			if key, value, ok := strings.Cut(line, "="); ok {
+				settings[key] = value
+			}
+		}
+		owner := "safeterm-config-" + profile
+		if settings["User"] != owner {
+			t.Errorf("%s: incorrect managed-file owner", profile)
+		}
+		groups := " " + settings["SupplementaryGroups"] + " "
+		if settings["Group"] != owner && !strings.Contains(groups, " "+owner+" ") {
+			t.Errorf("%s: cannot preserve managed files' private group", profile)
+		}
+		if settings["CapabilityBoundingSet"] != "" || settings["AmbientCapabilities"] != "" {
+			t.Errorf("%s: group preservation must not require capabilities", profile)
+		}
+	}
+}
+
 func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 	repository := repositoryRoot(t)
 	scripts := []string{

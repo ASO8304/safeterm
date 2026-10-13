@@ -70,7 +70,7 @@ usermod -a -G adm safeterm-log-reader
 usermod -a -G safeterm-gateway,safeterm-clients safeterm-broker
 usermod -a -G safeterm-gateway,safeterm-clients safeterm
 for name in safeterm-config-application safeterm-config-database safeterm-config-network; do
-  usermod -a -G safeterm-gateway "$name"
+  usermod -a -G "safeterm-gateway,$name" "$name"
 done
 
 for binary in "$bundle"/bin/safeterm-*; do
