@@ -15,6 +15,69 @@ import (
 	"safeterm/internal/contract"
 )
 
+func TestUnixWaitsCancelWithoutWaitingForDeadline(t *testing.T) {
+	for _, streaming := range []bool{false, true} {
+		t.Run(fmt.Sprintf("stream=%t", streaming), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "stalled.sock")
+			listener, err := net.Listen("unix", path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer listener.Close()
+			received := make(chan struct{})
+			serverDone := make(chan struct{})
+			go func() {
+				defer close(serverDone)
+				conn, err := listener.Accept()
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+				_ = conn.SetDeadline(time.Now().Add(3 * time.Second))
+				var request json.RawMessage
+				if json.NewDecoder(conn).Decode(&request) != nil {
+					return
+				}
+				close(received)
+				var b [1]byte
+				_, _ = conn.Read(b[:]) // Never respond; wait for client cancellation.
+			}()
+			client, err := NewUnixClient(path, []uint32{uint32(os.Getuid())})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			request, _ := contract.NewExecutionRequest("system_info", nil, contract.Metadata{})
+			finished := make(chan error, 1)
+			go func() {
+				if streaming {
+					_, err := client.StartStream(ctx, request)
+					finished <- err
+				} else {
+					_, err := client.Handle(ctx, request)
+					finished <- err
+				}
+			}()
+			select {
+			case <-received:
+			case <-time.After(2 * time.Second):
+				t.Fatal("request did not arrive")
+			}
+			cancel()
+			select {
+			case err := <-finished:
+				if err == nil {
+					t.Fatal("stalled request unexpectedly succeeded")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("cancellation did not interrupt IPC wait")
+			}
+			<-serverDone
+		})
+	}
+}
+
 // TEST-ISOLATION-006, TEST-ISOLATION-010
 func TestUnixIPCAuthenticatesPeersAndPreservesRequestID(t *testing.T) {
 	uid := uint32(os.Getuid())

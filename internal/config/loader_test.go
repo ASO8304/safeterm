@@ -27,6 +27,41 @@ func TestShippedTcpdumpOperationsFlushOutputWithoutNameResolution(t *testing.T) 
 	}
 }
 
+func TestShippedTracerouteUsesStreaming(t *testing.T) {
+	cfg, err := LoadConfig("../../configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range cfg.Operations {
+		if op.Name == "traceroute" {
+			if !op.LongRunning || op.RunnerProfile != ProfileNetworkObserver {
+				t.Fatal("traceroute must use the network observer streaming path")
+			}
+			if !slices.Contains(op.ArgsTemplate, "-n") {
+				t.Fatal("traceroute must avoid reverse DNS delays")
+			}
+			return
+		}
+	}
+	t.Fatal("traceroute operation missing")
+}
+
+func TestShippedPingUsesStreaming(t *testing.T) {
+	cfg, err := LoadConfig("../../configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range cfg.Operations {
+		if op.Name == "ping" {
+			if !op.LongRunning {
+				t.Fatal("ping must stream output before process exit")
+			}
+			return
+		}
+	}
+	t.Fatal("ping operation missing")
+}
+
 // writeConfigDir creates <base>/operations, <base>/roles and <base>/policies
 // under a fresh temp directory and writes the given JSON content into a
 // single file in each. Passing an empty string for any of them results in

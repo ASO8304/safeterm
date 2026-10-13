@@ -46,6 +46,10 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 			if !strings.Contains(unit, "CapabilityBoundingSet=CAP_NET_RAW") || !strings.Contains(unit, "AmbientCapabilities=CAP_NET_RAW") {
 				t.Errorf("network unit lacks narrow capability")
 			}
+		} else if profile.Name == config.ProfileServiceManager {
+			if !strings.Contains(unit, "CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE\nAmbientCapabilities=\n") {
+				t.Errorf("service-manager must bound sudo capabilities without ambient privileges")
+			}
 		} else if !strings.Contains(unit, "CapabilityBoundingSet=\nAmbientCapabilities=\n") {
 			t.Errorf("%s does not drop all capabilities", path)
 		}

@@ -24,7 +24,7 @@
   },
   {
     "name": "ping",
-    "description": "Send three bounded ICMP echo requests to an IPv4 address.",
+    "description": "Send bounded ICMP echo requests with live output; default count 100.",
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "ping",
@@ -46,7 +46,7 @@
         "max": 1000
       }
     ],
-    "long_running": false
+    "long_running": true
   },
   {
     "name": "log",
@@ -121,7 +121,7 @@
     "executable_ref": "traceroute",
     "args_template": ["-n", "-m", "12", "-w", "2", "{host}"],
     "parameters": [{ "name": "host", "type": "string", "required": true, "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$" }],
-    "long_running": false
+    "long_running": true
   },
   {
     "name": "memory_info",

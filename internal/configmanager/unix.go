@@ -253,6 +253,8 @@ func (c *UnixClient) call(ctx context.Context, request ipcRequest) (ipcReply, er
 	}
 	conn := connection.(*net.UnixConn)
 	defer conn.Close()
+	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancellation()
 	uid, err := peerUID(conn)
 	if err != nil || !c.allowed[uid] {
 		return ipcReply{}, fmt.Errorf("configmanager: server peer is not trusted")

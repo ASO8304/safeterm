@@ -216,6 +216,8 @@ func (c *UnixClient) Handle(ctx context.Context, request *contract.ExecutionRequ
 	}
 	conn := connection.(*net.UnixConn)
 	defer conn.Close()
+	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancellation()
 	credentials, err := credentialsFor(conn)
 	if err != nil || !c.allowedUID[credentials.UID] {
 		return nil, fmt.Errorf("isolation: Runner peer is not trusted")

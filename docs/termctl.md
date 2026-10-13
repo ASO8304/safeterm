@@ -186,3 +186,13 @@ Configuration changes always use the proposing user's own preview and y/N
 confirmation. Separate approval is removed. Existing registries remain readable:
 require_separate_approval is ignored and apply_roles follows propose_roles.
 A legacy config-approver role alone no longer grants apply access.
+
+Inside the restricted SSH or local-console terminal, Ctrl+C stops the active
+stream and returns to the prompt. Ctrl+] (Control plus right bracket) closes
+the entire SafeTerm session, including during an operation or a config prompt.
+The input reader cancels outstanding IPC waits; an active stream also receives
+semantic termination with a bounded five-second cleanup request. Exiting
+`sudo -iu safeterm` returns to the invoking shell; a physical-console login
+returns to the login screen, and SSH disconnects. It never opens an OS shell
+inside SafeTerm. Cancellation cannot undo a configuration change already
+committed by the server.

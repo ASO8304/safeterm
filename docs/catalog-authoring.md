@@ -135,3 +135,19 @@ an independent five-second deadline and still fails closed if audit fails.
 
 Changing these arguments changes the signed catalog. Use the normal package
 upgrade/signing procedure; editing the active JSON without signing is not valid.
+
+## Traceroute sessions
+
+The shipped traceroute operation sets `long_running: true` so the Broker routes
+it through bounded streaming instead of collecting all output until exit.
+`execute traceroute host=192.168.1.1` starts a session and supports Ctrl+C.
+The fixed `-n -m 12 -w 2` arguments disable reverse DNS and bound hops and
+probe waiting. A hop may still take time to produce output while probes wait
+for responses; streaming forwards bytes when traceroute writes them, rather
+than manufacturing progress during a probe wait.
+
+Ping also uses bounded streaming. Its count remains finite (100 by default),
+with the existing override and validation limits. Both ping and traceroute
+support Ctrl+C to stop the operation and Ctrl+] to close the entire terminal
+session. IPC waits are closed on context cancellation, including during stream
+startup, so a stalled response need not hold the terminal until its deadline.

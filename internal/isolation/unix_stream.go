@@ -120,6 +120,9 @@ func (c *UnixClient) StartStream(ctx context.Context, request *contract.Executio
 	if err != nil {
 		return nil, err
 	}
+	// Make cancellation effective during the start handshake as well.
+	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancellation()
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetWriteDeadline(deadline)
 	} else {

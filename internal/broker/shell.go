@@ -2,6 +2,7 @@ package broker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sort"
@@ -15,6 +16,8 @@ import (
 )
 
 const maxShellLineBytes = 4096
+
+var errShellEscape = errors.New("emergency session exit")
 
 type GatewayClient interface {
 	Handle(context.Context, *contract.ExecutionRequest) (*contract.ExecutionResponse, error)
@@ -52,15 +55,23 @@ func NewShellForBroker(client GatewayClient, catalog *Catalog, principal Princip
 	return &Shell{client: client, catalog: catalog, principal: principal, input: input, output: output, configs: configs}, nil
 }
 
-func (s *Shell) Run(ctx context.Context) error {
+func (s *Shell) Run(ctx context.Context) (runErr error) {
 	if ctx == nil {
 		return fmt.Errorf("broker: shell context is required")
 	}
-	input := make(chan byte, 64)
+	ctx, cancel := context.WithCancelCause(ctx)
+	defer cancel(nil)
+	defer func() {
+		if errors.Is(context.Cause(ctx), errShellEscape) {
+			fmt.Fprint(s.output, "\r\nsession closed (Ctrl+])\r\n")
+			runErr = nil
+		}
+	}()
+	input := make(chan byte, 2*maxShellLineBytes)
 	done := make(chan struct{})
 	defer close(done)
-	go readBytes(s.input, input, done)
-	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples.\r\n", s.principal.UserID)
+	go readBytes(s.input, input, done, cancel)
+	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples. Ctrl+] exits the session.\r\n", s.principal.UserID)
 	for {
 		line, err := s.readLine(ctx, input, s.prompt(), false, true)
 		if err != nil {
@@ -71,6 +82,9 @@ func (s *Shell) Run(ctx context.Context) error {
 			return err
 		}
 		exit, err := s.executeLine(ctx, strings.TrimSpace(line), input)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err != nil {
 			fmt.Fprintf(s.output, "error: %v\r\n", err)
 		}
@@ -81,15 +95,23 @@ func (s *Shell) Run(ctx context.Context) error {
 	}
 }
 
-func readBytes(reader io.Reader, output chan<- byte, done <-chan struct{}) {
+func readBytes(reader io.Reader, output chan<- byte, done <-chan struct{}, cancel context.CancelCauseFunc) {
 	defer close(output)
 	buffer := make([]byte, 1)
 	for {
 		n, err := reader.Read(buffer)
 		if n == 1 {
+			if buffer[0] == 0x1d { // Ctrl+]: bypass command/editor input entirely.
+				cancel(errShellEscape)
+				return
+			}
 			select {
 			case output <- buffer[0]:
 			case <-done:
+				return
+			default:
+				// Never block the emergency reader behind queued command input.
+				cancel(fmt.Errorf("broker: shell input queue exceeded"))
 				return
 			}
 		}
@@ -433,7 +455,7 @@ func (s *Shell) writeHelp(topic string) error {
 	case "config":
 		fmt.Fprint(s.output, "Configuration workflow\r\n  config list\r\n  config describe cats-options\r\n  config show cats-options\r\n  config edit cats-options cats Cat_Port\r\n\r\nThe editor validates the new value and shows a preview before applying it. Tab completes resource, section, and field names.\r\n")
 	case "keys":
-		fmt.Fprint(s.output, "Editing keys\r\n  Tab             complete commands, operations, parameters, and allowed values\r\n  Up / Down       browse command history\r\n  Left / Right    move the cursor\r\n  Home / End      jump to the beginning or end\r\n  Backspace/Del   delete around the cursor\r\n  Ctrl+C          cancel input or terminate the active stream\r\n")
+		fmt.Fprint(s.output, "Editing keys\r\n  Tab             complete commands, operations, parameters, and allowed values\r\n  Up / Down       browse command history\r\n  Left / Right    move the cursor\r\n  Home / End      jump to the beginning or end\r\n  Backspace/Del   delete around the cursor\r\n  Ctrl+C          cancel input or terminate the active stream\r\n  Ctrl+]          close the entire session, including during an operation\r\n")
 	default:
 		operation, ok := s.catalog.AuthorizedOperation(topic, s.principal.Roles)
 		if !ok {
@@ -485,12 +507,14 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(s.output, "session %s started; press Ctrl+C to terminate\r\n", session.ID)
+	fmt.Fprintf(s.output, "session %s started; Ctrl+C stops the operation; Ctrl+] exits the session\r\n", session.ID)
 	terminating := false
 	for {
 		select {
 		case <-ctx.Done():
-			s.terminate(session.ID)
+			if !terminating {
+				s.terminate(session.ID)
+			}
 			return ctx.Err()
 		case b, ok := <-input:
 			if !ok {
