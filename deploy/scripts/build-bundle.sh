@@ -40,6 +40,7 @@ for entry in audit config-manager console gateway runner ssh-broker preflight te
   chmod 0555 "$staging/bin/safeterm-$entry"
 done
 cp -R "$config_dir" "$staging/etc/safeterm"
+cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/etc/safeterm/"
 cp -R "$managed_dir" "$staging/managed"
 cp "$repo_dir"/deploy/systemd/*.service "$staging/systemd/"
 chmod 0644 "$staging"/systemd/*.service

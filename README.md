@@ -324,6 +324,11 @@ publish them as release assets for the stable links above.
 
 ## Project Structure
 
+The [catalog administration guide](configs/README.md) explains all catalog
+sections in detail. A plain-text edition is in `configs/README.txt`; both
+editions are installed at `/etc/safeterm/README.md` and
+`/etc/safeterm/README.txt`.
+
 ```text
 safeterm/
 ├── cmd/            Executable entry points (gateway, runner, ...)

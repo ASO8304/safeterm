@@ -267,6 +267,7 @@ for name in audit config-manager console gateway runner ssh-broker preflight ter
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
+cp "$payload/catalog-source/README.md" "$payload/catalog-source/README.txt" "$work/bundle/etc/safeterm/"
 cp -R "$payload/managed/." "$work/bundle/managed/"
 cp "$payload/systemd/"*.service "$work/bundle/systemd/"
 chmod 0644 "$work/bundle/systemd/"*.service
