@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"safeterm/internal/audit"
 	"safeterm/internal/config"
@@ -190,6 +191,48 @@ func TestGatewayRoutesWithoutExecuting(t *testing.T) {
 }
 
 type fakeCore struct{ calls int }
+
+type cancellingCore struct{ cancel context.CancelFunc }
+
+func (c cancellingCore) HandleRequest(_ context.Context, req *contract.ExecutionRequest) *contract.ExecutionResponse {
+	c.cancel()
+	return &contract.ExecutionResponse{RequestID: req.RequestID, Result: contract.ResultSuccess}
+}
+
+type cancellationAwareSink struct{ completed bool }
+
+func (s *cancellationAwareSink) Record(ctx context.Context, event audit.Event) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if event.Outcome == "completed" {
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) > 5*time.Second {
+			return errors.New("completion audit must have a bounded deadline")
+		}
+		s.completed = true
+	}
+	return nil
+}
+
+func TestRunnerRecordsCompletionAfterExecutionCancellation(t *testing.T) {
+	store, err := NewStore(testCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sink := &cancellationAwareSink{}
+	handler, err := NewProfileHandlerWithSink(config.ProfileDiagnostics, store, cancellingCore{cancel}, sink)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request, _ := contract.NewExecutionRequest("system_info", nil, contract.Metadata{})
+	response, err := handler.Handle(ctx, request)
+	if err != nil || response == nil || !sink.completed || ctx.Err() == nil {
+		t.Fatalf("response=%+v err=%v recorded=%t canceled=%v", response, err, sink.completed, ctx.Err())
+	}
+}
 
 func (c *fakeCore) HandleRequest(_ context.Context, req *contract.ExecutionRequest) *contract.ExecutionResponse {
 	c.calls++

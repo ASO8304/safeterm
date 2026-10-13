@@ -70,7 +70,7 @@ func TestTranslate_ExactTraceExample(t *testing.T) {
 	if err := validation.New(cfg).Validate(req); err != nil {
 		t.Fatal(err)
 	}
-	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/tcpdump", []string{"-i", "any", "port", "999", "and", "host", "192.168.10.20"})
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/tcpdump", []string{"-l", "-nn", "-i", "any", "port", "999", "and", "host", "192.168.10.20"})
 }
 
 func TestTranslate_ShippedPingUsesBoundedFixedArguments(t *testing.T) {

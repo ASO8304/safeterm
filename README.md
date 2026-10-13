@@ -76,7 +76,7 @@ Example translation output for trace with port=999 and host=192.168.10.20:
 
 ```text
 command: /usr/bin/tcpdump
-args: ["-i", "any", "port", "999", "and", "host", "192.168.10.20"]
+args: ["-l", "-nn", "-i", "any", "port", "999", "and", "host", "192.168.10.20"]
 ```
 
 The `translation.New(cfg)` constructor returns an error that must be checked before

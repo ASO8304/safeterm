@@ -66,7 +66,7 @@ func TestCore_WithRealTranslator_CapturesConfiguredCommands(t *testing.T) {
 		operation, role, command string
 		args                     []string
 	}{
-		{"trace", "netops", "/usr/bin/tcpdump", []string{"-i", "any", "port", "999", "and", "host", "192.168.10.20"}},
+		{"trace", "netops", "/usr/bin/tcpdump", []string{"-l", "-nn", "-i", "any", "port", "999", "and", "host", "192.168.10.20"}},
 		{"system_info", "viewer", "/usr/bin/uname", []string{"-a"}},
 	} {
 		t.Run(tc.operation, func(t *testing.T) {

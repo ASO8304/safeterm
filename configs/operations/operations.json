@@ -15,7 +15,7 @@
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "tcpdump",
-    "args_template": ["-i", "any", "port", "{port}", "and", "host", "{host}"],
+    "args_template": ["-l", "-nn", "-i", "any", "port", "{port}", "and", "host", "{host}"],
     "parameters": [
       { "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 },
       { "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
@@ -75,7 +75,7 @@
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "tcpdump",
-    "args_template": ["-i", "any", "host", "{host}"],
+    "args_template": ["-l", "-nn", "-i", "any", "host", "{host}"],
     "parameters": [{ "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }],
     "long_running": true
   },
@@ -85,7 +85,7 @@
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "tcpdump",
-    "args_template": ["-i", "any", "port", "{port}"],
+    "args_template": ["-l", "-nn", "-i", "any", "port", "{port}"],
     "parameters": [{ "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 }],
     "long_running": true
   },
@@ -95,7 +95,7 @@
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "tcpdump",
-    "args_template": ["-i", "any", "proto", "{protocol}", "and", "port", "{port}", "and", "host", "{host}"],
+    "args_template": ["-l", "-nn", "-i", "any", "proto", "{protocol}", "and", "port", "{port}", "and", "host", "{host}"],
     "parameters": [
       { "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" },
       { "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 },

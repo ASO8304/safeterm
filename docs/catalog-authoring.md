@@ -116,3 +116,22 @@ from the host administration console.
 The installer creates a rollback transaction before activation. Do not edit
 the active `/etc/safeterm` catalog directly: its detached signature will no
 longer match and services fail closed on restart.
+
+## Streaming tcpdump output
+
+All shipped capture operations (`trace`, `trace_host`, `trace_port`, and
+`trace_filtered`) use `-l -nn`. SafeTerm captures stdout through a pipe;
+`-l` makes tcpdump flush each text line instead of retaining a block until
+termination. `-nn` disables hostname and port-name resolution so lookup latency
+cannot delay packet rendering. The fixed capture/filter arguments remain
+catalog-owned. Runtime streaming cannot flush bytes still buffered inside the
+child process.
+
+On a test host, start `execute trace_port port=999`, generate TCP traffic to
+port 999 from another terminal, and verify packet lines appear before Ctrl+C.
+Termination should still return a final result and record durable completion
+without reusing the canceled execution context. Runner completion auditing has
+an independent five-second deadline and still fails closed if audit fails.
+
+Changing these arguments changes the signed catalog. Use the normal package
+upgrade/signing procedure; editing the active JSON without signing is not valid.

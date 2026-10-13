@@ -3,8 +3,29 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
+
+func TestShippedTcpdumpOperationsFlushOutputWithoutNameResolution(t *testing.T) {
+	cfg, err := LoadConfig("../../configs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	count := 0
+	for _, op := range cfg.Operations {
+		if op.ExecutableRef != "tcpdump" {
+			continue
+		}
+		count++
+		if !op.LongRunning || !slices.Contains(op.ArgsTemplate, "-l") || !slices.Contains(op.ArgsTemplate, "-nn") {
+			t.Errorf("%s: tcpdump must stream line-buffered numeric output", op.Name)
+		}
+	}
+	if count != 4 {
+		t.Fatalf("expected four capture operations, found %d", count)
+	}
+}
 
 // writeConfigDir creates <base>/operations, <base>/roles and <base>/policies
 // under a fresh temp directory and writes the given JSON content into a

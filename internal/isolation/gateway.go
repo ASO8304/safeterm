@@ -236,7 +236,11 @@ func (h *ProfileHandler) Handle(ctx context.Context, req *contract.ExecutionRequ
 		return nil, err
 	}
 	response := h.core.HandleRequest(ctx, req)
-	if err := h.record(ctx, req, "completed", snapshot.Version(), response); err != nil {
+	// Execution cancellation must not cancel the durable completion record.
+	// Bound cleanup independently while retaining request-scoped context values.
+	completionCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if err := h.record(completionCtx, req, "completed", snapshot.Version(), response); err != nil {
 		return nil, err
 	}
 	return response, nil
