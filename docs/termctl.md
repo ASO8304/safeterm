@@ -181,3 +181,8 @@ mkdir -p ~/.local/share/bash-completion/completions
 termctl completion bash > ~/.local/share/bash-completion/completions/termctl
 termctl completion zsh > ~/.zfunc/_termctl
 ```
+
+Configuration changes always use the proposing user's own preview and y/N
+confirmation. Separate approval is removed. Existing registries remain readable:
+require_separate_approval is ignored and apply_roles follows propose_roles.
+A legacy config-approver role alone no longer grants apply access.

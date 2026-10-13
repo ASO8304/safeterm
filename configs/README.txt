@@ -153,13 +153,13 @@ sudo termctl service restart all are a separate OS administration interface.
 roles/ defines known role names and descriptions, not executable paths or
 Linux privileges. Examples shipped with SafeTerm include viewer, netops,
 log-viewer, service-viewer, service-operator, config-viewer, config-operator
-and config-approver.
+and the legacy config-approver role (no longer needed for approval).
 
     { "name": "viewer", "description": "Read-only diagnostics." }
 
 Creating a role alone grants no operation. The identity must receive that role
 and a policy must grant the desired operations. Configuration-management roles
-also appear in the resource registry's read/propose/apply authorization rules;
+also appear in the resource registry's read/propose authorization rules;
 those permissions are separate from operation policies.
 
 6. Policies: connect roles to operations
@@ -337,3 +337,12 @@ Related source documentation: docs/catalog-authoring.md, docs/termctl.md,
 docs/ssh-authentication.md, docs/configuration-management.md and
 docs/offline-installation.md. These paths are in the source repository; this
 standalone guide is the copy installed alongside the runtime configuration.
+
+13. Single-operator configuration changes
+
+Config edits always use the same identity to propose and apply after preview
+and y/N confirmation. No second user is required. propose_roles controls both
+steps. Legacy apply_roles is normalized to propose_roles; legacy
+require_separate_approval is ignored. A config-approver-only identity cannot
+apply other users' proposals. Read, activation and rollback permissions remain
+separate. The --single-operator installer flag is now a compatibility no-op.

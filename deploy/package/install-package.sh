@@ -12,7 +12,7 @@ Install options:
   --ssh-user USER             SafeTerm SSH identity for a fresh install (default: alice)
   --ssh-password-hash-file FILE  bcrypt hash for a fresh SSH identity
   --ssh-public-key FILE       optional authorized public key
-  --single-operator           let proposing roles apply their own config changes
+  --single-operator           deprecated compatibility flag (single-operator is always enabled)
   --dry-run                   verify and print the base installation plan without host mutation
   --no-start                  install but do not enable or start services
   --local-key-dir DIR         local-signing key directory (default: /root/.config/safeterm)
@@ -256,12 +256,7 @@ if [ -f /etc/safeterm/config-manager/resources.json ]; then
 else
   install -m 0644 "$payload/config-manager/resources.json" "$work/config/config-manager/resources.json"
 fi
-if [ "$single_operator" = true ]; then
-  sed -i \
-    -e 's/"require_separate_approval": true/"require_separate_approval": false/g' \
-    -e 's/"apply_roles": \["config-approver"\]/"apply_roles": ["config-operator"]/g' \
-    "$work/config/config-manager/resources.json"
-fi
+
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
 for name in audit config-manager console gateway runner ssh-broker preflight termctl password-hash; do

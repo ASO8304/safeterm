@@ -284,10 +284,6 @@ func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byt
 			return err
 		}
 		fmt.Fprintf(s.output, "preview:\r\n%s\r\nproposal: %s\r\nexpires: %s\r\n", strings.ReplaceAll(preview.Diff, "\n", "\r\n"), preview.Token, preview.ExpiresAt.Format(time.RFC3339))
-		if description.Resource.RequireSeparateApproval {
-			fmt.Fprint(s.output, "Separate approver must run: config apply TOKEN\r\n")
-			return nil
-		}
 		answer, err := s.readConfigValue(ctx, input, "apply this change? [y/N]: ", false)
 		if err != nil {
 			return err

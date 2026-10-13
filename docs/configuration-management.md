@@ -21,9 +21,12 @@ Use `-` as `SECTION` for a root-level JSON field. `config edit` reads the
 current content hash, accepts one candidate value, validates it, and prints a
 redacted diff. Non-secret values are normalized before preview. Secret input is
 not echoed and secret values never appear in reads, diffs, errors, or audit.
-For a protected resource, a different identity with an apply role must use the
-short-lived token. Tokens are single-use, actor/resource/patch/version-bound,
-and kept only in memory.
+The proposing user confirms the preview with y/N and applies their own change.
+No second identity or approval role is required. Tokens are single-use,
+creator/resource/patch/version-bound, and kept only in memory. A different
+identity cannot consume another user's token. The propose_roles list controls
+both proposing and applying; legacy apply_roles is normalized to that list.
+Legacy require_separate_approval is accepted but ignored during upgrades.
 
 ## Registry and adapters
 

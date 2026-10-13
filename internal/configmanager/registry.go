@@ -74,6 +74,12 @@ func ValidateRegistry(registry *Registry) error {
 	paths := map[string]bool{}
 	for index := range registry.Resources {
 		resource := &registry.Resources[index]
+		// Legacy approval settings remain readable across upgrades. A writer
+		// now applies its own proposal; there is no independent approver role.
+		resource.RequireSeparateApproval = false
+		if resource.Access == AccessReadWrite {
+			resource.Permissions.ApplyRoles = append([]string(nil), resource.Permissions.ProposeRoles...)
+		}
 		if !identifierPattern.MatchString(resource.ID) || ids[resource.ID] {
 			return fmt.Errorf("configmanager: invalid or duplicate resource id %q", resource.ID)
 		}

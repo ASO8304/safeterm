@@ -258,10 +258,7 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 		m.proposalMu.Unlock()
 		return ApplyResult{}, fmt.Errorf("configmanager: proposal expired")
 	}
-	if resource.RequireSeparateApproval && actor.UserID == prepared.actor.UserID {
-		return ApplyResult{}, fmt.Errorf("configmanager: separate approval is required")
-	}
-	if !resource.RequireSeparateApproval && actor.UserID != prepared.actor.UserID {
+	if actor.UserID != prepared.actor.UserID {
 		return ApplyResult{}, fmt.Errorf("configmanager: proposal is bound to its creator")
 	}
 	m.proposalMu.Lock()

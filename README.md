@@ -35,7 +35,7 @@ Available capabilities:
   typed validation, redacted secrets, expiring proposals, optimistic concurrency,
   atomic writes, bounded backups, rollback, and optional typed activation checks
 - An interactive `config` workflow in the SSH restricted terminal for listing,
-  describing, reading, validating, previewing, approving, applying, and rolling
+  describing, reading, validating, previewing, applying, and rolling
   back registered fields without exposing a file editor or operating-system shell
 - A repository threat model and dedicated adversarial suite covering injection,
   IPC confusion, privilege boundaries, hardlinks, catalog integrity, resource

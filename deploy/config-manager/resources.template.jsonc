@@ -123,9 +123,7 @@
       "health_check_operation": "check_service",
       "rollback_on_failure": true,
 
-      // false lets the proposer apply their own proposal when their role is
-      // also listed in apply_roles. true enforces a second user.
-      "require_separate_approval": false,
+      // The proposing user applies the change after preview and confirmation.
       "backup": {
         "enabled": true,
         "keep": 5

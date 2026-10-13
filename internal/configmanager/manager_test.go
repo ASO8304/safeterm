@@ -157,10 +157,12 @@ func TestManagerRejectsUnknownReadOnlyRangeUnauthorizedAndCrossActor(t *testing.
 	}
 }
 
-func TestProposalExpiryAndSeparateApproval(t *testing.T) {
+func TestLegacyApprovalUsesCreatorAndProposalStillExpires(t *testing.T) {
 	path := writeTestINI(t)
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	manager, err := NewManager("application", testRegistry(path, true), nil, nil, &recordingSink{}, ManagerOptions{ProposalTTL: time.Minute, Now: func() time.Time { return now }})
+	registry := testRegistry(path, true)
+	registry.Resources[0].Permissions.ApplyRoles = []string{"approver"}
+	manager, err := NewManager("application", registry, nil, nil, &recordingSink{}, ManagerOptions{ProposalTTL: time.Minute, Now: func() time.Time { return now }})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,16 +173,16 @@ func TestProposalExpiryAndSeparateApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := manager.Apply(context.Background(), proposer, preview.Token); err == nil {
-		t.Fatal("self approval accepted")
+	if _, err := manager.Apply(context.Background(), actor("bob", "operator"), preview.Token); err == nil || !strings.Contains(err.Error(), "bound") {
+		t.Fatalf("another operator applied creator proposal: %v", err)
 	}
-	if _, err := manager.Apply(context.Background(), actor("bob", "approver"), preview.Token); err != nil {
+	if _, err := manager.Apply(context.Background(), proposer, preview.Token); err != nil {
 		t.Fatal(err)
 	}
 	read, _ = manager.Read(context.Background(), proposer, "cats-options")
 	preview, _ = manager.Preview(context.Background(), proposer, Patch{ResourceID: "cats-options", Section: "cats", Key: "Cat_Port", Value: "101", BaseVersion: read.Version})
 	now = now.Add(2 * time.Minute)
-	if _, err := manager.Apply(context.Background(), actor("bob", "approver"), preview.Token); err == nil || !strings.Contains(err.Error(), "expired") {
+	if _, err := manager.Apply(context.Background(), proposer, preview.Token); err == nil || !strings.Contains(err.Error(), "expired") {
 		t.Fatalf("expiry error=%v", err)
 	}
 }

@@ -92,8 +92,8 @@ sudo ./install.sh \
   --single-operator
 ```
 
-`--single-operator` makes each proposing role able to apply its own config
-proposal. Omit it when separate approval is required. On upgrades, the installer
+Single-operator editing is always enabled. `--single-operator` remains a
+deprecated compatibility flag and can be omitted. On upgrades, the installer
 preserves the existing SSH host key, SSH and console identity maps, Config
 Manager registry, and `/etc/safeterm-managed` contents. Therefore it does not
 rotate the SSH host fingerprint or reset managed values.
