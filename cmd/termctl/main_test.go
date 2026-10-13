@@ -2,11 +2,42 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestBashCompletionActuallyCompletes(t *testing.T) {
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skip("bash unavailable")
+	}
+	var script bytes.Buffer
+	if err := writeCompletion(&script, []string{"bash"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		words string
+		index int
+		want  string
+	}{
+		{"termctl ser", 1, "service"},
+		{"termctl service re", 2, "restart"},
+		{"termctl service restart config-n", 3, "config-network"},
+		{"termctl user add s", 3, "ssh"},
+		{"termctl catalog reg", 2, "regenerate-hashes"},
+		{"termctl user add ssh --password", 4, "--password-hash-file"},
+	} {
+		code := script.String() + fmt.Sprintf("\nCOMP_WORDS=(%s); COMP_CWORD=%d; _termctl_complete; printf '%%s\\n' \"${COMPREPLY[@]}\"", tc.words, tc.index)
+		out, err := exec.Command(bash, "--noprofile", "--norc", "-c", code).CombinedOutput()
+		if err != nil || strings.TrimSpace(string(out)) != tc.want {
+			t.Errorf("%s: output=%q err=%v want=%s", tc.words, out, err, tc.want)
+		}
+	}
+}
 
 func TestHelpAndCompletion(t *testing.T) {
 	var out bytes.Buffer

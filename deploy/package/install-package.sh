@@ -133,6 +133,7 @@ create_install_transaction() {
 /usr/local/bin/safeterm-password-hash
 /usr/local/bin/safeterm-termctl
 /usr/local/bin/termctl
+/usr/share/bash-completion/completions/termctl
 /usr/local/sbin/safeterm-install-rollback
 /usr/local/sbin/safeterm-uninstall
 /etc/safeterm

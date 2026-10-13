@@ -20,5 +20,6 @@ for name in ssh-broker config-manager-application config-manager-database config
   rm -f -- "/etc/systemd/system/safeterm-$name.service"
 done
 rm -f -- /usr/local/bin/termctl /etc/sudoers.d/safeterm-service-manager
+rm -f -- /usr/share/bash-completion/completions/termctl
 systemctl daemon-reload
 echo "SafeTerm uninstalled. Configuration, accounts, audit data, signing keys and rollback snapshots retained."

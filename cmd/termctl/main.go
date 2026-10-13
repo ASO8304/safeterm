@@ -819,7 +819,48 @@ func writeCompletion(out io.Writer, args []string) error {
 	services := "audit gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
-		fmt.Fprintf(out, "_termctl_complete() { local cur prev; cur=\"${COMP_WORDS[COMP_CWORD]}\"; prev=\"${COMP_WORDS[COMP_CWORD-1]}\"; if [[ \\\"$prev\\\" == service ]]; then COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == status || \\\"$prev\\\" == start || \\\"$prev\\\" == stop || \\\"$prev\\\" == restart || \\\"$prev\\\" == enable || \\\"$prev\\\" == disable ]]; then COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == catalog || \\\"$prev\\\" == config ]]; then COMPREPLY=($(compgen -W \\\"list describe\\\" -- \\\"$cur\\\")); elif [[ \\\"$prev\\\" == user ]]; then COMPREPLY=($(compgen -W \\\"list add auth del password\\\" -- \\\"$cur\\\")); else COMPREPLY=($(compgen -W \\\"%s\\\" -- \\\"$cur\\\")); fi; }; complete -F _termctl_complete termctl\n", serviceActions, services, commands)
+		fmt.Fprintf(out, `_termctl_complete() {
+  local cur="${COMP_WORDS[COMP_CWORD]}" choices=""
+  COMPREPLY=()
+  if (( COMP_CWORD == 1 )); then
+    choices="%s"
+  elif (( COMP_CWORD == 2 )); then
+    case "${COMP_WORDS[1]}" in
+      service) choices="%s" ;;
+      catalog) choices="list describe prepare regenerate-hashes" ;;
+      role|roles|config) choices="list describe" ;;
+      user) choices="list add auth del password" ;;
+      completion) choices="bash zsh" ;;
+      update) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
+    esac
+  else
+    case "${COMP_WORDS[1]}" in
+      service) if (( COMP_CWORD == 3 )); then choices="%s"; fi ;;
+      user)
+        if (( COMP_CWORD == 3 )); then
+          case "${COMP_WORDS[2]}" in add|auth|del|password) choices="ssh console" ;; esac
+        elif [[ "$cur" == -* ]]; then
+          choices="--id --os-user --roles --password-hash-file --authorized-key-file"
+        fi ;;
+      catalog)
+        case "${COMP_WORDS[2]}" in
+          prepare|regenerate-hashes)
+            case "${COMP_WORDS[COMP_CWORD-1]}" in
+              --source|--output) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
+              *) choices="--source --output" ;;
+            esac ;;
+        esac ;;
+      update)
+        if [[ "${COMP_WORDS[COMP_CWORD-1]}" == --signed-catalog ]]; then
+          mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return
+        fi
+        choices="--signed-catalog --dry-run" ;;
+    esac
+  fi
+  mapfile -t COMPREPLY < <(compgen -W "$choices" -- "$cur")
+}
+complete -F _termctl_complete termctl
+`, commands, serviceActions, services)
 		return nil
 	}
 	fmt.Fprintln(out, "#compdef termctl")

@@ -1,5 +1,20 @@
 # termctl
 
+The installer places Bash completion at
+`/usr/share/bash-completion/completions/termctl`. With the distribution's
+bash-completion integration enabled, it loads in a new interactive Bash session.
+For the current session, or without that integration, load it explicitly:
+
+```sh
+source /usr/share/bash-completion/completions/termctl
+```
+
+Use Tab after `termctl service ` for actions, after `termctl service restart `
+for SafeTerm service names, or after `termctl user add ` for identity types.
+This is Bash administration completion; the restricted SSH terminal has its
+own authorization-aware completion. Older releases with incorrectly escaped
+generated completion need the corrected binary before regeneration.
+
 Lifecycle administration (run from an ordinary administrator SSH/console,
 outside the restricted SafeTerm terminal):
 

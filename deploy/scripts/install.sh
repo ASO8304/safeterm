@@ -77,6 +77,10 @@ for binary in "$bundle"/bin/safeterm-*; do
   install -o root -g root -m 0555 "$binary" "/usr/local/bin/$(basename -- "$binary")"
 done
 install -o root -g root -m 0555 "$bundle/bin/safeterm-termctl" /usr/local/bin/termctl
+install -d -o root -g root -m 0755 /usr/share/bash-completion/completions
+"$bundle/bin/safeterm-termctl" completion bash > /usr/share/bash-completion/completions/termctl
+chown root:root /usr/share/bash-completion/completions/termctl
+chmod 0644 /usr/share/bash-completion/completions/termctl
 usermod --shell /usr/local/bin/safeterm-console safeterm
 if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
   echo /usr/local/bin/safeterm-console >>/etc/shells

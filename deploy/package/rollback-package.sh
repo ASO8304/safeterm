@@ -30,7 +30,7 @@ transaction="$transaction_root/$transaction_id"
 # Validate every removal path before stopping services or deleting files.
 while IFS= read -r path; do
   case "$path" in
-    /usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
+    /usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
     /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
     *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
   esac
@@ -46,7 +46,7 @@ done
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in
-    /usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
+    /usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
     /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
     *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
   esac
