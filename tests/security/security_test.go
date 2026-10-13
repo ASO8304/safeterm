@@ -169,11 +169,20 @@ func TestDeployedServicesRetainExplicitResourceAndPrivilegeBounds(t *testing.T) 
 			t.Errorf("%s must explicitly define capability sets", entry.Name())
 		}
 		expectedCapabilities := ""
+		expectedBounding := ""
 		if entry.Name() == "safeterm-runner-network-observer.service" {
 			expectedCapabilities = "CAP_NET_RAW"
+			expectedBounding = expectedCapabilities
 		}
-		if bounding != expectedCapabilities || ambient != expectedCapabilities {
-			t.Errorf("%s capabilities bounding=%q ambient=%q, want %q", entry.Name(), bounding, ambient, expectedCapabilities)
+		if privilegedController {
+			expectedBounding = "CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE"
+			families, _ := systemdSetting(unit, "RestrictAddressFamilies")
+			if families != "AF_UNIX AF_NETLINK" {
+				t.Errorf("%s must permit sudo's local audit transport", entry.Name())
+			}
+		}
+		if bounding != expectedBounding || ambient != expectedCapabilities {
+			t.Errorf("%s capabilities bounding=%q ambient=%q, want bounding=%q ambient=%q", entry.Name(), bounding, ambient, expectedBounding, expectedCapabilities)
 		}
 	}
 }

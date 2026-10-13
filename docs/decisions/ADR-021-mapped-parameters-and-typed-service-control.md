@@ -29,6 +29,14 @@ sets `NoNewPrivileges=no` and `RestrictSUIDSGID=no`; all other sandbox controls,
 resource limits, executable integrity checks, peer authentication, policy, and
 durable audit remain active.
 
+Deployment correction: the service-manager capability bounding set permits
+only CAP_SETUID, CAP_SETGID and CAP_AUDIT_WRITE. Ambient capabilities remain
+empty: the Runner receives no ambient privilege; setuid sudo can obtain only
+the bounded capabilities needed for identity transitions and native Linux
+audit messages. AF_UNIX and AF_NETLINK permit local systemd and audit IPC.
+An empty bounding set prevented sudo from setting its root GID even with
+NoNewPrivileges disabled. Other service profiles retain their existing bounds.
+
 Read-only status and mutating lifecycle operations use separate catalog roles.
 Fresh identities receive `service-viewer`, never `service-operator`.
 
