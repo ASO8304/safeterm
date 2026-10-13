@@ -271,6 +271,12 @@ SafeTerm Verification: PASS
 
 ## Installation Packages
 
+After initial installation, administrators can upgrade an extracted release
+with `sudo termctl update /path/to/package`, restore the latest pre-install
+state with `sudo termctl rollback`, or remove the runtime with
+`sudo termctl uninstall`. Uninstall preserves data and accounts. See the
+[termctl administration guide](docs/termctl.md).
+
 GitHub Actions builds self-contained offline installation packages for Linux
 AMD64 and ARM64. Tagged builds publish the latest packages as GitHub Release
 assets:

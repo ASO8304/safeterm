@@ -11,6 +11,8 @@ usage() {
 
 [ "$#" -le 1 ] || usage
 [ "$(id -u)" -eq 0 ] || { echo "rollback requires root" >&2; exit 1; }
+exec 9>/run/lock/safeterm-lifecycle.lock
+flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
 selection=${1:-latest}
 case "$selection" in ''|*[!A-Za-z0-9._-]*) usage ;; esac
 if [ "$selection" = latest ]; then
@@ -25,6 +27,15 @@ transaction="$transaction_root/$transaction_id"
 
 (cd "$transaction" && sha256sum -c SNAPSHOT-SHA256SUMS)
 
+# Validate every removal path before stopping services or deleting files.
+while IFS= read -r path; do
+  case "$path" in
+    /usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
+    /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
+    *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
+  esac
+done <"$transaction/replace-paths"
+
 for unit in $units; do
   systemctl stop "$unit" >/dev/null 2>&1 || true
 done
@@ -35,6 +46,7 @@ done
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in
+    /usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
     /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
     *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
   esac

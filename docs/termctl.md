@@ -1,5 +1,37 @@
 # termctl
 
+Lifecycle administration (run from an ordinary administrator SSH/console,
+outside the restricted SafeTerm terminal):
+
+```sh
+sudo termctl update /path/to/extracted/safeterm-offline-amd64 --dry-run
+sudo termctl update /path/to/extracted/safeterm-offline-amd64
+sudo termctl rollback
+sudo termctl uninstall
+```
+
+Update uses an already existing local signing key. With offline signing, add
+`--signed-catalog /path/to/signed-catalog` instead. Download and verify the
+release archive checksum before extracting it. The installer verifies its
+internal manifest, preserves identities and managed settings, and restarts
+services. It retains one pre-install snapshot after success; failed updates
+retain their recovery snapshot. Rollback automatically selects the latest
+snapshot, including after a failed installation, without any saved ID.
+Rollback is explicit, not automatic on installation failure.
+
+Uninstall removes runtime binaries, units and the service-manager sudoers rule.
+It retains configuration, accounts, keys, audit data and snapshots; it is
+idempotent and supports reinstall without enrollment. It does not implement
+data purging. After uninstall, recovery remains available through
+`sudo /usr/local/sbin/safeterm-install-rollback` or the package copy
+`sudo ./payload/rollback.sh`. These operations use a shared nonblocking lock to
+reject concurrent lifecycle changes.
+
+Rollback restores the account databases captured by the existing installer;
+use it before making unrelated account/group changes on the host. It also
+discards SafeTerm state changes since that snapshot. It requires local snapshot
+storage: administrators do not need to copy or remember transaction IDs.
+
 `termctl` is the single local administration entry point installed with
 SafeTerm. It provides catalog and configuration discovery, fixed service
 status/lifecycle commands, SSH identity inspection, and access to the full

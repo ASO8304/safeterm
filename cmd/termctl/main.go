@@ -59,6 +59,18 @@ func run(args []string, out, errOut io.Writer) error {
 		return nil
 	}
 	switch args[0] {
+	case "update":
+		return updateCommand(args[1:])
+	case "rollback":
+		if len(args) != 1 {
+			return fmt.Errorf("usage: termctl rollback")
+		}
+		return execCommand("/usr/local/sbin/safeterm-install-rollback", "latest")
+	case "uninstall":
+		if len(args) != 1 {
+			return fmt.Errorf("usage: termctl uninstall")
+		}
+		return execCommand("/usr/local/sbin/safeterm-uninstall")
 	case "completion":
 		return writeCompletion(out, args[1:])
 	case "catalog":
@@ -81,6 +93,9 @@ func run(args []string, out, errOut io.Writer) error {
 func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "SafeTerm control utility")
 	fmt.Fprintln(out, "Usage:")
+	fmt.Fprintln(out, "  termctl update PACKAGE_DIR [--signed-catalog DIR] [--dry-run]")
+	fmt.Fprintln(out, "  termctl rollback")
+	fmt.Fprintln(out, "  termctl uninstall (preserves data, identities and rollback snapshots)")
 	fmt.Fprintln(out, "  termctl catalog list|describe OPERATION")
 	fmt.Fprintln(out, "  termctl catalog prepare --source DIR --output DIR")
 	fmt.Fprintln(out, "  termctl role list|describe ROLE")
@@ -96,6 +111,43 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl shell")
 	fmt.Fprintln(out, "  termctl completion bash|zsh")
 	fmt.Fprintln(out, "Use Tab completion for commands, services, and catalog operations.")
+}
+
+func updateCommand(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: termctl update PACKAGE_DIR [--signed-catalog DIR] [--dry-run]")
+	}
+	dir, err := filepath.Abs(args[0])
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(dir, "PACKAGE-SHA256SUMS")); err != nil {
+		return fmt.Errorf("invalid package directory: %w", err)
+	}
+	options := []string{}
+	signed := false
+	for i := 1; i < len(args); i++ {
+		switch args[i] {
+		case "--dry-run":
+			options = append(options, "--dry-run")
+		case "--signed-catalog":
+			if signed || i+1 >= len(args) {
+				return fmt.Errorf("--signed-catalog requires one directory")
+			}
+			signed = true
+			i++
+			options = append(options, "--signed-catalog", args[i])
+		default:
+			return fmt.Errorf("unknown update option %q", args[i])
+		}
+	}
+	if !signed {
+		if _, err := os.Stat("/root/.config/safeterm/catalog-ed25519.key"); err != nil {
+			return fmt.Errorf("no local signing key; provide --signed-catalog DIR")
+		}
+		options = append(options, "--local-signing")
+	}
+	return execCommand(filepath.Join(dir, "install.sh"), options...)
 }
 
 func catalogCommand(dir string, args []string, out io.Writer) error {
@@ -763,7 +815,7 @@ func writeCompletion(out io.Writer, args []string) error {
 	if len(args) != 1 || (args[0] != "bash" && args[0] != "zsh") {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
-	commands := "catalog service config user shell completion help"
+	commands := "catalog role service config user shell update rollback uninstall completion help"
 	services := "audit gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {

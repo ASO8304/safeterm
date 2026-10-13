@@ -94,6 +94,8 @@ fi
 if [ -n "$signed_catalog" ] && [ "$local_signing" = true ]; then usage; fi
 if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then usage; fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
+exec 9>/run/lock/safeterm-lifecycle.lock
+flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
 for tool in sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
@@ -132,6 +134,7 @@ create_install_transaction() {
 /usr/local/bin/safeterm-termctl
 /usr/local/bin/termctl
 /usr/local/sbin/safeterm-install-rollback
+/usr/local/sbin/safeterm-uninstall
 /etc/safeterm
 /etc/safeterm-managed
 /etc/cat
@@ -304,6 +307,7 @@ fi
 # is supplied with a locally rebuilt package.
 install -o root -g root -m 0555 "$work/bundle/bin/safeterm-termctl" /usr/local/bin/safeterm-termctl
 install -o root -g root -m 0555 "$work/bundle/bin/safeterm-termctl" /usr/local/bin/termctl
+install -o root -g root -m 0555 "$payload/uninstall.sh" /usr/local/sbin/safeterm-uninstall
 [ -x /usr/local/bin/safeterm-termctl ] || { echo "termctl installation failed" >&2; exit 1; }
 [ -x /usr/local/bin/termctl ] || { echo "termctl alias installation failed" >&2; exit 1; }
 /usr/local/bin/safeterm-preflight --installed
@@ -318,4 +322,11 @@ if [ "$start_services" = true ]; then
   systemctl --quiet is-active safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 echo "SafeTerm package installation: PASS"
+# Retain one pre-install snapshot; operators never need to track IDs and
+# repeated upgrades do not accumulate snapshots indefinitely.
+for old_transaction in "$transaction_root"/*; do
+  [ -d "$old_transaction" ] || continue
+  [ "$old_transaction" = "$transaction" ] || rm -rf -- "$old_transaction"
+done
+echo "Administration: sudo termctl rollback | sudo termctl uninstall"
 echo "Rollback remains available with: sudo /usr/local/sbin/safeterm-install-rollback $(basename "$transaction")"

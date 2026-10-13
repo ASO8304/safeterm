@@ -12,7 +12,7 @@ The target must already provide systemd and these Ubuntu tools and executable
 paths:
 
 ```text
-sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo
+sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo flock
 /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo
 ```
 
@@ -175,13 +175,20 @@ installer changes the host.
 
 ## Transactional installation rollback
 
+For installed hosts, use `sudo termctl update /path/to/extracted/package`
+(or add `--signed-catalog DIR` for offline signing), `sudo termctl rollback`,
+and `sudo termctl uninstall`. The latter removes the runtime while preserving
+state and accounts for reinstall. See [termctl](termctl.md) for details.
+Successful installations retain only the latest recovery snapshot.
+
 Every non-dry-run installation creates a root-only transaction before the first
 persistent installation change. The transaction records the previous SafeTerm
 files and directories, local signing-key directory, audit data, managed data,
 service unit files, service enabled/running states, and the affected local
 account databases. Its contents are protected by a SHA-256 manifest.
 
-The installer prints the transaction ID and exact rollback command. To restore
+The installer prints the transaction ID and exact rollback command. No ID
+needs to be saved: `termctl rollback` selects the latest snapshot. To restore
 the newest pre-install state, run:
 
 ```bash

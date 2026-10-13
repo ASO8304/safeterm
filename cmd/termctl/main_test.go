@@ -19,6 +19,26 @@ func TestHelpAndCompletion(t *testing.T) {
 	}
 }
 
+func TestLifecycleRejectsInvalidInput(t *testing.T) {
+	var out bytes.Buffer
+	for _, args := range [][]string{
+		{"rollback", "extra"}, {"uninstall", "--purge"}, {"update"},
+		{"update", t.TempDir()},
+	} {
+		if err := run(args, &out, &out); err == nil {
+			t.Fatalf("invalid lifecycle input accepted: %v", args)
+		}
+	}
+	if err := run([]string{"help"}, &out, &out); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"termctl update", "termctl rollback", "termctl uninstall"} {
+		if !strings.Contains(out.String(), command) {
+			t.Fatalf("missing help for %s", command)
+		}
+	}
+}
+
 func TestUserListAndSSHAuthUpdate(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, "ssh"), 0o755); err != nil {
