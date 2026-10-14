@@ -216,3 +216,22 @@ repair with `sudo chown root:safeterm-broker /etc/safeterm/ssh/users.json` and
 `sudo chmod 0640 /etc/safeterm/ssh/users.json`. If systemd reports start-limit-hit,
 run `sudo systemctl reset-failed safeterm-ssh-broker.service` before starting it.
 Upgrade to the corrected termctl before making further identity changes.
+
+## Contextual question-mark help in the restricted terminal
+
+Alongside normal Tab completion, enter a standalone `?` token and press Enter:
+
+```text
+?                         Main commands with short descriptions
+execute ?                 Authorized operations with descriptions
+execute ping ?            Ping parameters, constraints and an example
+config ?                  Configuration subcommands with descriptions
+config edit ?             Authorized configuration resources
+config edit cats-options ? Registered fields for that resource
+```
+
+This help is available in both SSH and local-console SafeTerm sessions. It is
+read-only, filters operations/resources through the user's permissions, and
+returns to the normal prompt. It does not change Linux-style Tab behavior.
+The question mark must be a separate token; it is not a wildcard. These are
+restricted-terminal commands, not Bash commands or `termctl` CLI subcommands.

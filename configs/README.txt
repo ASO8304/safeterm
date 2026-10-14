@@ -346,3 +346,11 @@ steps. Legacy apply_roles is normalized to propose_roles; legacy
 require_separate_approval is ignored. A config-approver-only identity cannot
 apply other users' proposals. Read, activation and rollback permissions remain
 separate. The --single-operator installer flag is now a compatibility no-op.
+
+14. Contextual terminal help
+
+Alongside Tab completion, type ? and press Enter for main commands with short
+descriptions. Use execute ? for authorized operations, execute ping ? for
+parameter help, config ? for config subcommands, and config edit ? for
+authorized resources. Separate ? from preceding words with a space. Help
+never executes an operation or edits a file and returns to the prompt.

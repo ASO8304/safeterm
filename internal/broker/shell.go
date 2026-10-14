@@ -71,7 +71,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	done := make(chan struct{})
 	defer close(done)
 	go readBytes(s.input, input, done, cancel)
-	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples. Ctrl+] exits the session.\r\n", s.principal.UserID)
+	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
 	for {
 		line, err := s.readLine(ctx, input, s.prompt(), false, true)
 		if err != nil {
@@ -126,6 +126,9 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		return false, nil
 	}
 	fields := strings.Fields(line)
+	if fields[len(fields)-1] == "?" {
+		return false, s.questionHelp(ctx, fields[:len(fields)-1])
+	}
 	switch fields[0] {
 	case "help":
 		if len(fields) > 2 {
@@ -194,6 +197,81 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		return false, fmt.Errorf("unknown shell command %q; use 'help'", fields[0])
 	}
 	return false, nil
+}
+
+// questionHelp is read-only and never dispatches an execution or mutation.
+// Tab completion remains the editor's existing Linux-style workflow.
+func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
+	row := func(name, description string) {
+		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, strings.Join(strings.Fields(description), " "))))
+	}
+	if len(fields) == 0 {
+		for _, item := range [][2]string{
+			{"execute", "Execute an authorized operation; use execute ? to list operations"},
+			{"list", "List authorized operations"},
+			{"describe", "Show an operation's parameters and an example"},
+			{"config", "Inspect and edit registered configuration; use config ?"},
+			{"whoami", "Show your identity and roles"},
+			{"clear", "Clear the terminal screen"},
+			{"help", "Show usage and keyboard shortcuts"},
+			{"exit", "Close this SafeTerm session"},
+		} {
+			row(item[0], item[1])
+		}
+		return nil
+	}
+	switch fields[0] {
+	case "execute", "describe":
+		if len(fields) == 1 {
+			operations := s.catalog.AuthorizedOperations(s.principal.Roles)
+			if len(operations) == 0 {
+				fmt.Fprint(s.output, "No authorized operations.\r\n")
+			}
+			for _, op := range operations {
+				row(op.Name, op.Description)
+			}
+			return nil
+		}
+		op, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
+		if !ok {
+			return fmt.Errorf("operation %q is unknown or unauthorized", fields[1])
+		}
+		s.describe(op)
+		return nil
+	case "config":
+		if len(fields) == 1 {
+			for _, item := range [][2]string{
+				{"list", "List configuration resources you may access"},
+				{"describe RESOURCE", "Show registered fields and types"},
+				{"show RESOURCE", "Read values with secrets redacted"},
+				{"edit RESOURCE SECTION KEY", "Validate, preview and confirm a field change"},
+				{"apply TOKEN", "Apply your own unexpired proposal"},
+				{"rollback RESOURCE", "Restore the latest configuration backup"},
+			} {
+				row(item[0], item[1])
+			}
+			return nil
+		}
+		if fields[1] == "show" || fields[1] == "describe" || fields[1] == "edit" || fields[1] == "rollback" {
+			if s.configs == nil {
+				return fmt.Errorf("configuration management is unavailable")
+			}
+			if len(fields) == 2 {
+				resources, err := s.configs.List(ctx, s.principal)
+				if err != nil {
+					return err
+				}
+				for _, resource := range resources {
+					row(resource.ID, resource.Description)
+				}
+				return nil
+			}
+			return s.runConfig(ctx, []string{"describe", fields[2]}, nil)
+		}
+	case "help":
+		return s.writeHelp("")
+	}
+	return fmt.Errorf("no contextual help here; use ?, execute ?, or config ?")
 }
 
 func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byte) error {
@@ -455,7 +533,7 @@ func (s *Shell) writeHelp(topic string) error {
 	case "config":
 		fmt.Fprint(s.output, "Configuration workflow\r\n  config list\r\n  config describe cats-options\r\n  config show cats-options\r\n  config edit cats-options cats Cat_Port\r\n\r\nThe editor validates the new value and shows a preview before applying it. Tab completes resource, section, and field names.\r\n")
 	case "keys":
-		fmt.Fprint(s.output, "Editing keys\r\n  Tab             complete commands, operations, parameters, and allowed values\r\n  Up / Down       browse command history\r\n  Left / Right    move the cursor\r\n  Home / End      jump to the beginning or end\r\n  Backspace/Del   delete around the cursor\r\n  Ctrl+C          cancel input or terminate the active stream\r\n  Ctrl+]          close the entire session, including during an operation\r\n")
+		fmt.Fprint(s.output, "Editing keys\r\n  Tab             complete commands, operations, parameters, and allowed values\r\n  ? then Enter    show contextual commands and descriptions\r\n  Up / Down       browse command history\r\n  Left / Right    move the cursor\r\n  Home / End      jump to the beginning or end\r\n  Backspace/Del   delete around the cursor\r\n  Ctrl+C          cancel input or terminate the active stream\r\n  Ctrl+]          close the entire session, including during an operation\r\n")
 	default:
 		operation, ok := s.catalog.AuthorizedOperation(topic, s.principal.Roles)
 		if !ok {
