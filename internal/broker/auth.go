@@ -170,8 +170,8 @@ func ValidatePasswordComplexity(password []byte) error {
 		return fmt.Errorf("password must contain uppercase, lowercase, and numeric characters")
 	}
 	for _, value := range string(password) {
-		if value < 0x20 || value == 0x7f {
-			return fmt.Errorf("password must not contain control characters")
+		if value < 0x20 || value > 0x7e {
+			return fmt.Errorf("password must contain only printable ASCII characters supported by the terminal")
 		}
 	}
 	return nil
