@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,36 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestBulkRestartStopsDependentsBeforeStartingDependencies(t *testing.T) {
+	var out bytes.Buffer
+	var calls []string
+	err := serviceCommandWithRunner([]string{"restart", "all"}, &out, func(action, unit string) error {
+		calls = append(calls, action+" "+unit)
+		return nil
+	})
+	n := len(serviceOrder)
+	if err != nil || len(calls) != 3*n {
+		t.Fatalf("calls=%v err=%v", calls, err)
+	}
+	for i, name := range serviceOrder {
+		if calls[n-1-i] != "stop "+serviceUnits[name] || calls[n+i] != "reset-failed "+serviceUnits[name] || calls[2*n+i] != "start "+serviceUnits[name] {
+			t.Fatalf("incorrect restart ordering: %v", calls)
+		}
+	}
+}
+
+func TestBulkRestartAbortsAfterFailure(t *testing.T) {
+	var out bytes.Buffer
+	calls := 0
+	err := serviceCommandWithRunner([]string{"restart", "all"}, &out, func(action, unit string) error {
+		calls++
+		return errors.New("failed")
+	})
+	if err == nil || calls != 1 {
+		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+}
 
 func TestBashCompletionActuallyCompletes(t *testing.T) {
 	bash, err := exec.LookPath("bash")

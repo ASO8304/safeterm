@@ -241,6 +241,17 @@ func roleCommand(dir string, args []string, out io.Writer) error {
 }
 
 func serviceCommand(args []string, out, errOut io.Writer) error {
+	if len(args) > 0 && isServiceAction(args[0]) && args[0] != "status" && os.Geteuid() != 0 {
+		return fmt.Errorf("service changes require root; use sudo termctl service %s", strings.Join(args, " "))
+	}
+	return serviceCommandWithRunner(args, errOut, func(action, unit string) error {
+		cmd := exec.Command("/usr/bin/systemctl", "--no-pager", action, unit)
+		cmd.Stdout, cmd.Stderr = out, errOut
+		return cmd.Run()
+	})
+}
+
+func serviceCommandWithRunner(args []string, errOut io.Writer, invoke func(string, string) error) error {
 	if len(args) < 1 || !isServiceAction(args[0]) || len(args) > 2 {
 		return fmt.Errorf("usage: termctl service status|start|stop|restart|enable|disable [NAME|all]")
 	}
@@ -252,12 +263,29 @@ func serviceCommand(args []string, out, errOut io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if args[0] == "restart" && name == "all" {
+		stopping, _ := selectedServices("all", "stop")
+		for _, item := range stopping {
+			if err := invoke("stop", serviceUnits[item]); err != nil {
+				return fmt.Errorf("stop %s: %w", item, err)
+			}
+		}
+		for _, item := range names {
+			if err := invoke("reset-failed", serviceUnits[item]); err != nil {
+				return fmt.Errorf("reset-failed %s: %w", item, err)
+			}
+		}
+		for _, item := range names {
+			if err := invoke("start", serviceUnits[item]); err != nil {
+				return fmt.Errorf("start %s: %w", item, err)
+			}
+		}
+		return nil
+	}
 	var failures []string
 	for _, item := range names {
 		unit := serviceUnits[item]
-		cmd := exec.Command("/usr/bin/systemctl", "--no-pager", args[0], unit)
-		cmd.Stdout, cmd.Stderr = out, errOut
-		if err := cmd.Run(); err != nil {
+		if err := invoke(args[0], unit); err != nil {
 			fmt.Fprintf(errOut, "termctl service %s %s failed: %v\n", args[0], item, err)
 			failures = append(failures, item)
 		}
@@ -507,7 +535,7 @@ func upsertUser(dir string, kind string, auth bool, o userOptions, cfg *config.C
 		if err := writeJSONAtomic(path, data, 0640); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "SSH user %s updated\n", o.id)
+		fmt.Fprintf(out, "SSH user %s updated; run sudo termctl service restart ssh to load changes\n", o.id)
 		return nil
 	}
 	path := filepath.Join(dir, "console", "users.json")
@@ -598,7 +626,7 @@ func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writ
 		if err := writeJSONAtomic(path, data, 0640); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "SSH user %s deleted\n", o.id)
+		fmt.Fprintf(out, "SSH user %s deleted; run sudo termctl service restart ssh to load changes\n", o.id)
 		return nil
 	}
 	path := filepath.Join(dir, "console", "users.json")
@@ -706,7 +734,7 @@ func setUserPassword(dir, kind string, o userOptions, out io.Writer) error {
 	if err := writeJSONAtomic(path, data, 0640); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "SSH password updated for %s\n", o.id)
+	fmt.Fprintf(out, "SSH password updated for %s; run sudo termctl service restart ssh to load changes\n", o.id)
 	return nil
 }
 
@@ -779,6 +807,14 @@ func nonEmptyLines(value string) []string {
 	return lines
 }
 func writeJSONAtomic(path string, value any, mode os.FileMode) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("identity file must be a regular non-symlink file")
+	}
+	mode = info.Mode().Perm()
 	data, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
@@ -795,7 +831,15 @@ func writeJSONAtomic(path string, value any, mode os.FileMode) error {
 		tmp.Close()
 		return err
 	}
+	if err := preserveIdentityOwner(tmp, info); err != nil {
+		tmp.Close()
+		return fmt.Errorf("preserve identity file ownership: %w", err)
+	}
 	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
 		tmp.Close()
 		return err
 	}

@@ -196,3 +196,23 @@ semantic termination with a bounded five-second cleanup request. Exiting
 returns to the login screen, and SSH disconnects. It never opens an OS shell
 inside SafeTerm. Cancellation cannot undo a configuration change already
 committed by the server.
+
+Identity updates preserve the existing file UID, GID and permissions during
+atomic replacement. In particular, SSH users.json must remain
+root:safeterm-broker mode 0640, and console users.json root:safeterm mode 0640.
+SSH identities are loaded at Broker startup: restart only `termctl service
+restart ssh` (with sudo) after changing SSH users or passwords. Existing
+connections will be interrupted.
+
+`sudo termctl service restart all` stops dependents in reverse dependency
+order, resets failed/start-limit state for the fixed SafeTerm unit list, then
+starts dependencies first. It stops on the first failure. This avoids repeated
+implicit Broker starts from sequential restarts of its required services.
+Mutating service commands reject non-root invocation with a sudo instruction;
+status remains available with ordinary operating-system read permissions.
+
+On an older installation where a user edit changed the SSH file to root:root,
+repair with `sudo chown root:safeterm-broker /etc/safeterm/ssh/users.json` and
+`sudo chmod 0640 /etc/safeterm/ssh/users.json`. If systemd reports start-limit-hit,
+run `sudo systemctl reset-failed safeterm-ssh-broker.service` before starting it.
+Upgrade to the corrected termctl before making further identity changes.
