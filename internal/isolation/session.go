@@ -62,6 +62,7 @@ type SessionManager struct {
 }
 
 type sessionEntry struct {
+	expiry     *time.Timer
 	manager    *SessionManager
 	id         string
 	request    *contract.ExecutionRequest
@@ -150,6 +151,9 @@ func (m *SessionManager) StartStream(ctx context.Context, req *contract.Executio
 		return nil, err
 	}
 
+	if req.Metadata.BrokerType == "console" && !req.Metadata.SessionExpiresAt.IsZero() {
+		entry.expiry = time.AfterFunc(time.Until(req.Metadata.SessionExpiresAt), func() { cancel(context.DeadlineExceeded) })
+	}
 	entry.state = contract.SessionRunning
 	entry.events <- contract.StreamFrame{
 		Version: contract.StreamProtocolVersion, Type: contract.FrameSessionStarted,
@@ -197,6 +201,7 @@ func (m *SessionManager) Terminate(ctx context.Context, request contract.Control
 	if err := entry.audit(ctx, "terminate-requested", nil); err != nil {
 		entry.mu.Lock()
 		if entry.state == contract.SessionTerminating {
+
 			entry.state = contract.SessionRunning
 		}
 		entry.mu.Unlock()
@@ -285,6 +290,12 @@ func (s *sessionEntry) RecordLifecycle(event string) {
 }
 
 func (s *sessionEntry) run(ctx context.Context) {
+	defer s.cancel(nil)
+	defer func() {
+		if s.expiry != nil {
+			s.expiry.Stop()
+		}
+	}()
 	streamCtx := execution.WithLifecycleSink(execution.WithStreamSink(ctx, s), s)
 	response, err := s.manager.handler.Handle(streamCtx, s.request)
 	if err != nil || response == nil {

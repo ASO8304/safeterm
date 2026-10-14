@@ -24,8 +24,10 @@ func main() {
 	applicationConfigUser := flag.String("application-config-user", "safeterm-config-application", "application Config Manager user")
 	databaseConfigUser := flag.String("database-config-user", "safeterm-config-database", "database Config Manager user")
 	networkConfigUser := flag.String("network-config-user", "safeterm-config-network", "network Config Manager user")
+	identityUser := flag.String("identity-user", "safeterm-identity", "Console Identity producer user")
 	flag.Parse()
 	if err := run(*socketPath, *storePath, []producerUser{
+		{name: *identityUser, policy: audit.Producer{Component: audit.ComponentIdentity}},
 		{name: *gatewayUser, policy: audit.Producer{Component: audit.ComponentGateway}},
 		{name: *diagnosticsUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "diagnostics"}},
 		{name: *networkUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "network-observer"}},

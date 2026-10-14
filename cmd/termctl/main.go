@@ -18,6 +18,7 @@ import (
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
 	"safeterm/internal/deployment"
+	"safeterm/internal/identity"
 )
 
 const defaultConfigDir = "/etc/safeterm"
@@ -30,12 +31,13 @@ var serviceUnits = map[string]string{
 	"config-application": "safeterm-config-manager-application.service",
 	"config-database":    "safeterm-config-manager-database.service",
 	"config-network":     "safeterm-config-manager-network.service",
+	"identity":           "safeterm-identity.service",
 }
 
 // serviceOrder is the dependency order used for bulk lifecycle operations.
 // Stopping and disabling use the reverse order so dependents leave first.
 var serviceOrder = []string{
-	"audit", "diagnostics", "network", "logs", "services", "gateway",
+	"audit", "identity", "diagnostics", "network", "logs", "services", "gateway",
 	"config-application", "config-database", "config-network", "ssh",
 }
 
@@ -103,11 +105,11 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl service start|stop|restart|enable|disable [NAME|all]")
 	fmt.Fprintln(out, "  termctl config list|describe RESOURCE")
 	fmt.Fprintln(out, "  termctl user list")
-	fmt.Fprintln(out, "  termctl user add ssh|console [--id ID] [--os-user OS_USER] --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
-	fmt.Fprintln(out, "  termctl user auth ssh|console [--id ID] [--os-user OS_USER] [--password-hash-file FILE] [--authorized-key-file FILE]")
+	fmt.Fprintln(out, "  termctl user add ssh|console --id ID --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
+	fmt.Fprintln(out, "  termctl user auth ssh|console --id ID [--password-hash-file FILE] [--authorized-key-file FILE]")
 	fmt.Fprintln(out, "  termctl user password ssh --id ID")
-	fmt.Fprintln(out, "  termctl user password console --os-user OS_USER")
-	fmt.Fprintln(out, "  termctl user del ssh|console --id ID|--os-user OS_USER")
+	fmt.Fprintln(out, "  termctl user password console --id ID")
+	fmt.Fprintln(out, "  termctl user del ssh|console --id ID")
 	fmt.Fprintln(out, "  termctl shell")
 	fmt.Fprintln(out, "  termctl completion bash|zsh")
 	fmt.Fprintln(out, "Use Tab completion for commands, services, and catalog operations.")
@@ -360,7 +362,7 @@ func userCommand(dir string, args []string, out io.Writer) error {
 	}
 	if args[0] == "password" {
 		if len(args) < 2 || (args[1] != "ssh" && args[1] != "console") {
-			return fmt.Errorf("usage: termctl user password ssh|console --id ID|--os-user OS_USER")
+			return fmt.Errorf("usage: termctl user password ssh|console --id ID")
 		}
 		o, err := parseUserOptions(args[2:])
 		if err != nil {
@@ -383,11 +385,11 @@ func userCommand(dir string, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	if options.id == "" && kind == "ssh" {
+	if options.id == "" {
 		return fmt.Errorf("--id is required")
 	}
-	if kind == "console" && options.osUser == "" {
-		return fmt.Errorf("--os-user is required")
+	if kind == "console" && options.osUser != "" {
+		return fmt.Errorf("Console users are internal; use --id without --os-user")
 	}
 	if args[0] == "del" {
 		return deleteUser(dir, kind, options, cfg, out)
@@ -449,7 +451,7 @@ func listUsers(dir string, out io.Writer) error {
 			return err
 		}
 		for _, u := range console.Users {
-			fmt.Fprintf(out, "console/%-11s os-user=%s roles=%s\n", u.UserID, u.OSUser, strings.Join(u.Roles, ","))
+			fmt.Fprintf(out, "console/%-16s roles=%s password=%t disabled=%t\n", u.UserID, strings.Join(u.Roles, ","), u.PasswordHash != "", u.Disabled || u.PasswordHash == "")
 		}
 	}
 	return nil
@@ -538,53 +540,83 @@ func upsertUser(dir string, kind string, auth bool, o userOptions, cfg *config.C
 		fmt.Fprintf(out, "SSH user %s updated; run sudo termctl service restart ssh to load changes\n", o.id)
 		return nil
 	}
+	return upsertConsoleUser(dir, auth, o, cfg, out, false)
+}
+
+func upsertConsoleUser(dir string, auth bool, o userOptions, cfg *config.Config, out io.Writer, forcePassword bool) error {
+	if o.id == "" {
+		return fmt.Errorf("--id is required")
+	}
+	if o.osUser != "" || o.keyFile != "" {
+		return fmt.Errorf("Console users use internal --id and password authentication")
+	}
+	known := map[string]bool{}
+	for _, r := range cfg.Roles {
+		known[r.Name] = true
+	}
 	path := filepath.Join(dir, "console", "users.json")
-	var data broker.ConsoleIdentityConfig
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	if err := json.Unmarshal(raw, &data); err != nil {
+	users, err := identity.ParseUsers(raw, known)
+	if err != nil {
 		return err
 	}
 	index := -1
-	for i := range data.Users {
-		if data.Users[i].OSUser == o.osUser {
+	for i, u := range users.Users {
+		if u.UserID == o.id {
 			index = i
 			break
 		}
 	}
-	if !auth && index >= 0 {
-		return fmt.Errorf("console user %q already exists", o.osUser)
-	}
 	if auth && index < 0 {
-		return fmt.Errorf("console user %q does not exist", o.osUser)
+		return fmt.Errorf("Console user does not exist")
 	}
-	entry := broker.ConsoleIdentity{OSUser: o.osUser, UserID: o.id, Roles: roles}
+	if !auth && index >= 0 {
+		return fmt.Errorf("Console user already exists")
+	}
+	entry := broker.ConsoleIdentity{UserID: o.id, Roles: splitRoles(o.roles)}
 	if index >= 0 {
-		entry = data.Users[index]
+		entry = users.Users[index]
 	}
-	if o.id != "" {
-		entry.UserID = o.id
+	entry.OSUser = ""
+	if o.roles != "" {
+		entry.Roles = splitRoles(o.roles)
 	}
-	if len(roles) > 0 {
-		entry.Roles = roles
-	}
-	if index < 0 {
-		data.Users = append(data.Users, entry)
-	} else {
-		data.Users[index] = entry
-	}
-	encoded, _ := json.Marshal(data)
-	for _, u := range data.Users {
-		if _, err := broker.ParseConsolePrincipal(encoded, u.OSUser, known); err != nil {
+	passwordChanged := false
+	if o.hashFile != "" {
+		passwordChanged = true
+		entry.PasswordHash, err = readSingleLine(o.hashFile)
+		if err != nil {
+			return err
+		}
+	} else if entry.PasswordHash == "" || forcePassword {
+		passwordChanged = true
+		entry.PasswordHash, err = readInteractivePasswordHash()
+		if err != nil {
 			return err
 		}
 	}
-	if err := writeJSONAtomic(path, data, 0640); err != nil {
+	if passwordChanged {
+		entry.Disabled = false
+	}
+	if index < 0 {
+		users.Users = append(users.Users, entry)
+	} else {
+		users.Users[index] = entry
+	}
+	encoded, err := json.Marshal(users)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "console user %s updated\n", o.osUser)
+	if _, err = identity.ParseUsers(encoded, known); err != nil {
+		return err
+	}
+	if err = writeJSONAtomic(path, users, 0640); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "Console user %s updated; no OS account or service restart required\n", o.id)
 	return nil
 }
 
@@ -641,14 +673,14 @@ func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writ
 	next := data.Users[:0]
 	found := false
 	for _, u := range data.Users {
-		if u.OSUser == o.osUser {
+		if u.UserID == o.id {
 			found = true
 			continue
 		}
 		next = append(next, u)
 	}
 	if !found {
-		return fmt.Errorf("console user %q does not exist", o.osUser)
+		return fmt.Errorf("console user %q does not exist", o.id)
 	}
 	if len(next) == 0 {
 		return fmt.Errorf("cannot delete the last console user")
@@ -659,24 +691,27 @@ func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writ
 		known[role.Name] = true
 	}
 	encoded, _ := json.Marshal(data)
-	for _, u := range data.Users {
-		if _, err := broker.ParseConsolePrincipal(encoded, u.OSUser, known); err != nil {
-			return err
-		}
+	if _, err := identity.ParseUsers(encoded, known); err != nil {
+		return err
 	}
+
 	if err := writeJSONAtomic(path, data, 0640); err != nil {
 		return err
 	}
-	fmt.Fprintf(out, "console user %s deleted\n", o.osUser)
+	fmt.Fprintf(out, "console user %s deleted\n", o.id)
 	return nil
 }
 
 func setUserPassword(dir, kind string, o userOptions, out io.Writer) error {
-	if kind == "ssh" && o.id == "" {
+	if o.id == "" {
 		return fmt.Errorf("--id is required")
 	}
-	if kind == "console" && o.osUser == "" {
-		return fmt.Errorf("--os-user is required")
+	if kind == "console" {
+		cfg, err := config.LoadConfig(dir)
+		if err != nil {
+			return err
+		}
+		return upsertConsoleUser(dir, true, o, cfg, out, true)
 	}
 	password, err := readInteractivePassword()
 	if err != nil {
@@ -685,16 +720,6 @@ func setUserPassword(dir, kind string, o userOptions, out io.Writer) error {
 	defer clear(password)
 	if err := broker.ValidatePasswordComplexity(password); err != nil {
 		return err
-	}
-	if kind == "console" {
-		cmd := exec.Command("/usr/sbin/chpasswd", "-c", "SHA512")
-		cmd.Stdin = strings.NewReader(o.osUser + ":" + string(password) + "\n")
-		cmd.Stdout, cmd.Stderr = out, out
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("set console password: %w", err)
-		}
-		fmt.Fprintf(out, "console password updated for %s\n", o.osUser)
-		return nil
 	}
 	path := filepath.Join(dir, "ssh", "users.json")
 	raw, err := os.ReadFile(path)
@@ -860,7 +885,7 @@ func writeCompletion(out io.Writer, args []string) error {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
 	commands := "catalog role service config user shell update rollback uninstall completion help"
-	services := "audit gateway ssh diagnostics network logs services config-application config-database config-network all"
+	services := "audit identity gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
 		fmt.Fprintf(out, `_termctl_complete() {
@@ -884,7 +909,7 @@ func writeCompletion(out io.Writer, args []string) error {
         if (( COMP_CWORD == 3 )); then
           case "${COMP_WORDS[2]}" in add|auth|del|password) choices="ssh console" ;; esac
         elif [[ "$cur" == -* ]]; then
-          choices="--id --os-user --roles --password-hash-file --authorized-key-file"
+          choices="--id --roles --password-hash-file --authorized-key-file"
         fi ;;
       catalog)
         case "${COMP_WORDS[2]}" in

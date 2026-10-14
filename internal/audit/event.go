@@ -13,6 +13,7 @@ import (
 const SchemaVersion = 1
 
 const (
+	ComponentIdentity      = "identity"
 	ComponentGateway       = "gateway"
 	ComponentRunner        = "runner"
 	ComponentConfigManager = "config-manager"
@@ -120,10 +121,11 @@ func (e Event) Validate() error {
 	if !isUTC(e.OccurredAt) || (e.ReceivedAt != nil && !isUTC(*e.ReceivedAt)) || (e.StartedAt != nil && !isUTC(*e.StartedAt)) || (e.EndedAt != nil && !isUTC(*e.EndedAt)) {
 		return fmt.Errorf("audit: timestamps must use UTC")
 	}
-	if e.Component != ComponentGateway && e.Component != ComponentRunner && e.Component != ComponentConfigManager {
+	if e.Component != ComponentGateway && e.Component != ComponentRunner && e.Component != ComponentConfigManager && e.Component != ComponentIdentity {
 		return fmt.Errorf("audit: unsupported component %q", e.Component)
 	}
 	allowedOutcomes := map[string]map[string]bool{
+		ComponentIdentity: {"authenticated": true, "authentication-failed": true, "logged-out": true},
 		ComponentGateway: {
 			"unknown-operation": true, "profile-unavailable": true, "routed": true,
 			"runner-error": true, "returned": true,

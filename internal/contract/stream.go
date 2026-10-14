@@ -43,12 +43,13 @@ const (
 // SessionOwner is authenticated transport context when created by the M12 SSH
 // Broker. It is never used as a process primitive.
 type SessionOwner struct {
-	BrokerType string `json:"broker_type"`
-	UserID     string `json:"user_id"`
+	ConsoleSession string `json:"console_session,omitempty"`
+	BrokerType     string `json:"broker_type"`
+	UserID         string `json:"user_id"`
 }
 
 func OwnerFromMetadata(metadata Metadata) SessionOwner {
-	return SessionOwner{BrokerType: metadata.BrokerType, UserID: metadata.UserID}
+	return SessionOwner{BrokerType: metadata.BrokerType, UserID: metadata.UserID, ConsoleSession: metadata.ConsoleSession}
 }
 
 type StreamFrame struct {

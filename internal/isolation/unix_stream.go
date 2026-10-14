@@ -37,7 +37,7 @@ type streamDisconnector interface {
 	disconnect(context.Context, string, contract.SessionOwner)
 }
 
-func (s *UnixServer) handleStream(conn *net.UnixConn, data []byte) {
+func (s *UnixServer) handleStream(conn *net.UnixConn, data []byte, policy PeerPolicy, peer PeerIdentity) {
 	if s.streaming == nil {
 		_ = json.NewEncoder(conn).Encode(streamIPCReply{Error: "streaming is unavailable"})
 		return
@@ -60,6 +60,10 @@ func (s *UnixServer) handleStream(conn *net.UnixConn, data []byte) {
 			_ = json.NewEncoder(conn).Encode(streamIPCReply{Error: "invalid start request"})
 			return
 		}
+		if policy.authorize(request.Request, peer) != nil {
+			_ = json.NewEncoder(conn).Encode(streamIPCReply{Error: "peer is not authorized for stream"})
+			return
+		}
 		_ = conn.SetReadDeadline(time.Time{})
 		session, err := s.streaming.StartStream(context.Background(), request.Request)
 		if err != nil {
@@ -67,6 +71,8 @@ func (s *UnixServer) handleStream(conn *net.UnixConn, data []byte) {
 			return
 		}
 		owner := contract.OwnerFromMetadata(request.Request.Metadata)
+		verification := time.NewTicker(15 * time.Second)
+		defer verification.Stop()
 		disconnected := make(chan struct{})
 		go func() {
 			var buffer [1]byte
@@ -77,6 +83,16 @@ func (s *UnixServer) handleStream(conn *net.UnixConn, data []byte) {
 			var frame contract.StreamFrame
 			var ok bool
 			select {
+			case <-verification.C:
+				check := *request.Request
+				check.Metadata.ClaimedRoles = append([]string(nil), request.Request.Metadata.ClaimedRoles...)
+				if policy.AuthorizePeer != nil && policy.authorize(&check, peer) != nil {
+					if disconnector, ok := s.streaming.(streamDisconnector); ok {
+						disconnector.disconnect(context.Background(), session.ID, owner)
+					}
+					return
+				}
+				continue
 			case frame, ok = <-session.Events:
 				if !ok {
 					return
@@ -98,6 +114,10 @@ func (s *UnixServer) handleStream(conn *net.UnixConn, data []byte) {
 	case ipcTypeTerminate:
 		if request.Control == nil || request.Request != nil {
 			_ = json.NewEncoder(conn).Encode(streamIPCReply{Error: "invalid terminate request"})
+			return
+		}
+		if policy.AuthorizeControl != nil && policy.AuthorizeControl(request.Control, peer) != nil {
+			_ = json.NewEncoder(conn).Encode(streamIPCReply{Error: "peer is not authorized for control"})
 			return
 		}
 		result, err := s.streaming.Terminate(context.Background(), *request.Control)

@@ -1,17 +1,9 @@
 {
   "users": [
     {
-      "os_user": "safeterm",
-      "user_id": "safeterm",
-      "roles": [
-        "viewer",
-        "netops",
-        "log-viewer",
-        "service-viewer",
-        "config-viewer",
-        "config-operator",
-        "config-approver"
-      ]
+      "user_id": "local-admin",
+      "roles": ["viewer", "netops", "log-viewer", "service-viewer", "config-viewer", "config-operator"],
+      "disabled": true
     }
   ]
 }

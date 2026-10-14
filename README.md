@@ -49,10 +49,11 @@ Available capabilities:
   IPC, Gateway, Runner, integrity, direct execution, and durable Audit boundaries
 - A full restricted-shell line editor with cursor movement, insertion/deletion,
   bounded history, secret-safe input, and authorization-aware Tab completion
-- A local `safeterm` console login that presents the same restricted terminal
+- Internal Console usernames/passwords behind one shared `safeterm` Linux login,
+  with isolated Identity service and process-bound sessions across the signed
+  catalog, Gateway, Runner, configuration and audit boundaries
 - A `termctl` administration command with catalog, service, config, user, and
   shell-completion workflows
-  and crosses the same signed-catalog, IPC, policy, Runner, config, and audit boundaries
 - A self-contained AMD64/ARM64 installation package that needs no Git, Go,
   module download, or Internet access on the target and preserves installed state on upgrade
 - A checksum-protected pre-install transaction and offline rollback command that
@@ -208,8 +209,10 @@ M16 gives the restricted terminal normal line-editing behavior: cursor keys,
 Home/End, insertion and deletion, bounded per-session history, and Tab
 completion filtered through the user's authorized catalog and config views.
 The same terminal is installed as the fixed login shell for the local
-`safeterm` OS account. Its identity and roles come from a root-managed mapping,
-and Gateway binds `broker_type=console` to that account's peer UID. It does not
+`safeterm` OS account. Internal Console authentication now uses an isolated
+Identity service, bcrypt passwords and process-bound sessions verified by
+Gateway and Config Managers (see [Console authentication](docs/console-authentication.md)
+and [ADR-025](docs/decisions/ADR-025-internal-console-authentication.md)). It does not
 start Bash or expose arbitrary command execution. See
 [REQ-016](docs/requirements/REQ-016-interactive-terminal-and-console-broker.md),
 [ADR-018](docs/decisions/ADR-018-shared-restricted-terminal-and-console-login.md),

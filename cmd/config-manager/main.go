@@ -14,6 +14,7 @@ import (
 
 	"safeterm/internal/audit"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/identity"
 	"safeterm/internal/isolation"
 )
 
@@ -99,9 +100,42 @@ func run(profile, registryPath, socket, brokerUsers, auditSocket, auditUser, gat
 		return err
 	}
 	defer server.Close()
+	consoleUID, err := lookupUID("safeterm")
+	if err != nil {
+		return err
+	}
+	identityUID, err := lookupUID(identity.UserName)
+	if err != nil {
+		return err
+	}
+	identityClient := identity.NewClient(identity.SocketPath, identityUID)
+	server.SetActorAuthorizer(consoleActorAuthorizer(consoleUID, identityClient))
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return server.Serve(ctx)
+}
+
+func consoleActorAuthorizer(consoleUID uint32, identityClient *identity.Client) func(*configmanager.Actor, uint32, int32) error {
+	return func(actor *configmanager.Actor, uid uint32, pid int32) error {
+		if actor == nil {
+			return identity.ErrDenied
+		}
+		if uid != consoleUID {
+			if actor.BrokerType != "ssh" || actor.ConsoleSession != "" {
+				return identity.ErrDenied
+			}
+			return nil
+		}
+		if actor.BrokerType != "console" {
+			return identity.ErrDenied
+		}
+		session, err := identityClient.Verify(context.Background(), actor.ConsoleSession, identity.Peer{UID: uid, PID: pid})
+		if err != nil || actor.UserID != session.UserID {
+			return identity.ErrDenied
+		}
+		actor.Roles = append([]string(nil), session.Roles...)
+		return nil
+	}
 }
 
 func lookupUID(name string) (uint32, error) {

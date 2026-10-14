@@ -42,7 +42,7 @@ func configActor(principal Principal) configmanager.Actor {
 	if brokerType == "" {
 		brokerType = "ssh"
 	}
-	return configmanager.Actor{BrokerType: brokerType, UserID: principal.UserID, Roles: append([]string(nil), principal.Roles...)}
+	return configmanager.Actor{BrokerType: brokerType, UserID: principal.UserID, Roles: append([]string(nil), principal.Roles...), ConsoleSession: principal.ConsoleSession}
 }
 
 func (b *ConfigBroker) List(ctx context.Context, principal Principal) ([]configmanager.ResourceSummary, error) {

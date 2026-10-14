@@ -1,7 +1,7 @@
 # REQ-016 — Interactive Terminal and Console Broker
 
 **Source:** M16 — Interactive Terminal UX and Console Access  
-**Status:** Implemented in M16
+**Status:** Implemented in M16; OS mapping/authentication criteria superseded by REQ-021 and ADR-025.
 
 ## Requirement
 

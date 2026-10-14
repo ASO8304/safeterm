@@ -9,11 +9,79 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"safeterm/internal/contract"
 )
+
+func TestConsoleStreamRechecksWithoutInjectingFramesAndRevokes(t *testing.T) {
+	uid := uint32(os.Getuid())
+	manager, recorder := newTestSessionManagerWithTimeout(t, "interrupt", DefaultStreamOptions(), 45*time.Second)
+	var revoked atomic.Bool
+	var calls atomic.Int32
+	rechecked := make(chan struct{}, 1)
+	policy := PeerPolicy{AllowStreaming: true, AuthorizePeer: func(*contract.ExecutionRequest, PeerIdentity) error {
+		if revoked.Load() {
+			return fmt.Errorf("session revoked")
+		}
+		if calls.Add(1) > 1 {
+			select {
+			case rechecked <- struct{}{}:
+			default:
+			}
+		}
+		return nil
+	}}
+	path := filepath.Join(t.TempDir(), "revocation.sock")
+	server, err := ListenUnixStreamingWithPeerPolicies(path, 0600, map[uint32]PeerPolicy{uid: policy}, manager.handler, manager)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	go server.Serve(ctx)
+	client, _ := NewUnixClient(path, []uint32{uid})
+	session, err := client.StartStream(ctx, streamRequest(t, "alice"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-rechecked:
+	case <-ctx.Done():
+		t.Fatal("stream was not revalidated")
+	}
+	// Successful verification is not a stream event. An empty injected frame
+	// would make the real Unix client close this stream immediately.
+	stable := time.After(300 * time.Millisecond)
+drain:
+	for {
+		select {
+		case _, ok := <-session.Events:
+			if !ok {
+				t.Fatal("successful recheck broke streaming")
+			}
+		case <-stable:
+			break drain
+		}
+	}
+	revoked.Store(true)
+	for {
+		select {
+		case _, ok := <-session.Events:
+			if !ok {
+				if !recorder.has("client-disconnected") {
+					t.Fatal("revocation did not cancel the session")
+				}
+				return
+			}
+		case <-ctx.Done():
+			t.Fatal("revoked stream remained active")
+		}
+	}
+}
 
 func TestUnixWaitsCancelWithoutWaitingForDeadline(t *testing.T) {
 	for _, streaming := range []bool{false, true} {
@@ -214,6 +282,35 @@ func TestUnixIPCRejectsUnknownFieldsAndTrailingMessages(t *testing.T) {
 		if reply.Error != "invalid request" || handler.calls != 0 {
 			t.Fatalf("payload accepted: reply=%+v calls=%d", reply, handler.calls)
 		}
+	}
+}
+
+func TestStreamingCannotBypassPeerAuthentication(t *testing.T) {
+	uid := uint32(os.Getuid())
+	manager, _ := newTestSessionManager(t, "interrupt", DefaultStreamOptions())
+	policy := PeerPolicy{AllowStreaming: true, AuthorizePeer: func(_ *contract.ExecutionRequest, peer PeerIdentity) error {
+		if peer.UID != uid || peer.PID != int32(os.Getpid()) {
+			t.Error("peer identity was not derived from the kernel")
+		}
+		return fmt.Errorf("no authenticated session")
+	}, AuthorizeControl: func(*contract.ControlRequest, PeerIdentity) error { return fmt.Errorf("no authenticated session") }}
+	path := filepath.Join(t.TempDir(), "gateway.sock")
+	server, err := ListenUnixStreamingWithPeerPolicies(path, 0600, map[uint32]PeerPolicy{uid: policy}, manager.handler, manager)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go server.Serve(ctx)
+	client, _ := NewUnixClient(path, []uint32{uid})
+	if _, err = client.StartStream(ctx, streamRequest(t, "alice")); err == nil {
+		t.Fatal("stream bypassed authentication")
+	}
+	manager.mu.RLock()
+	defer manager.mu.RUnlock()
+	if manager.active != 0 || len(manager.sessions) != 0 {
+		t.Fatal("unauthenticated request created a session")
 	}
 }
 

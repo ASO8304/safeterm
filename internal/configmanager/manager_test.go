@@ -68,6 +68,31 @@ func actor(id string, roles ...string) Actor {
 	return Actor{BrokerType: "ssh", UserID: id, Roles: roles}
 }
 
+func TestConsoleProposalCannotBeAppliedByAnotherLoginOfSameUser(t *testing.T) {
+	manager, err := NewManager("application", testRegistry(writeTestINI(t), false), nil, nil, &recordingSink{}, ManagerOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	creator := Actor{BrokerType: "console", UserID: "alice", Roles: []string{"viewer", "operator"}, ConsoleSession: "first-login"}
+	ctx := context.Background()
+	read, err := manager.Read(ctx, creator, "cats-options")
+	if err != nil {
+		t.Fatal(err)
+	}
+	preview, err := manager.Preview(ctx, creator, Patch{ResourceID: "cats-options", Section: "cats", Key: "Cat_Port", Value: "100", BaseVersion: read.Version})
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := creator
+	other.ConsoleSession = "second-login"
+	if _, err = manager.Apply(ctx, other, preview.Token); err == nil {
+		t.Fatal("another login reused a proposal")
+	}
+	if _, err = manager.Apply(ctx, creator, preview.Token); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestManagerPreviewApplyRedactionConflictAndRollback(t *testing.T) {
 	path := writeTestINI(t)
 	sink := &recordingSink{}

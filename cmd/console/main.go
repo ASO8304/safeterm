@@ -5,12 +5,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"golang.org/x/sys/unix"
 	"os"
 	"os/signal"
 	"os/user"
 	"path/filepath"
+	"safeterm/internal/identity"
 	"strconv"
 	"syscall"
+	"time"
 
 	"golang.org/x/term"
 
@@ -22,9 +25,8 @@ import (
 )
 
 const (
-	configDir      = "/etc/safeterm"
-	identitiesPath = "/etc/safeterm/console/users.json"
-	gatewaySocket  = "/run/safeterm-gateway/gateway.sock"
+	configDir     = "/etc/safeterm"
+	gatewaySocket = "/run/safeterm-gateway/gateway.sock"
 )
 
 var managerEndpoints = []struct{ socket, user string }{
@@ -45,8 +47,16 @@ func run() error {
 		return fmt.Errorf("console: an interactive terminal is required")
 	}
 	current, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("console: resolve OS identity: %w", err)
+	if err != nil || current.Username != "safeterm" {
+		return fmt.Errorf("console: use the shared safeterm OS account")
+	}
+	// Prevent sibling processes of the shared UID from reading login credentials
+	// or tokens through ptrace/proc; prohibit gaining privileges through exec.
+	if err = unix.Prctl(unix.PR_SET_DUMPABLE, 0, 0, 0, 0); err != nil {
+		return err
+	}
+	if err = unix.Prctl(unix.PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
+		return err
 	}
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
@@ -59,10 +69,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	principal, err := broker.LoadConsolePrincipal(identitiesPath, current.Username, catalog.KnownRoles())
-	if err != nil {
-		return err
-	}
+
 	gatewayUID, err := lookupUID("safeterm-gateway")
 	if err != nil {
 		return err
@@ -92,7 +99,18 @@ func run() error {
 		return fmt.Errorf("console: enter raw terminal mode: %w", err)
 	}
 	defer term.Restore(int(os.Stdin.Fd()), state)
-	shell, err := broker.NewShellForBroker(client, catalog, principal, os.Stdin, os.Stdout, configs, "console")
+	identityUID, err := lookupUID(identity.UserName)
+	if err != nil {
+		return err
+	}
+	identityClient := identity.NewClient(identity.SocketPath, identityUID)
+	shell, err := broker.NewAuthenticatedConsoleShell(client, catalog, os.Stdin, os.Stdout, configs,
+		func(ctx context.Context, user string, password []byte) (broker.Principal, time.Time, error) {
+			session, err := identityClient.Login(ctx, user, password)
+			return broker.Principal{UserID: session.UserID, Roles: session.Roles, BrokerType: "console", ConsoleSession: session.Token}, session.ExpiresAt, err
+		}, func(ctx context.Context, p broker.Principal) error {
+			return identityClient.Logout(ctx, p.ConsoleSession)
+		})
 	if err != nil {
 		return err
 	}

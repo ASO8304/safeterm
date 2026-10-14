@@ -49,10 +49,15 @@ type ipcReply struct {
 }
 
 type UnixServer struct {
+	authorize   func(*Actor, uint32, int32) error
 	listener    *net.UnixListener
 	service     Service
 	allowed     map[uint32]bool
 	connections chan struct{}
+}
+
+func (s *UnixServer) SetActorAuthorizer(authorize func(*Actor, uint32, int32) error) {
+	s.authorize = authorize
 }
 
 func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, service Service) (*UnixServer, error) {
@@ -139,6 +144,13 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 	if decoder.Decode(&trailing) != io.EOF {
 		_ = json.NewEncoder(conn).Encode(ipcReply{Error: "invalid request"})
 		return
+	}
+	if s.authorize != nil {
+		pid, err := peerPID(conn)
+		if err != nil || s.authorize(&request.Actor, uid, pid) != nil {
+			_ = json.NewEncoder(conn).Encode(ipcReply{Error: "actor is not authenticated"})
+			return
+		}
 	}
 	reply := s.dispatch(request)
 	_ = json.NewEncoder(conn).Encode(reply)

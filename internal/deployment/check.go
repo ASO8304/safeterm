@@ -7,22 +7,24 @@ import (
 	"os/user"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"safeterm/internal/broker"
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
 )
 
 var RuntimeBinaries = []string{
 	"safeterm-audit", "safeterm-config-manager", "safeterm-gateway",
 	"safeterm-console", "safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight",
-	"safeterm-termctl",
+	"safeterm-termctl", "safeterm-identity",
 }
 
 var SystemdUnits = []string{
-	"safeterm-audit.service",
+	"safeterm-audit.service", "safeterm-identity.service",
 	"safeterm-config-manager-application.service",
 	"safeterm-config-manager-database.service",
 	"safeterm-config-manager-network.service",
@@ -161,11 +163,25 @@ func Check(options CheckOptions) (Report, error) {
 	if _, err := broker.LoadSSHHostKey(filepath.Join(configDir, "ssh", "ssh_host_ed25519_key")); err != nil {
 		return Report{}, err
 	}
-	consoleData, err := os.ReadFile(filepath.Join(configDir, "console", "users.json"))
+	consolePath := filepath.Join(configDir, "console", "users.json")
+	if options.Installed {
+		group, err := user.LookupGroup(identity.UserName)
+		if err != nil {
+			return Report{}, err
+		}
+		gid, err := strconv.ParseUint(group.Gid, 10, 32)
+		if err != nil {
+			return Report{}, err
+		}
+		if err = identity.CheckRootManaged(consolePath, uint32(gid)); err != nil {
+			return Report{}, err
+		}
+	}
+	consoleData, err := broker.ReadConsoleUsersData(consolePath)
 	if err != nil {
 		return Report{}, err
 	}
-	if _, err := broker.ParseConsolePrincipal(consoleData, "safeterm", catalog.KnownRoles()); err != nil {
+	if _, err := identity.ParseUsers(consoleData, catalog.KnownRoles()); err != nil {
 		return Report{}, err
 	}
 	registryPath := filepath.Join(configDir, "config-manager", "resources.json")
@@ -296,7 +312,7 @@ func requireSecureFile(path string, executable bool) error {
 }
 
 func checkAccounts(cfg *config.Config) error {
-	names := []string{"safeterm", "safeterm-audit", "safeterm-broker", "safeterm-gateway", "safeterm-config-application", "safeterm-config-database", "safeterm-config-network"}
+	names := []string{"safeterm-identity", "safeterm", "safeterm-audit", "safeterm-broker", "safeterm-gateway", "safeterm-config-application", "safeterm-config-database", "safeterm-config-network"}
 	for _, profile := range cfg.Profiles {
 		names = append(names, profile.RunAsUser)
 	}

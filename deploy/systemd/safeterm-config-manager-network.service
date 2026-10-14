@@ -1,7 +1,7 @@
 [Unit]
 Description=SafeTerm network Config Manager
-After=local-fs.target safeterm-audit.service
-Requires=safeterm-audit.service
+After=safeterm-identity.service local-fs.target safeterm-audit.service
+Requires=safeterm-audit.service safeterm-identity.service
 Before=safeterm-ssh-broker.service
 
 [Service]

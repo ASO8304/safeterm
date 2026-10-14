@@ -44,8 +44,8 @@ safeterm_ssh_users: []
 safeterm_console_users: []
 # Example:
 # safeterm_console_users:
-#   - os_user: safeterm
-#     user_id: alice
+#   - user_id: alice
+#     password_hash: "$2a$12$REPLACE_WITH_GENERATED_HASH" # Store with Ansible Vault
 #     roles: [viewer, netops, log-viewer, service-viewer]
 
 # Optional controller-side replacement for the complete Config Manager registry.

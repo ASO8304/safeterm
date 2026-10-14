@@ -235,6 +235,11 @@ func (h *ProfileHandler) Handle(ctx context.Context, req *contract.ExecutionRequ
 	if err := h.record(ctx, req, "accepted", snapshot.Version(), nil); err != nil {
 		return nil, err
 	}
+	if req.Metadata.BrokerType == "console" && !req.Metadata.SessionExpiresAt.IsZero() {
+		var expire context.CancelFunc
+		ctx, expire = context.WithDeadline(ctx, req.Metadata.SessionExpiresAt)
+		defer expire()
+	}
 	response := h.core.HandleRequest(ctx, req)
 	// Execution cancellation must not cancel the durable completion record.
 	// Bound cleanup independently while retaining request-scoped context values.

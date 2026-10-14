@@ -76,25 +76,16 @@ func TestPositionalMappedArgumentAndHelpExample(t *testing.T) {
 	}
 }
 
-func TestConsoleIdentityUsesConfiguredRoles(t *testing.T) {
-	data := []byte(`{"users":[{"os_user":"safeterm","user_id":"console-operator","roles":["netops","viewer"]}]}`)
-	principal, err := ParseConsolePrincipal(data, "safeterm", map[string]bool{"viewer": true, "netops": true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if principal.UserID != "console-operator" || principal.BrokerType != "console" || strings.Join(principal.Roles, ",") != "netops,viewer" {
-		t.Fatalf("principal=%+v", principal)
-	}
-	if _, err := ParseConsolePrincipal(data, "other", map[string]bool{"viewer": true, "netops": true}); err == nil {
-		t.Fatal("unregistered OS user accepted")
-	}
+func TestConsoleRequestsCarryAuthenticatedSession(t *testing.T) {
+	principal := Principal{UserID: "console-operator", Roles: []string{"netops", "viewer"}, BrokerType: "console", ConsoleSession: "opaque-token"}
+
 	catalog, _ := NewCatalog(brokerTestConfig())
 	shell, err := NewShellForBroker(&fakeGateway{}, catalog, principal, bytes.NewReader(nil), &bytes.Buffer{}, nil, "console")
 	if err != nil {
 		t.Fatal(err)
 	}
 	request, err := shell.request("system_info", map[string]string{})
-	if err != nil || request.Metadata.BrokerType != "console" || request.Metadata.UserID != "console-operator" {
+	if err != nil || request.Metadata.BrokerType != "console" || request.Metadata.UserID != "console-operator" || request.Metadata.ConsoleSession != "opaque-token" {
 		t.Fatalf("request=%+v err=%v", request, err)
 	}
 }

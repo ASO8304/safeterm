@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Accepted. Console OS-user mapping superseded by ADR-025; shared terminal UX retained.
 
 ## Context
 

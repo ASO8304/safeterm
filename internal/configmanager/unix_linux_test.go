@@ -5,6 +5,7 @@ package configmanager
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -12,6 +13,44 @@ import (
 	"testing"
 	"time"
 )
+
+func TestIPCAuthenticatesActorBeforeDispatchAndReplacesRoles(t *testing.T) {
+	manager, err := NewManager("application", testRegistry(writeTestINI(t), false), nil, nil, &recordingSink{}, ManagerOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	socket := filepath.Join(t.TempDir(), "authenticated.sock")
+	uid, pid := uint32(os.Getuid()), int32(os.Getpid())
+	server, err := ListenUnix(socket, 0600, []uint32{uid}, manager)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	server.SetActorAuthorizer(func(actor *Actor, peerUID uint32, peerPID int32) error {
+		if peerUID != uid || peerPID != pid || actor.UserID != "alice" || actor.ConsoleSession != "valid-session" {
+			return fmt.Errorf("denied")
+		}
+		actor.Roles = []string{"viewer"}
+		return nil
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go server.Serve(ctx)
+	client, _ := NewUnixClient(socket, []uint32{uid})
+	claim := Actor{BrokerType: "console", UserID: "alice", Roles: []string{"operator", "viewer"}}
+	if _, err = client.Read(ctx, claim, "cats-options"); err == nil {
+		t.Fatal("shared UID read resource without login")
+	}
+	claim.ConsoleSession = "valid-session"
+	read, err := client.Read(ctx, claim, "cats-options")
+	if err != nil {
+		t.Fatal(err)
+	}
+	patch := Patch{ResourceID: "cats-options", Section: "cats", Key: "Cat_Port", Value: "100", BaseVersion: read.Version}
+	if _, err = client.Preview(ctx, claim, patch); err == nil {
+		t.Fatal("caller-supplied operator role was trusted")
+	}
+}
 
 func TestUnixIPCAuthenticatesPeersAndCarriesSemanticRequests(t *testing.T) {
 	path := writeTestINI(t)

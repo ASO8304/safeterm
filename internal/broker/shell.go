@@ -26,14 +26,23 @@ type GatewayClient interface {
 }
 
 type Shell struct {
-	client    GatewayClient
-	catalog   *Catalog
-	principal Principal
-	input     io.Reader
-	output    io.Writer
-	configs   *ConfigBroker
-	skipLF    bool
-	history   []string
+	consoleLogin  func(context.Context, string, []byte) (Principal, time.Time, error)
+	consoleLogout func(context.Context, Principal) error
+	client        GatewayClient
+	catalog       *Catalog
+	principal     Principal
+	input         io.Reader
+	output        io.Writer
+	configs       *ConfigBroker
+	skipLF        bool
+	history       []string
+}
+
+func NewAuthenticatedConsoleShell(client GatewayClient, catalog *Catalog, input io.Reader, output io.Writer, configs *ConfigBroker, login func(context.Context, string, []byte) (Principal, time.Time, error), logout func(context.Context, Principal) error) (*Shell, error) {
+	if client == nil || catalog == nil || input == nil || output == nil || login == nil || logout == nil {
+		return nil, fmt.Errorf("broker: invalid authenticated Console")
+	}
+	return &Shell{client: client, catalog: catalog, input: input, output: output, configs: configs, consoleLogin: login, consoleLogout: logout}, nil
 }
 
 func NewShell(client GatewayClient, catalog *Catalog, principal Principal, input io.Reader, output io.Writer) (*Shell, error) {
@@ -71,6 +80,45 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	done := make(chan struct{})
 	defer close(done)
 	go readBytes(s.input, input, done, cancel)
+	if s.consoleLogin != nil {
+		fmt.Fprint(s.output, "\r\nSafeTerm Console login (Ctrl+] exits)\r\n")
+		authenticated := false
+		for attempt := 0; attempt < 3; attempt++ {
+			user, err := s.readLine(ctx, input, "Username: ", false, false)
+			if err != nil {
+				return err
+			}
+			password, err := s.readLine(ctx, input, "Password: ", true, false)
+			if err != nil {
+				return err
+			}
+			secret := []byte(password)
+			principal, expires, err := s.consoleLogin(ctx, user, secret)
+			clear(secret)
+			password = ""
+			if err != nil {
+				fmt.Fprint(s.output, "Login failed.\r\n")
+				continue
+			}
+			if principal.ConsoleSession == "" || principal.BrokerType != "console" || !identityPattern.MatchString(principal.UserID) || len(principal.Roles) == 0 || !expires.After(time.Now()) {
+				return fmt.Errorf("broker: invalid Console session")
+			}
+			s.principal = principal
+			var expire context.CancelFunc
+			ctx, expire = context.WithDeadline(ctx, expires)
+			defer expire()
+			defer func() {
+				cleanup, stop := context.WithTimeout(context.Background(), 3*time.Second)
+				defer stop()
+				_ = s.consoleLogout(cleanup, principal)
+			}()
+			authenticated = true
+			break
+		}
+		if !authenticated {
+			return fmt.Errorf("broker: Console login denied")
+		}
+	}
 	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
 	for {
 		line, err := s.readLine(ctx, input, s.prompt(), false, true)
@@ -563,7 +611,8 @@ func operationExample(operation config.OperationDefinition) string {
 
 func (s *Shell) request(operation string, arguments map[string]string) (*contract.ExecutionRequest, error) {
 	return contract.NewExecutionRequest(operation, arguments, contract.Metadata{
-		BrokerType: s.principal.BrokerType, UserID: s.principal.UserID,
+		ConsoleSession: s.principal.ConsoleSession,
+		BrokerType:     s.principal.BrokerType, UserID: s.principal.UserID,
 		ClaimedRoles: append([]string(nil), s.principal.Roles...), ReceivedAt: time.Now().UTC(),
 	})
 }
@@ -627,7 +676,7 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	return s.client.Terminate(ctx, terminate(sessionID, contract.SessionOwner{BrokerType: s.principal.BrokerType, UserID: s.principal.UserID}))
+	return s.client.Terminate(ctx, terminate(sessionID, contract.SessionOwner{BrokerType: s.principal.BrokerType, UserID: s.principal.UserID, ConsoleSession: s.principal.ConsoleSession}))
 }
 
 func (s *Shell) prompt() string { return fmt.Sprintf("safeterm::%s> ", s.principal.UserID) }

@@ -1,7 +1,7 @@
 # Linux systemd deployment
 
 SafeTerm ships authenticated restricted SSH and local-console Brokers, three isolated Config
-Managers, and an independent append-only Audit Service alongside one unprivileged
+Managers, an isolated Console Identity service, and an independent append-only Audit Service alongside one unprivileged
 Node Gateway and four capability-isolated Runner units. All Runner units use
 the same `safeterm-runner` binary, but they run as
 different users with separate runtime directories, sockets, catalogs, resource
@@ -14,6 +14,7 @@ describes the service identities and security boundaries enforced by the units.
 Required service accounts:
 
 ```text
+safeterm-identity
 safeterm-gateway
 safeterm-broker
 safeterm
@@ -35,7 +36,11 @@ console account have `safeterm-gateway` as a supplementary group so they can
 reach the Gateway socket; Gateway independently verifies each Broker UID before
 accepting a request. Gateway applies a distinct peer policy after that identity
 check: each Broker may use unary and streaming routes only with its bound
-`broker_type` (`ssh` or `console`), while each
+`broker_type` (`ssh` or `console`). Console requests additionally require a
+process-bound internal session; Gateway replaces caller roles with Identity
+service roles. The Identity socket permits login/logout only from the shared
+Console UID and verification only from Gateway/Config Manager UIDs. Its 8 KiB
+protocol admits at most 32 concurrent connections. Each
 Config Manager UID may use unary routing only for the typed activation and
 health operations assigned to its own profile.
 
@@ -50,7 +55,8 @@ retained chain. The hash chain is corruption evidence, not a digital signature
 or an external checkpoint against complete-file replacement or tail truncation.
 
 Install the binaries as `/usr/local/bin/safeterm-ssh-broker`, `/usr/local/bin/safeterm-console`, `/usr/local/bin/safeterm-config-manager`, `/usr/local/bin/safeterm-gateway`,
-`/usr/local/bin/safeterm-runner`, `/usr/local/bin/safeterm-audit`, and keep
+`/usr/local/bin/safeterm-runner`, `/usr/local/bin/safeterm-audit`,
+`/usr/local/bin/safeterm-identity`, and keep
 `catalog-sign` only on an offline administration host. Install the catalog,
 `catalog.sig`, and the separately provisioned public key at
 `/etc/safeterm/trust/catalog-ed25519.pub` read-only, then copy the unit files to
@@ -73,13 +79,15 @@ and matching SSH username to roles that exist in the signed catalog. A key may
 belong to only one user. Connect with `ssh -t -p 2222 alice@HOST`; the PTY runs
 the SafeTerm command menu and never starts an operating-system shell.
 
-Install `deploy/console/users.example.json` as the root-owned
-`/etc/safeterm/console/users.json`. The automated installer creates the
-unprivileged `safeterm` login account, assigns `/usr/local/bin/safeterm-console`
-as its shell, and grants only the socket traversal groups needed by that client.
-Set its password explicitly with `passwd safeterm` before console login. The
-console executable accepts no path or role overrides and still depends on
-Gateway and the isolated Config Managers and Runners.
+Install the Console credential file as root:safeterm-identity mode 0640, with
+root-owned parent directories. The shared safeterm account must not join the
+safeterm-identity group. The automated installer installs a disabled example,
+creates the one restricted Linux login and starts the isolated Identity service.
+Provision operators with `sudo termctl user add console --id alice --roles viewer`;
+no per-person Linux accounts are needed. Enter using `sudo -iu safeterm`, then
+supply the internal username/password. Physical Linux login may additionally
+use `passwd safeterm` to unlock the shared entry account. PAM is unchanged.
+See [Console authentication](../../docs/console-authentication.md).
 
 Before deployment, calculate SHA-256 for the exact target-host binaries,
 update every executable registry entry, and sign the complete catalog with the
@@ -154,8 +162,8 @@ activation operation, and any resource outside its selected profile. The SSH
 Broker reaches each manager through its own authenticated Unix socket. Use
 `config list`, `config describe ID`, `config show ID`, and
 `config edit ID SECTION KEY` inside the restricted terminal. Use `-` for a
-root-level JSON field. Protected resources return a proposal token that a
-different authorized identity applies with `config apply TOKEN`; retained
+root-level JSON field. The proposing user previews and confirms changes;
+proposal tokens are bound to that identity and Console session. Retained
 backups can be restored with `config rollback ID`.
 
 Gateway must load the same root-owned registry as the Config Managers. Its

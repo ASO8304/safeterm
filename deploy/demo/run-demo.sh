@@ -25,9 +25,7 @@ alice_key=$(cat "$work_dir/secrets/alice_ed25519.pub")
 cat >"$work_dir/config/ssh/users.json" <<EOF
 {"users":[{"user_id":"alice","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"authorized_keys":["$alice_key"]}]}
 EOF
-cat >"$work_dir/config/console/users.json" <<'EOF'
-{"users":[{"os_user":"safeterm","user_id":"safeterm","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"]}]}
-EOF
+cp "$repo_dir/deploy/console/users.example.json" "$work_dir/config/console/users.json"
 cp "$repo_dir/deploy/config-manager/resources.example.json" "$work_dir/config/config-manager/resources.json"
 chmod 0600 "$work_dir/config/ssh/ssh_host_ed25519_key" "$work_dir/config/ssh/users.json" "$work_dir/config/console/users.json"
 chmod 0644 "$work_dir/config/catalog.sig" "$work_dir/config/trust/catalog-ed25519.pub" "$work_dir/config/config-manager/resources.json"

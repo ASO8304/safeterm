@@ -66,6 +66,32 @@ func TestSessionHelperProcess(t *testing.T) {
 
 type allowStage struct{}
 
+func TestConsoleSessionExpiryTerminatesRunningProcess(t *testing.T) {
+	manager, _ := newTestSessionManager(t, "interrupt", DefaultStreamOptions())
+	request := streamRequest(t, "alice")
+	request.Metadata.BrokerType = "console"
+	request.Metadata.ConsoleSession = "test-session"
+	request.Metadata.SessionExpiresAt = time.Now().Add(500 * time.Millisecond)
+	session, err := manager.StartStream(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	timeout := time.After(5 * time.Second)
+	for {
+		select {
+		case frame, ok := <-session.Events:
+			if !ok {
+				t.Fatal("missing session exit")
+			}
+			if frame.Type == contract.FrameSessionExited {
+				return
+			}
+		case <-timeout:
+			t.Fatal("operation survived Console authentication expiry")
+		}
+	}
+}
+
 func (allowStage) Validate(*contract.ExecutionRequest) error  { return nil }
 func (allowStage) Authorize(*contract.ExecutionRequest) error { return nil }
 
@@ -111,13 +137,17 @@ func (r *lockedEventRecorder) has(outcome string) bool {
 }
 
 func newTestSessionManager(t *testing.T, action string, options StreamOptions) (*SessionManager, *lockedEventRecorder) {
+	return newTestSessionManagerWithTimeout(t, action, options, 5*time.Second)
+}
+
+func newTestSessionManagerWithTimeout(t *testing.T, action string, options StreamOptions, timeout time.Duration) (*SessionManager, *lockedEventRecorder) {
 	t.Helper()
 	t.Setenv(sessionHelperEnvironment, "1")
 	store, err := NewStore(testCatalog(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	executionOptions := execution.DefaultOptions(5 * time.Second)
+	executionOptions := execution.DefaultOptions(timeout)
 	executionOptions.OutputLimit = options.OutputBudget
 	executionOptions.ChunkBytes = options.ChunkBytes
 	executionOptions.InterruptGrace = 25 * time.Millisecond

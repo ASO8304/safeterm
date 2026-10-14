@@ -21,9 +21,10 @@ var identityPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]{0,127}$`)
 // Principal is the identity established by SSH authentication.
 // Roles are loaded by the Broker and never accepted from the remote client.
 type Principal struct {
-	UserID     string
-	Roles      []string
-	BrokerType string
+	ConsoleSession string
+	UserID         string
+	Roles          []string
+	BrokerType     string
 }
 
 type SSHUser struct {

@@ -80,6 +80,12 @@ of these values is defined, Ansible owns the complete corresponding file. JSON
 is checked before replacement, affected services are restarted in dependency
 order, and installed preflight verifies the resulting deployment.
 
+Console users use internal `user_id`, `roles`, and `password_hash` fields,
+without `os_user`. Disabled placeholders may omit a hash with `disabled: true`.
+The credential file belongs to root:safeterm-identity mode 0640; the shared
+Console account cannot read it. User updates are loaded on each authentication
+and verification, without restarting Identity. Tasks suppress secret logging.
+
 Use Ansible Vault for inventory secrets. Do not put private SSH keys, signing
 private keys, passwords, or tokens in this directory.
 

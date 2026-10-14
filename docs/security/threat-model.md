@@ -2,7 +2,7 @@
 
 ## Scope and assets
 This model covers the SSH Broker, local Console Broker, Node Gateway, capability-isolated Runners,
-Config Managers, Audit Service, signed catalogs, root-owned identity/resource
+Config Managers, isolated Console Identity service, Audit Service, signed catalogs, root-owned identity/resource
 registries, managed configuration files, Unix sockets, execution results, and
 streaming session state on one Linux host.
 
@@ -21,8 +21,9 @@ Untrusted SSH client
      -> profile-specific Config Manager socket -> exact managed directory
 
 Local console login
-  -> OS authentication / fixed SafeTerm login shell / root-owned role mapping
-  -> console UID -> the same peer-scoped Gateway and Config Manager boundaries
+  -> shared Linux entry account / fixed SafeTerm login shell
+  -> internal bcrypt login at isolated Identity service
+  -> process-bound session -> Gateway and Config Managers verify session + derive roles
 
 Gateway, Runner, and Config Manager UIDs
   -> producer-scoped Audit socket -> append-only Audit UID/store
@@ -43,12 +44,12 @@ UID's peer policy, socket access, filesystem view, capabilities, and cgroup.
 | Threat | Required control | Verification |
 |---|---|---|
 | Shell/argument injection | Whitelisted operations and parameters; whole-token templates; direct argv execution; no shell | Injection corpus, fuzz seeds, AST/source invariant |
-| Forged identity or role | SSH key or console OS-user mapping creates server-owned roles; Gateway binds each broker type to its peer UID | Live SSH tests, console identity tests, peer-policy tests, privilege-abuse suite |
+| Forged identity or role | SSH credential authentication or internal Console bcrypt login; Console sessions bound to kernel UID/PID, verified at Gateway and Config Managers with authoritative roles | Live SSH tests, identity/session replay and role-forgery tests, peer-policy tests, privilege-abuse suite |
 | Cross-profile privilege escalation | Separate UIDs/sockets/catalog subsets/capabilities; peer-scoped activation operations | Routing and systemd tests; Config Manager Gateway denial tests |
 | IPC parser confusion or memory exhaustion | Versioned strict JSON; unknown/trailing rejection; frame/deadline limits; fixed concurrent-connection admission ceilings | Malformed, oversized, and connection-saturation IPC tests plus fuzz seeds |
 | Catalog/executable replacement | Detached signature; canonical path, mode, hash, native ELF, held descriptor | Tamper, symlink, interpreter, and replacement tests |
 | Configuration traversal or corruption | Opaque resource IDs; canonical path rules; no links; schema/full-document validation; atomic rename | Path/link/parser/concurrency/rollback tests |
-| Proposal theft, replay, or confused approval | Random short-lived single-use token bound to actor, patch, resource and base hash | Tamper, replay, expiry, actor and separate-approval tests |
+| Proposal theft, replay, or confused approval | Random short-lived single-use token bound to actor, patch, resource and base hash | Tamper, replay, expiry, actor/session binding tests |
 | Secret or control-byte disclosure | Redacted fields/diffs/audit; argument names only; terminal byte filtering | Secret corpus, audit inspection, terminal sanitization tests |
 | Process/output/session exhaustion | Deadlines, output/queue/session/connection limits, process groups, finite cgroup/systemd bounds | Resource-abuse, manifest-value, and lifecycle tests; race detector |
 | Audit spoofing or tampering | Producer UID/profile policy; synchronous fsync; hash-linked records; single-link store | Producer-spoof, corruption, partial-write, hard-link tests |
@@ -78,3 +79,10 @@ per connection, and the existing connection ceiling and handshake deadline apply
 These bounds limit CPU work; they are not a per-source rate limiter or an account
 lockout policy. Deployments exposed to untrusted networks should apply network
 access controls. Public keys are offered only when a user has configured them.
+
+Internal Console users no longer require per-person OS accounts. The shared entry
+UID cannot read credential hashes or use verification-only Identity APIs. Legacy
+OS mappings without bcrypt hashes are denied. Login rate/concurrency bounds,
+short-lived opaque sessions, stream revalidation and expiry cancellation limit
+abuse. Processes sharing that UID can still deny service; never grant it a general
+OS shell. See [Console authentication](../console-authentication.md) and ADR-025.

@@ -50,7 +50,7 @@ EOF
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
 getent group adm >/dev/null 2>&1 || { echo "required Ubuntu group is missing: adm" >&2; exit 1; }
 
-groups='safeterm safeterm-audit safeterm-broker safeterm-clients safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
+groups='safeterm safeterm-identity safeterm-audit safeterm-broker safeterm-clients safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
 for name in $groups; do
   groupadd -f "$name"
   [ "$name" = safeterm ] && continue
@@ -63,10 +63,11 @@ if ! id -u safeterm >/dev/null 2>&1; then
   useradd --create-home --shell /usr/local/bin/safeterm-console --gid safeterm safeterm
 fi
 
-for name in safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network; do
+for name in safeterm-identity safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network; do
   usermod -a -G safeterm-audit "$name"
 done
 usermod -a -G adm safeterm-log-reader
+usermod -a -G safeterm-clients safeterm-gateway
 usermod -a -G safeterm-gateway,safeterm-clients safeterm-broker
 usermod -a -G safeterm-gateway,safeterm-clients safeterm
 for name in safeterm-config-application safeterm-config-database safeterm-config-network; do
@@ -92,7 +93,7 @@ find /etc/safeterm -type d -exec chmod 0755 {} \;
 find /etc/safeterm -type f -exec chmod 0644 {} \;
 chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
-chown root:safeterm /etc/safeterm/console/users.json
+chown root:safeterm-identity /etc/safeterm/console/users.json
 chmod 0640 /etc/safeterm/console/users.json
 
 install -d -o root -g root -m 0755 /etc/safeterm-managed
@@ -120,12 +121,13 @@ systemctl daemon-reload
 /usr/local/bin/safeterm-preflight --installed
 
 if [ "$start_services" = true ]; then
-  systemctl enable safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl enable safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
+  systemctl restart safeterm-identity.service
   systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl restart safeterm-gateway.service
   systemctl restart safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl restart safeterm-ssh-broker.service
-  systemctl --quiet is-active safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl --quiet is-active safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 echo "SafeTerm installation: PASS"

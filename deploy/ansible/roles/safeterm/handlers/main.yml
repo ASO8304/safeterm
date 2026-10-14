@@ -4,6 +4,7 @@
     name: "{{ item }}"
     state: restarted
   loop:
+    - safeterm-identity.service
     - safeterm-config-manager-application.service
     - safeterm-config-manager-database.service
     - safeterm-config-manager-network.service

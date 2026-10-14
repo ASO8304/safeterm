@@ -35,6 +35,22 @@ func TestConfigManagerUnitsCanPreserveManagedGroupWithoutPrivileges(t *testing.T
 	}
 }
 
+func TestConsoleIdentityUnitHasIsolatedReadOnlyCredentials(t *testing.T) {
+	unit := readText(t, filepath.Join(repositoryRoot(t), "deploy", "systemd", "safeterm-identity.service"))
+	settings := map[string]string{}
+	for _, line := range strings.Split(unit, "\n") {
+		if key, value, ok := strings.Cut(line, "="); ok {
+			settings[key] = value
+		}
+	}
+	if settings["User"] != "safeterm-identity" || settings["NoNewPrivileges"] != "yes" || settings["ProtectSystem"] != "strict" || settings["LimitCORE"] != "0" || settings["RestrictAddressFamilies"] != "AF_UNIX" {
+		t.Fatal("Identity service must isolate credential handling")
+	}
+	if settings["CapabilityBoundingSet"] != "" || settings["AmbientCapabilities"] != "" || settings["ReadWritePaths"] != "" {
+		t.Fatal("Identity must not execute privileged operations or modify credentials")
+	}
+}
+
 func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 	repository := repositoryRoot(t)
 	scripts := []string{

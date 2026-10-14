@@ -29,14 +29,13 @@
 - name: Validate managed console identity list
   ansible.builtin.assert:
     that:
-      - safeterm_console_users | map(attribute='os_user') | list | unique | length == safeterm_console_users | length
-      - item.os_user is match('^[a-z_][a-z0-9_-]*[$]?$')
-      - item.user_id is match('^[A-Za-z0-9_.@-]+$')
+      - safeterm_console_users | map(attribute='user_id') | list | unique | length == safeterm_console_users | length
+      - item.user_id is match('^[A-Za-z0-9][A-Za-z0-9_.@-]*$')
       - item.roles | length > 0
-    fail_msg: Managed console users require unique safe OS users, SafeTerm IDs, and roles.
+      - (item.disabled | default(false)) or (item.password_hash | default('') | length > 0)
+    fail_msg: Console users require unique internal IDs, roles and bcrypt hashes (or disabled=true).
+  no_log: true
   loop: "{{ safeterm_console_users }}"
-  loop_control:
-    label: "{{ item.os_user | default('invalid') }}"
   when: safeterm_console_users | length > 0
 
 - name: Manage complete console identity map
@@ -44,9 +43,11 @@
     src: console-users.json.j2
     dest: /etc/safeterm/console/users.json
     owner: root
-    group: safeterm
+    group: safeterm-identity
     mode: '0640'
     validate: /usr/bin/python3 -m json.tool %s
+  no_log: true
+  diff: false
   when: safeterm_console_users | length > 0
 
 - name: Inspect Config Manager registry on the controller

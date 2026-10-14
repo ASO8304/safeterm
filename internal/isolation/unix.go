@@ -36,8 +36,27 @@ type UnixServer struct {
 // capabilities it may use. Authorize runs after strict decoding and before a
 // unary request crosses the Gateway boundary.
 type PeerPolicy struct {
-	AllowStreaming bool
-	Authorize      func(*contract.ExecutionRequest) error
+	AllowStreaming   bool
+	Authorize        func(*contract.ExecutionRequest) error
+	AuthorizePeer    func(*contract.ExecutionRequest, PeerIdentity) error
+	AuthorizeControl func(*contract.ControlRequest, PeerIdentity) error
+}
+
+type PeerIdentity struct {
+	UID uint32
+	PID int32
+}
+
+func (p PeerPolicy) authorize(req *contract.ExecutionRequest, peer PeerIdentity) error {
+	if p.Authorize != nil {
+		if err := p.Authorize(req); err != nil {
+			return err
+		}
+	}
+	if p.AuthorizePeer != nil {
+		return p.AuthorizePeer(req, peer)
+	}
+	return nil
 }
 
 func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Client) (*UnixServer, error) {
@@ -161,7 +180,7 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 			_ = json.NewEncoder(conn).Encode(ipcReply{Error: "streaming is not authorized for peer"})
 			return
 		}
-		s.handleStream(conn, frame)
+		s.handleStream(conn, frame, policy, PeerIdentity{credentials.UID, credentials.PID})
 		return
 	}
 	decoder.DisallowUnknownFields()
@@ -174,8 +193,8 @@ func (s *UnixServer) handle(conn *net.UnixConn) {
 		_ = json.NewEncoder(conn).Encode(ipcReply{Error: "invalid request"})
 		return
 	}
-	if policy.Authorize != nil {
-		if err := policy.Authorize(&request); err != nil {
+	{
+		if err := policy.authorize(&request, PeerIdentity{credentials.UID, credentials.PID}); err != nil {
 			_ = json.NewEncoder(conn).Encode(ipcReply{Error: "peer is not authorized for request"})
 			return
 		}

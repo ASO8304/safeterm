@@ -1,9 +1,13 @@
+// Internal Console users do not need Linux accounts. Provision through:
+// sudo termctl user add console --id alice --roles viewer,netops
+// Or supply a bcrypt hash and set disabled=false here. Do not use a plaintext
+// password. The shared Linux safeterm account has no read access to this file.
 {
   "users": [
     {
-      "os_user": "safeterm",                  // exact local OS account
-      "user_id": "local-operator",            // identity shown in audit and prompt
-      "roles": ["viewer", "log-viewer", "service-viewer"]
+      "user_id": "local-operator",
+      "roles": ["viewer", "log-viewer", "service-viewer"],
+      "disabled": true
     }
   ]
 }

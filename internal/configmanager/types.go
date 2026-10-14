@@ -39,9 +39,10 @@ const (
 )
 
 type Actor struct {
-	BrokerType string   `json:"broker_type"`
-	UserID     string   `json:"user_id"`
-	Roles      []string `json:"roles"`
+	ConsoleSession string   `json:"console_session,omitempty"`
+	BrokerType     string   `json:"broker_type"`
+	UserID         string   `json:"user_id"`
+	Roles          []string `json:"roles"`
 }
 
 type Permissions struct {

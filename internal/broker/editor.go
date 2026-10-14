@@ -19,10 +19,10 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 	redraw := func() {
 		display := string(line)
 		if secret {
-			display = strings.Repeat("*", len(line))
+			display = ""
 		}
 		fmt.Fprintf(s.output, "\r%s%s\x1b[K", prompt, display)
-		if remaining := len(line) - cursor; remaining > 0 {
+		if remaining := len(line) - cursor; remaining > 0 && !secret {
 			fmt.Fprintf(s.output, "\x1b[%dD", remaining)
 		}
 	}
@@ -108,7 +108,7 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 				}
 				return value, nil
 			case '\t':
-				if !secret {
+				if !secret && useHistory {
 					line, cursor = s.completeLine(ctx, line, cursor, prompt)
 					redraw()
 				}

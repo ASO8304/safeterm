@@ -115,23 +115,44 @@ termctl user del ssh --id alice
 termctl user password ssh --id alice
 ```
 
-Local console mappings use the operating-system account and a SafeTerm user
-id. They control the restricted local console only; web authentication is a
-separate identity domain:
+Console users are internal SafeTerm identities. They all enter through the one
+restricted Linux `safeterm` account, then authenticate with their own username
+and password. No per-person Linux account, `useradd`, PAM change or `chpasswd`
+is involved. Console and SSH user lists are independent, even for the same ID.
 
 ```sh
-termctl user add console --os-user safeterm --id console \
-  --roles viewer,config-viewer
-termctl user auth console --os-user safeterm --roles viewer,netops
-termctl user del console --os-user safeterm
-termctl user password console --os-user safeterm
+sudo termctl user add console --id alice --roles viewer,netops,config-viewer
+# New password: (hidden)
+# Confirm password: (hidden)
+sudo termctl user auth console --id alice --roles viewer,config-viewer
+sudo termctl user password console --id alice
+sudo termctl user del console --id alice
+sudo termctl user list
+sudo -iu safeterm
+# Username: alice
+# Password: (hidden)
 ```
 
-The password command prompts twice without echo. It enforces at least eight
-characters, including an uppercase letter, a lowercase letter, and a number;
-printable symbols are allowed and control characters are rejected. The SSH password is stored as bcrypt; the console password is passed
-to the Linux account password database through `chpasswd` and is never stored
-in the SafeTerm identity map.
+For unattended provisioning, add `--password-hash-file /secure/alice.hash`.
+`--os-user` is obsolete for Console users. Console changes take effect without a
+service restart and invalidate existing sessions when credentials or roles change.
+The password command prompts twice without echo. Passwords must be 8–72 printable
+ASCII characters, contain uppercase and lowercase letters and a number. Only
+bcrypt hashes are stored. This policy applies to both SSH and internal Console
+password entry; a precomputed hash cannot prove the original password's complexity.
+An explicit password reset also enables a disabled Console identity. A roles-only
+update keeps a disabled identity disabled.
+
+After upgrading an old OS-user mapping, provision its internal password once:
+
+```sh
+sudo termctl user password console --id safeterm
+```
+
+Legacy entries without a hash remain disabled. The Linux account password is
+separate and unchanged; `sudo passwd safeterm` is only needed if the site permits
+physical Linux login through that shared account. See
+[Console authentication and migration](console-authentication.md).
 
 The command validates roles, password hashes, keys, duplicate identities, and
 the rule that at least one valid identity remains in each map. It writes the
@@ -147,8 +168,9 @@ termctl completion bash > ~/.local/share/bash-completion/completions/termctl
 termctl completion zsh > ~/.zfunc/_termctl
 ```
 
-`termctl shell` opens the existing restricted SafeTerm terminal, where `execute`
-and `config` workflows use the authenticated local-console identity.
+`sudo -u safeterm termctl shell` opens the restricted terminal through the
+shared entry account, then prompts for the internal Console username/password.
+`execute` and `config` use that authenticated identity.
 
 All service actions require the operating-system permissions needed by
 `systemctl`; administrators normally invoke them with `sudo`:
@@ -162,7 +184,7 @@ sudo termctl service enable all
 sudo termctl service disable config-network
 ```
 
-The fixed service names are `audit`, `gateway`, `ssh`, `diagnostics`,
+The fixed service names are `audit`, `identity`, `gateway`, `ssh`, `diagnostics`,
 `network`, `logs`, `services`, `config-application`, `config-database`, and
 `config-network`. `termctl service status` without a name is equivalent to
 `termctl service status all`.
@@ -199,7 +221,8 @@ committed by the server.
 
 Identity updates preserve the existing file UID, GID and permissions during
 atomic replacement. In particular, SSH users.json must remain
-root:safeterm-broker mode 0640, and console users.json root:safeterm mode 0640.
+root:safeterm-broker mode 0640, and console users.json root:safeterm-identity mode 0640.
+The shared safeterm account must never belong to safeterm-identity.
 SSH identities are loaded at Broker startup: restart only `termctl service
 restart ssh` (with sudo) after changing SSH users or passwords. Existing
 connections will be interrupted.

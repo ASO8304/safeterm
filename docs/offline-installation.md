@@ -98,11 +98,21 @@ preserves the existing SSH host key, SSH and console identity maps, Config
 Manager registry, and `/etc/safeterm-managed` contents. Therefore it does not
 rotate the SSH host fingerprint or reset managed values.
 
-Enable local console authentication explicitly:
+Provision an internal Console identity explicitly (independent of SSH):
 
 ```bash
-sudo passwd safeterm
+sudo termctl user add console --id alice --roles viewer,netops,config-viewer
+sudo -iu safeterm
+# Enter alice and its internal password at the SafeTerm login screen.
 ```
+
+Fresh packages ship a disabled `local-admin` example and do not copy the SSH
+password into Console. For an existing legacy user, use
+`sudo termctl user password console --id safeterm` instead of adding it again.
+Existing entries without a bcrypt hash cannot log in. Physical Linux login may
+additionally require setting the shared entry account's separate password with
+`sudo passwd safeterm`; this never replaces internal authentication. See the
+[Console migration guide](console-authentication.md).
 
 ## Production offline signing
 

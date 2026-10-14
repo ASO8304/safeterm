@@ -23,10 +23,12 @@ import (
 // Metadata carries information about how a request arrived and who
 // claims to have sent it.
 type Metadata struct {
-	BrokerType   string    `json:"broker_type"` // e.g. "cli", "ssh", "console", "web"
-	UserID       string    `json:"user_id"`
-	ClaimedRoles []string  `json:"claimed_roles"`
-	ReceivedAt   time.Time `json:"received_at"`
+	ConsoleSession   string    `json:"console_session,omitempty"`
+	SessionExpiresAt time.Time `json:"session_expires_at,omitempty"`
+	BrokerType       string    `json:"broker_type"` // e.g. "cli", "ssh", "console", "web"
+	UserID           string    `json:"user_id"`
+	ClaimedRoles     []string  `json:"claimed_roles"`
+	ReceivedAt       time.Time `json:"received_at"`
 }
 
 // ExecutionRequest is the single standardized contract that every Broker

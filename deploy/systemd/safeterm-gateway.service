@@ -1,13 +1,13 @@
 [Unit]
 Description=SafeTerm unprivileged node gateway
-Requires=safeterm-audit.service
-After=safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
+Requires=safeterm-audit.service safeterm-identity.service
+After=safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
 
 [Service]
 Type=simple
 User=safeterm-gateway
 Group=safeterm-gateway
-SupplementaryGroups=safeterm-audit
+SupplementaryGroups=safeterm-audit safeterm-clients
 RuntimeDirectory=safeterm-gateway
 RuntimeDirectoryMode=0750
 ExecStart=/usr/local/bin/safeterm-gateway --config /etc/safeterm

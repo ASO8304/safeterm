@@ -9,7 +9,7 @@ Go, or Internet access on the Ubuntu target, follow the
 The original M15 demo workflow targets a fresh, disposable Linux host with
 systemd. Run that full demo in a VM. The current offline installer also supports
 in-place upgrades with a checksum-protected rollback transaction. It creates
-system users, writes `/etc/safeterm`, installs units, and enables ten services.
+system users, writes `/etc/safeterm`, installs units, and enables eleven services.
 
 ## Prerequisites
 
@@ -49,8 +49,8 @@ catalog-sign -config /tmp/safeterm-catalog \
 
 Add the root-managed SSH host private key at
 `ssh/ssh_host_ed25519_key`, the password-hash and optional public-key identity map at `ssh/users.json`,
-the local-login identity map at `console/users.json`, and the resource registry
-at `config-manager/resources.json`. A production console map can start from
+the internal Console credential store at `console/users.json`, and the resource registry
+at `config-manager/resources.json`. A production Console user list can start from
 `deploy/console/users.example.json`; keep only the roles that operator needs.
 Prepare a managed
 seed directory whose layout is `PROFILE/basename(registered path)`.
@@ -88,7 +88,7 @@ Connect with an authorized key:
 ssh -t -p 2222 alice@HOST
 ```
 
-Inside the restricted terminal, run `whoami`, `list`, `run system_info`, and
+Inside the restricted terminal, run `whoami`, `list`, `execute system_info`, and
 `config list`. Long-running `trace` output can be stopped with Ctrl+C, which
 maps to the semantic terminate protocol.
 
@@ -98,19 +98,30 @@ parameters, config resources, sections, and fields. Arrow keys provide cursor
 movement and session history; Home, End, Delete, Backspace, Ctrl+A, Ctrl+E,
 Ctrl+U, Ctrl+W, and Ctrl+L provide normal line editing.
 
-For local VM or physical-console access, enroll a password after installation:
+For local Console access, create internal SafeTerm users, then enter through the
+shared restricted Linux account:
 
 ```bash
-sudo passwd safeterm
+sudo termctl user add console --id alice --roles viewer,netops,config-viewer
+sudo -iu safeterm
+# Username: alice
+# Password: (hidden)
 ```
 
-Then log in as `safeterm` from the Linux console. The account's fixed login
-shell is `/usr/local/bin/safeterm-console`, so it displays
-`safeterm::safeterm> ` and the same restricted menu. The installer intentionally
-does not choose a password. Roles are controlled only by the root-owned
-`/etc/safeterm/console/users.json`; the login user cannot supply roles, paths,
-or a replacement identity file. After changing that file, start a new login
-session. No SafeTerm service restart is required.
+Each person gets an internal identity, not a Linux account. The fixed login shell
+is `/usr/local/bin/safeterm-console`; it authenticates through the isolated
+`safeterm-identity.service` before showing `safeterm::alice>`. Only Identity can
+read the root-managed bcrypt credential file. Gateway and Config Managers verify
+opaque process-bound sessions and derive roles from Identity, rather than trusting
+the shared Linux UID or caller-provided roles. Passwords never enter command history.
+
+The shared account is initially locked. For physical Linux login, a site may set
+its separate entry password with `sudo passwd safeterm`; Linux PAM is unchanged.
+Internal authentication is still mandatory afterward. Existing Console mappings
+are preserved during upgrade but need an internal password before they can log in:
+`sudo termctl user password console --id safeterm`. No Linux users are deleted.
+See [Console authentication](console-authentication.md) for the complete migration
+and security boundary.
 
 ## Disposable-host demo
 

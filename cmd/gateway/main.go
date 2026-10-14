@@ -16,6 +16,7 @@ import (
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
 	"safeterm/internal/contract"
+	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
 )
@@ -99,7 +100,12 @@ func run(configDir, socketPath, brokerUser, consoleUser, configManagerUsers, con
 	if err != nil {
 		return fmt.Errorf("gateway: parse Broker UID: %w", err)
 	}
-	peerPolicies := map[uint32]isolation.PeerPolicy{uint32(brokerUID): {AllowStreaming: true, Authorize: brokerPeerAuthorizer("ssh")}}
+	peerPolicies := map[uint32]isolation.PeerPolicy{uint32(brokerUID): {AllowStreaming: true, Authorize: brokerPeerAuthorizer("ssh"), AuthorizeControl: func(c *contract.ControlRequest, _ isolation.PeerIdentity) error {
+		if c == nil || c.Owner.BrokerType != "ssh" || c.Owner.ConsoleSession != "" {
+			return identity.ErrDenied
+		}
+		return nil
+	}}}
 	consoleAccount, err := user.Lookup(consoleUser)
 	if err != nil {
 		return fmt.Errorf("gateway: resolve console Broker user: %w", err)
@@ -111,7 +117,16 @@ func run(configDir, socketPath, brokerUser, consoleUser, configManagerUsers, con
 	if consoleUID == brokerUID {
 		return fmt.Errorf("gateway: console and SSH Broker UIDs must be distinct")
 	}
-	peerPolicies[uint32(consoleUID)] = isolation.PeerPolicy{AllowStreaming: true, Authorize: brokerPeerAuthorizer("console")}
+	identityAccount, err := user.Lookup(identity.UserName)
+	if err != nil {
+		return err
+	}
+	identityUID, err := strconv.ParseUint(identityAccount.Uid, 10, 32)
+	if err != nil {
+		return err
+	}
+	identityClient := identity.NewClient(identity.SocketPath, uint32(identityUID))
+	peerPolicies[uint32(consoleUID)] = consolePeerPolicy(identityClient)
 	resourceRegistry, err := configmanager.LoadRegistry(configRegistry)
 	if err != nil {
 		return fmt.Errorf("gateway: load Config Manager registry: %w", err)
@@ -152,7 +167,7 @@ func run(configDir, socketPath, brokerUser, consoleUser, configManagerUsers, con
 
 func brokerPeerAuthorizer(brokerType string) func(*contract.ExecutionRequest) error {
 	return func(request *contract.ExecutionRequest) error {
-		if request == nil || request.Metadata.BrokerType != brokerType {
+		if request == nil || request.Metadata.BrokerType != brokerType || request.Metadata.ConsoleSession != "" {
 			return fmt.Errorf("gateway: Broker peer must use %s identity", brokerType)
 		}
 		return nil
@@ -195,4 +210,30 @@ func configManagerPeerAuthorizer(profile string, allowed map[string]bool) func(*
 		}
 		return nil
 	}
+}
+
+func consolePeerPolicy(client *identity.Client) isolation.PeerPolicy {
+	return isolation.PeerPolicy{AllowStreaming: true,
+		AuthorizePeer: func(req *contract.ExecutionRequest, p isolation.PeerIdentity) error {
+			if req == nil || req.Metadata.BrokerType != "console" {
+				return identity.ErrDenied
+			}
+			session, err := client.Verify(context.Background(), req.Metadata.ConsoleSession, identity.Peer{UID: p.UID, PID: p.PID})
+			if err != nil || req.Metadata.UserID != session.UserID {
+				return identity.ErrDenied
+			}
+			req.Metadata.ClaimedRoles = append([]string(nil), session.Roles...)
+			req.Metadata.SessionExpiresAt = session.ExpiresAt
+			return nil
+		},
+		AuthorizeControl: func(req *contract.ControlRequest, p isolation.PeerIdentity) error {
+			if req == nil || req.Owner.BrokerType != "console" {
+				return identity.ErrDenied
+			}
+			session, err := client.Verify(context.Background(), req.Owner.ConsoleSession, identity.Peer{UID: p.UID, PID: p.PID})
+			if err != nil || req.Owner.UserID != session.UserID {
+				return identity.ErrDenied
+			}
+			return nil
+		}}
 }

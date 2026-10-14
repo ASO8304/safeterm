@@ -44,7 +44,7 @@ func ListenUnix(path string, mode os.FileMode, producers map[uint32][]Producer, 
 			return nil, fmt.Errorf("audit: UID %d has no producer policy", uid)
 		}
 		for _, producer := range identities {
-			if producer.Component != ComponentGateway && producer.Component != ComponentRunner && producer.Component != ComponentConfigManager {
+			if producer.Component != ComponentGateway && producer.Component != ComponentRunner && producer.Component != ComponentConfigManager && producer.Component != ComponentIdentity {
 				return nil, fmt.Errorf("audit: invalid producer component %q", producer.Component)
 			}
 			if (producer.Component == ComponentRunner || producer.Component == ComponentConfigManager) && producer.Profile == "" {

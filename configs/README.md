@@ -50,7 +50,7 @@ The installer also creates these adjacent, separately managed files:
 
     ssh/users.json                     SSH identities, roles and authentication
     ssh/ssh_host_ed25519_key            SSH server identity (private key)
-    console/users.json                 OS-user to SafeTerm identity mappings
+    console/users.json                 Internal Console users, roles and bcrypt hashes
     config-manager/resources.json      Registered editable resources and fields
 
 These adjacent files are not part of the signed catalog model. They must still
@@ -354,3 +354,32 @@ descriptions. Use execute ? for authorized operations, execute ping ? for
 parameter help, config ? for config subcommands, and config edit ? for
 authorized resources. Separate ? from preceding words with a space. Help
 never executes an operation or edits a file and returns to the prompt.
+
+## 15. Internal Console authentication
+
+Console users no longer map one-to-one to Linux accounts. One restricted Linux
+entry account (`safeterm`) launches the Console, which prompts for an internal
+username and password before exposing the menu. Provision each operator with:
+
+```sh
+sudo termctl user add console --id alice --roles viewer,netops,config-viewer
+sudo termctl user password console --id alice
+sudo termctl user auth console --id alice --roles viewer,config-viewer
+sudo termctl user list
+sudo -iu safeterm
+```
+
+Passwords are entered twice without echo and stored only as bcrypt hashes in
+`/etc/safeterm/console/users.json`, owned by root:safeterm-identity mode 0640.
+Only the isolated Identity daemon can read these hashes; the shared account
+cannot. Internal roles are verified server-side using an opaque session bound
+to the Console process UID/PID. Sessions expire after 30 minutes by default.
+Changing a password or role invalidates the old session; no restart is needed.
+SSH users remain a separate identity list with independent credentials.
+
+Legacy `os_user` entries are accepted for migration only. Without an internal
+hash they are disabled, so upgrade requires provisioning their internal password
+once with `sudo termctl user password console --id EXISTING_ID`. `passwd safeterm`
+changes only the separate Linux entry password, not the internal user password.
+The installer does not change PAM or create a Linux account for each operator.
+See the repository's `docs/console-authentication.md` and ADR-025 for details.
