@@ -2,6 +2,9 @@
 
 A configurable platform for secure system command execution.
 
+[Install a downloaded Release](#install-from-a-downloaded-github-release) ·
+[Full installation and update guide](docs/offline-installation.md)
+
 ## Current Status
 
 **Milestone: M19 — Operator Catalog and Terminal UX (complete)**
@@ -272,58 +275,242 @@ When every check passes, the final output is:
 SafeTerm Verification: PASS
 ```
 
-## Installation Packages
+## Install from a downloaded GitHub Release
 
-After initial installation, administrators can upgrade an extracted release
-with `sudo termctl update /path/to/package`, restore the latest pre-install
-state with `sudo termctl rollback`, or remove the runtime with
-`sudo termctl uninstall`. Uninstall preserves data and accounts. See the
-[termctl administration guide](docs/termctl.md).
+Use this procedure if you already downloaded a Release package. You do not need
+to clone this repository or compile SafeTerm. Download links:
 
-GitHub Actions builds self-contained offline installation packages for Linux
-AMD64 and ARM64. Tagged builds publish the latest packages as GitHub Release
-assets:
-
+- [All Releases](https://github.com/ASO8304/safeterm/releases)
 - [Download AMD64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-amd64.tar.gz)
 - [Download AMD64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-amd64.tar.gz.sha256)
 - [Download ARM64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz)
 - [Download ARM64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz.sha256)
 
-On the target host, verify and extract the package before installation:
+### 1. Check the target and install OS prerequisites
+
+Use Ubuntu 24.04 with systemd running as PID 1 and an administrator account with
+`sudo`. No Git, Go or Python build environment is required to install the Release.
+Check the architecture:
+
+```bash
+uname -m
+ps -p 1 -o comm=
+```
+
+`x86_64` needs **amd64**; `aarch64`/`arm64` needs **arm64**. The examples below use
+amd64; replace both archive and extracted-directory names with arm64 when needed.
+Download the archive **and its `.sha256` file from the same Release**. Use the
+prebuilt assets, not GitHub's automatically generated "Source code" archive.
+
+On an Internet-connected Ubuntu target, install prerequisites before SafeTerm:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ca-certificates coreutils findutils gawk grep gzip \
+  libc-bin openssh-client passwd sed sudo systemd tar tcpdump util-linux \
+  iputils-ping dnsutils traceroute procps
+```
+
+On an air-gapped host, provision these packages from installation media or an
+internal APT mirror first. "Offline package" means SafeTerm's binaries are bundled;
+it does not include Ubuntu packages. Plain containers without systemd as PID 1
+are not covered by this installation procedure.
+
+### 2. Verify and extract the downloaded archive
+
+Run these commands in the directory containing the downloaded archive and checksum.
+The new staging directory avoids mixing a new Release with an old extracted copy:
 
 ```bash
 sha256sum -c safeterm-offline-amd64.tar.gz.sha256
-tar -xzf safeterm-offline-amd64.tar.gz
-cd safeterm-offline-amd64
-sudo ./install.sh --help
+release_dir=$(mktemp -d "$HOME/safeterm-release.XXXXXX")
+tar -xzf safeterm-offline-amd64.tar.gz -C "$release_dir"
+cd "$release_dir/safeterm-offline-amd64"
+ls install.sh PACKAGE-SHA256SUMS TARGET_ARCH payload/bin/safeterm-termctl
 ```
 
-For a single-host evaluation, create a bcrypt password hash and run the local
-signing installation:
+Stop if checksum verification fails. Keep this shell in the extracted package
+root for the following steps. If SafeTerm is **already installed**, skip fresh
+password enrollment and use **Updating an existing installation** below.
+
+### 3. Create the initial SSH password hash (fresh installation only)
+
+The installer requires an initial SSH credential. This example creates internal
+SSH user `admin`, not a Linux account named `admin`. The bundled tool asks for the
+password twice without echo and writes only a bcrypt hash:
 
 ```bash
-sudo install -d -m 700 /root/safeterm-secrets
+sudo install -d -m 0700 /root/safeterm-secrets
 sudo ./payload/bin/safeterm-password-hash \
-  -output /root/safeterm-secrets/alice.hash
-
-sudo ./install.sh \
-  --local-signing \
-  --ssh-user alice \
-  --ssh-password-hash-file /root/safeterm-secrets/alice.hash \
-  --single-operator \
-  --dry-run
-
-sudo ./install.sh \
-  --local-signing \
-  --ssh-user alice \
-  --ssh-password-hash-file /root/safeterm-secrets/alice.hash \
-  --single-operator
+  -output /root/safeterm-secrets/admin-bootstrap.hash
 ```
 
-The complete air-gapped and production signing procedure is documented in
-[docs/offline-installation.md](docs/offline-installation.md). Manual workflow
-runs retain the same files as Actions artifacts; tagged runs additionally
-publish them as release assets for the stable links above.
+Use 8–72 printable ASCII characters, including uppercase, lowercase and a number.
+Do not put the plaintext password in a command argument. The tool refuses to
+overwrite an existing hash file; reuse the correct file or choose a new filename.
+An SSH public key is optional; a key-only initial installation may instead supply
+`--ssh-public-key /path/to/admin.pub`.
+
+### 4. Preview and install
+
+For a demo or single-host evaluation, use local signing. SafeTerm hashes the
+approved executables on this host, signs the catalog locally, and keeps the key
+under `/root/.config/safeterm` for later updates. Run the preview first:
+
+```bash
+sudo ./install.sh --local-signing \
+  --ssh-user admin \
+  --ssh-password-hash-file /root/safeterm-secrets/admin-bootstrap.hash \
+  --dry-run
+```
+
+After `Dry run: PASS`, install:
+
+```bash
+sudo ./install.sh --local-signing \
+  --ssh-user admin \
+  --ssh-password-hash-file /root/safeterm-secrets/admin-bootstrap.hash
+```
+
+Expect `SafeTerm package installation: PASS`. The installer installs `termctl`,
+configuration and service units, creates the isolated service accounts, and starts
+the services. `--local-signing` alone is insufficient on a fresh host: the SSH
+password-hash or public-key option is required. `--single-operator` is obsolete
+and unnecessary.
+
+For production with the signing key kept off the server, use the
+[production offline signing procedure](docs/offline-installation.md#production-offline-signing)
+instead of this local-signing step. The Release archive checksum verifies the transferred
+package; catalog signing separately protects the deployed command definitions.
+
+### 5. Verify services and test SSH
+
+Run from the ordinary administrator shell:
+
+```bash
+command -v termctl
+sudo /usr/local/bin/safeterm-preflight --installed
+sudo termctl service status all
+```
+
+`termctl` is installed at `/usr/local/bin/termctl`. From another machine, replace
+`SERVER_IP` with the target address:
+
+```bash
+ssh -tt -p 2222 admin@SERVER_IP
+```
+
+Check the displayed host-key fingerprint through a trusted channel before
+accepting a new host. Enter the SSH password from step 3. If a host firewall or
+network ACL is active, allow TCP port 2222 only from the intended client networks.
+
+Inside the restricted SafeTerm terminal, try:
+
+```text
+whoami
+execute ?
+execute system_info
+execute memory_info
+execute ping host=127.0.0.1 count=5
+config list
+exit
+```
+
+Tab completes authorized inputs; a standalone `?` followed by Enter shows help.
+Ctrl+C stops an active stream; Ctrl+] exits the whole SafeTerm session.
+
+### 6. Create a Console user and test local login
+
+Console and SSH have independent user lists and passwords. The SSH `admin` user
+above does not automatically become a Console user. From the ordinary
+administrator shell:
+
+```bash
+sudo termctl user add console --id alice --roles viewer,netops,config-viewer
+sudo -iu safeterm
+```
+
+The first command asks for Alice's internal password twice. The second opens the
+shared restricted Linux entry account, then SafeTerm prompts:
+
+```text
+Username: alice
+Password: (the internal password just set; hidden)
+safeterm::alice>
+```
+
+No Linux account named `alice` is needed. Fresh packages contain a disabled
+`local-admin` placeholder and no default Console password. The Linux entry account
+is initially password-locked; `sudo -iu safeterm` works for an authorized admin.
+If direct physical Linux login is required, set its separate entry password with
+`sudo passwd safeterm`; the internal SafeTerm login is still mandatory afterward.
+
+To discover roles or change the internal password:
+
+```bash
+termctl role list
+termctl role describe netops
+sudo termctl user password console --id alice
+```
+
+### Updating an existing installation
+
+Verify and extract the **new** archive using step 2, then run these commands from
+its package root. For an installation using the default local signing key:
+
+```bash
+sudo termctl update "$PWD" --dry-run
+sudo termctl update "$PWD"
+sudo /usr/local/bin/safeterm-preflight --installed
+sudo termctl service status all
+```
+
+`$PWD` must contain `install.sh`, `PACKAGE-SHA256SUMS`, `TARGET_ARCH` and `payload/`;
+do not pass the archive, `payload/`, or the parent download directory. The update
+preserves installed identities, the SSH host key, the Config Manager registry and
+managed values. It restarts services and interrupts active sessions; use an
+ordinary administrator session for the update.
+
+If the host uses an offline-signed catalog, prepare and sign a catalog for this
+Release and the target host as described in the full guide, then use:
+
+```bash
+sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog --dry-run
+sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog
+```
+
+For an older Console OS-user mapping (for example, `user_id: safeterm`), set its
+internal password once after upgrading; do not add the same ID again:
+
+```bash
+sudo termctl user password console --id safeterm
+sudo -iu safeterm
+```
+
+Log in at the SafeTerm prompt using username `safeterm` and that internal password.
+The old Linux account password does not replace internal authentication.
+
+### Rollback and uninstall
+
+From the ordinary administrator shell:
+
+```bash
+sudo termctl rollback
+sudo termctl uninstall
+```
+
+These are separate actions: rollback restores the latest retained pre-install
+snapshot; uninstall removes runtime binaries/units while retaining configuration,
+accounts and audit data. Rollback also discards changes since the snapshot and
+restores captured account databases, so use it before unrelated host account
+changes. No transaction ID needs to be saved. See the full installation and
+termctl guides for recovery after a partially failed installation.
+
+For detailed offline signing, recovery and troubleshooting, see the
+[full Release installation guide](docs/offline-installation.md). See also
+[Console authentication and migration](docs/console-authentication.md) and
+[termctl administration](docs/termctl.md). Manual Actions runs provide downloadable
+artifacts; tagged runs publish the archive and checksum as Release assets.
 
 ## Project Structure
 
