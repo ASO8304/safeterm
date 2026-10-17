@@ -86,3 +86,24 @@ OS mappings without bcrypt hashes are denied. Login rate/concurrency bounds,
 short-lived opaque sessions, stream revalidation and expiry cancellation limit
 abuse. Processes sharing that UID can still deny service; never grant it a general
 OS shell. See [Console authentication](../console-authentication.md) and ADR-025.
+
+
+## Restricted external configuration writer (ADR-029)
+
+The dedicated root file writer is a new trusted boundary. Config Managers remain
+unprivileged and retain user-role/proposal authorization. The writer trusts only
+profile-mapped manager UIDs over Unix peer credentials, revalidates registered
+resource/field patches and versions, and accepts no caller path, rendered document
+or command. A compromised manager can access registered files and editable fields
+in its own profile, not arbitrary root files. Root-authored resource schemas are
+security policy and must constrain sensitive values appropriately.
+
+The writer's root-controlled parent namespace, protected-target denylist, generated
+systemd directory grants, link/type checks, bounded IPC, exact metadata checks and
+independent audit reduce the scope of that privilege. It uses only CHOWN, FOWNER
+and DAC_READ_SEARCH capabilities, has no subprocess interface, and fails when
+ACL/xattr/label preservation is unavailable. Root-private backups remain outside
+application directories. Atomic replacement changes inode/mtime. An external
+application ignoring deployment coordination can still race an optimistic update;
+version/inode/metadata rechecks detect changes but do not supply a universal OS
+transaction against other independent writers.

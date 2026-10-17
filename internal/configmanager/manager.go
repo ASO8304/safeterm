@@ -28,6 +28,7 @@ type TypedActivator interface {
 }
 
 type ManagerOptions struct {
+	FileWriter  FileWriter
 	ProposalTTL time.Duration
 	Now         func() time.Time
 }
@@ -51,6 +52,7 @@ type managedResource struct {
 }
 
 type Manager struct {
+	writer     FileWriter
 	profile    string
 	version    string
 	resources  map[string]*managedResource
@@ -84,7 +86,7 @@ func NewManager(profile string, registry *Registry, validators map[string]Applic
 		options.Now = time.Now
 	}
 	manager := &Manager{
-		profile: profile, version: registry.Version, resources: map[string]*managedResource{},
+		writer: options.FileWriter, profile: profile, version: registry.Version, resources: map[string]*managedResource{},
 		validators: map[string]ApplicationValidator{}, activator: activator, audit: sink,
 		ttl: options.ProposalTTL, now: options.Now, proposals: map[string]proposal{},
 	}
@@ -101,7 +103,7 @@ func NewManager(profile string, registry *Registry, validators map[string]Applic
 		if (resource.ActivationOperation != "" || resource.HealthCheckOperation != "") && activator == nil {
 			return nil, fmt.Errorf("configmanager: resource %q requires an activator", resource.ID)
 		}
-		data, _, err := readManagedFile(resource.Path)
+		data, _, err := manager.readFile(resource)
 		if err != nil {
 			return nil, fmt.Errorf("configmanager: verify resource %q: %w", resource.ID, err)
 		}
@@ -161,7 +163,7 @@ func (m *Manager) Read(ctx context.Context, actor Actor, resourceID string) (Rea
 	managed := m.resources[resourceID]
 	managed.mu.Lock()
 	defer managed.mu.Unlock()
-	data, _, err := readManagedFile(resource.Path)
+	data, _, err := m.readFile(resource)
 	if err != nil {
 		return ReadResult{}, err
 	}
@@ -274,7 +276,7 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 	managed := m.resources[resource.ID]
 	managed.mu.Lock()
 	defer managed.mu.Unlock()
-	current, info, err := readManagedFile(resource.Path)
+	current, info, err := m.readFile(resource)
 	if err != nil {
 		return ApplyResult{}, err
 	}
@@ -289,7 +291,7 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 	if err := m.record(ctx, actor, resource, ActionApply, "apply-authorized", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, contentVersion(prepared.rendered), prepared.id, actor.UserID); err != nil {
 		return ApplyResult{}, err
 	}
-	backup, err := commitReplacement(resource, prepared.rendered, current, info)
+	backup, err := m.commitFile(resource, prepared.patch, prepared.rendered, current, info)
 	if err != nil {
 		_ = m.record(ctx, actor, resource, ActionApply, "apply-rejected", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), currentVersion, "", prepared.id, actor.UserID)
 		return ApplyResult{}, err
@@ -301,7 +303,7 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 			result.ActivationOutcome = "failed"
 			_ = m.record(ctx, actor, resource, ActionActivate, "activation-failed", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, newVersion, prepared.id, actor.UserID)
 			if resource.RollbackOnFailure && backup != "" {
-				if rollbackErr := restoreBackup(resource, backup); rollbackErr != nil {
+				if rollbackErr := m.restoreFile(resource, backup, newVersion); rollbackErr != nil {
 					result.RollbackOutcome = "failed"
 					_ = m.record(ctx, actor, resource, ActionRollback, "rollback-failed", prepared.patch.Section+"."+prepared.patch.Key, newVersion, currentVersion, prepared.id, actor.UserID)
 					return result, fmt.Errorf("configmanager: activation failed: %v; rollback failed: %w", err, rollbackErr)
@@ -318,7 +320,7 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 				result.ActivationOutcome = "health-check-failed"
 				_ = m.record(ctx, actor, resource, ActionActivate, "activation-failed", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), currentVersion, newVersion, prepared.id, actor.UserID)
 				if resource.RollbackOnFailure && backup != "" {
-					if rollbackErr := restoreBackup(resource, backup); rollbackErr == nil {
+					if rollbackErr := m.restoreFile(resource, backup, newVersion); rollbackErr == nil {
 						result.RollbackOutcome, result.Version = "succeeded", currentVersion
 						_ = m.record(ctx, actor, resource, ActionRollback, "rollback-succeeded", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), newVersion, currentVersion, prepared.id, actor.UserID)
 					} else {
@@ -334,7 +336,7 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 	}
 	if err := m.record(ctx, actor, resource, ActionApply, "applied", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, result.Version, prepared.id, actor.UserID); err != nil {
 		if backup != "" {
-			_ = restoreBackup(resource, backup)
+			_ = m.restoreFile(resource, backup, newVersion)
 		}
 		return ApplyResult{}, err
 	}
@@ -349,11 +351,11 @@ func (m *Manager) Rollback(ctx context.Context, actor Actor, resourceID string) 
 	managed := m.resources[resourceID]
 	managed.mu.Lock()
 	defer managed.mu.Unlock()
-	current, _, err := readManagedFile(resource.Path)
+	current, _, err := m.readFile(resource)
 	if err != nil {
 		return RollbackResult{}, err
 	}
-	backup, err := latestBackup(resource)
+	backup, err := m.latestFileBackup(resource)
 	if err != nil {
 		return RollbackResult{}, err
 	}
@@ -361,11 +363,11 @@ func (m *Manager) Rollback(ctx context.Context, actor Actor, resourceID string) 
 	if err := m.record(ctx, actor, resource, ActionRollback, "rollback-authorized", "", before, "", "", actor.UserID); err != nil {
 		return RollbackResult{}, err
 	}
-	if err := restoreBackup(resource, backup); err != nil {
+	if err := m.restoreFile(resource, backup, before); err != nil {
 		_ = m.record(ctx, actor, resource, ActionRollback, "rollback-failed", "", before, "", "", actor.UserID)
 		return RollbackResult{}, err
 	}
-	afterData, _, err := readManagedFile(resource.Path)
+	afterData, _, err := m.readFile(resource)
 	if err != nil {
 		return RollbackResult{}, err
 	}
@@ -394,7 +396,7 @@ func (m *Manager) prepare(ctx context.Context, actor Actor, patch Patch) (propos
 	managed := m.resources[resource.ID]
 	managed.mu.Lock()
 	defer managed.mu.Unlock()
-	data, _, err := readManagedFile(resource.Path)
+	data, _, err := m.readFile(resource)
 	if err != nil {
 		return proposal{}, Resource{}, err
 	}
@@ -440,6 +442,10 @@ func (m *Manager) prepare(ctx context.Context, actor Actor, patch Patch) (propos
 		if err := m.validators[resource.ValidatorID].Validate(ctx, resource, rendered); err != nil {
 			return proposal{}, Resource{}, fmt.Errorf("configmanager: application validation failed: %w", err)
 		}
+	}
+	actual, exists := reparsed.Get(field.Section, field.Key)
+	if !exists || scalarString(actual) != normalized {
+		return proposal{}, Resource{}, fmt.Errorf("configmanager: value changed during rendering")
 	}
 	diff := renderDiff(field, scalarString(oldValue), normalized)
 	return proposal{resourceID: resource.ID, patch: patch, normalizedValue: normalized, rendered: rendered, diff: diff, secret: field.Secret}, resource, nil

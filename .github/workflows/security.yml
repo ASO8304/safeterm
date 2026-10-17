@@ -23,6 +23,10 @@ jobs:
           go-version: "1.26.x"
           cache: true
       - run: make security
+      - name: Test privileged configuration writer with an unprivileged client
+        run: |
+          go test -c -o "$RUNNER_TEMP/configmanager-root.test" ./internal/configmanager
+          sudo "$RUNNER_TEMP/configmanager-root.test" -test.run '^TestPrivilegedWriterRootIntegration$' -test.v
 
   govulncheck:
     name: Go Vulnerability Check

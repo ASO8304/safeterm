@@ -36,7 +36,7 @@ and backup policy. Unknown JSON properties are rejected when loading the
 registry. One path can belong to only one resource.
 
 The INI adapter accepts blank lines, full-line `;` or `#` comments, named
-`[sections]`, and `key = value` assignments. Keys and sections contain letters,
+`[sections]` (including trailing section-header comments), and `key = value` assignments. Keys and sections contain letters,
 digits, `.`, `_`, or `-` and begin with a letter. Values can be unquoted,
 single-quoted, or JSON-style double-quoted strings. Inline `;` and `#` comments
 must follow whitespace outside quotes. Duplicate sections/keys, malformed
@@ -50,12 +50,23 @@ selects the root. Registered fields must be scalars. Rendering uses two-space
 indentation, lexicographically sorted object keys as provided by Go's JSON
 encoder, and one trailing newline, so the same document renders identically.
 
+## External files with unchanged ownership
+
+For a file owned by root or another service, opt in with `privileged_write: true`
+in its root-owned resource definition. The unprivileged Config Manager delegates
+semantic field writes to a separate restricted root writer. Do not chown the
+application file or grant the manager general write access. Use
+`sudo termctl config check` and `sudo termctl config apply` to validate and activate
+the registry and generated writer sandbox. See
+[external configuration files](external-configuration-files.md) for a complete
+example, namespace restrictions, metadata preservation and recovery.
+
 ## Validation and commit
 
 Managed seed files are owned by the corresponding Config Manager user and
 private group. Each systemd manager runs with primary group `safeterm-clients`
 for IPC and explicitly includes its own private group in `SupplementaryGroups`.
-This allows an unprivileged manager to preserve the target GID when creating
+For the original manager-owned resources, this allows an unprivileged manager to preserve the target GID when creating
 backups and replacement files. It does not require `CAP_CHOWN`. If an older
 installation reports `preserve backup owner: operation not permitted`, verify
 the target UID/GID and the service's supplementary groups before retrying.

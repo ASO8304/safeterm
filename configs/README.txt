@@ -445,3 +445,26 @@ Finish intended edits with termctl catalog apply before an update. Unapplied
 changes, incompatible profiles and executable digest mismatches stop validation;
 updates do not reset site definitions to make checks pass. Catalog rollback restores
 the previous activation; package rollback restores the pre-update snapshot.
+
+
+## External files owned by root or another service
+
+Resource definitions may opt in with privileged_write: true. This uses the separate
+restricted root file writer; Config Managers and terminal users remain unprivileged.
+Do not chown the external file to SafeTerm or add broad ACL write permissions.
+After editing config-manager/resources.json, run:
+
+    sudo termctl config check
+    sudo termctl config apply
+
+The parent directories must be root-owned without group/world write, including ACL
+write masks. The file keeps its UID/GID/mode/access ACLs and extended attributes.
+INI edits replace only the selected value token and retain unrelated comments,
+section/key order, quotes, whitespace and LF/CRLF. Ambiguous/injected values are
+rejected before writing. JSON retains its deterministic rendering behavior.
+
+The writer has no arbitrary path or shell API. Root-private backups are stored
+under /var/lib/safeterm-config-writer. termctl config rollback recovers interrupted
+registry activation; config rollback RESOURCE inside SafeTerm restores file values.
+This requires a package with ADR-029, after v0.20.15. See the external configuration
+file guide in the repository for the full security contract and restrictions.

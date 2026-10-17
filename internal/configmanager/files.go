@@ -76,6 +76,17 @@ func commitReplacement(resource Resource, rendered, expected []byte, info os.Fil
 }
 
 func atomicWrite(path string, data []byte, info os.FileInfo) error {
+	original, originalInfo, err := readManagedFile(path)
+	if err != nil {
+		return err
+	}
+	if info == nil || !os.SameFile(info, originalInfo) || info.Mode() != originalInfo.Mode() || info.Size() != originalInfo.Size() || !info.ModTime().Equal(originalInfo.ModTime()) {
+		return fmt.Errorf("configmanager: target changed before replacement")
+	}
+	metadata, err := captureMetadata(path)
+	if err != nil {
+		return err
+	}
 	directory := filepath.Dir(path)
 	temp, err := os.CreateTemp(directory, ".safeterm-write-*")
 	if err != nil {
@@ -89,22 +100,31 @@ func atomicWrite(path string, data []byte, info os.FileInfo) error {
 			_ = os.Remove(tempPath)
 		}
 	}()
-	if err := temp.Chmod(info.Mode().Perm()); err != nil {
-		return fmt.Errorf("configmanager: preserve file mode: %w", err)
-	}
-	if uid, gid, ok := fileOwnerIDs(info); ok {
-		if err := temp.Chown(uid, gid); err != nil {
-			return fmt.Errorf("configmanager: preserve file owner: %w", err)
-		}
-	}
 	if _, err := temp.Write(data); err != nil {
 		return fmt.Errorf("configmanager: write temporary file: %w", err)
+	}
+	if err := applyMetadata(temp, metadata); err != nil {
+		return err
 	}
 	if err := temp.Sync(); err != nil {
 		return fmt.Errorf("configmanager: sync temporary file: %w", err)
 	}
 	if err := temp.Close(); err != nil {
 		return fmt.Errorf("configmanager: close temporary file: %w", err)
+	}
+	current, currentInfo, err := readManagedFile(path)
+	if err != nil {
+		return err
+	}
+	if !os.SameFile(originalInfo, currentInfo) || contentVersion(current) != contentVersion(original) {
+		return fmt.Errorf("configmanager: concurrent target edit")
+	}
+	currentMetadata, err := captureMetadata(path)
+	if err != nil {
+		return err
+	}
+	if !sameMetadata(metadata, currentMetadata) {
+		return fmt.Errorf("configmanager: concurrent metadata edit")
 	}
 	if err := os.Rename(tempPath, path); err != nil {
 		return fmt.Errorf("configmanager: atomically replace managed file: %w", err)
@@ -130,13 +150,15 @@ func writeBackup(resource Resource, data []byte, info os.FileInfo) (string, erro
 			_ = os.Remove(path)
 		}
 	}()
-	if uid, gid, present := fileOwnerIDs(info); present {
-		if err := file.Chown(uid, gid); err != nil {
-			return "", fmt.Errorf("configmanager: preserve backup owner: %w", err)
-		}
+	metadata, err := captureMetadata(resource.Path)
+	if err != nil {
+		return "", err
 	}
 	if _, err := file.Write(data); err != nil {
 		return "", fmt.Errorf("configmanager: write backup: %w", err)
+	}
+	if err := applyMetadata(file, metadata); err != nil {
+		return "", err
 	}
 	if err := file.Sync(); err != nil {
 		return "", fmt.Errorf("configmanager: sync backup: %w", err)

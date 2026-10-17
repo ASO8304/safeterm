@@ -1,15 +1,6 @@
 ---
 - name: Restart SafeTerm control plane
-  ansible.builtin.systemd_service:
-    name: "{{ item }}"
-    state: restarted
-  loop:
-    - safeterm-identity.service
-    - safeterm-config-manager-application.service
-    - safeterm-config-manager-database.service
-    - safeterm-config-manager-network.service
-    - safeterm-gateway.service
-    - safeterm-ssh-broker.service
+  ansible.builtin.command: /usr/local/bin/termctl config apply
   listen: Restart SafeTerm control plane
 
 - name: Restart SafeTerm SSH broker

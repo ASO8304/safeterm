@@ -18,13 +18,13 @@ import (
 )
 
 var RuntimeBinaries = []string{
-	"safeterm-audit", "safeterm-config-manager", "safeterm-gateway",
+	"safeterm-audit", "safeterm-config-manager", "safeterm-config-writer", "safeterm-gateway",
 	"safeterm-console", "safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight",
 	"safeterm-termctl", "safeterm-identity",
 }
 
 var SystemdUnits = []string{
-	"safeterm-audit.service", "safeterm-identity.service",
+	"safeterm-audit.service", "safeterm-identity.service", "safeterm-config-writer.service",
 	"safeterm-config-manager-application.service",
 	"safeterm-config-manager-database.service",
 	"safeterm-config-manager-network.service",
@@ -199,6 +199,9 @@ func Check(options CheckOptions) (Report, error) {
 		}
 	}
 	if err != nil {
+		return Report{}, err
+	}
+	if _, err := configmanager.WriterUnitDropIn(registry, options.Installed); err != nil {
 		return Report{}, err
 	}
 	if err := CheckRegistryCatalog(cfg, registry); err != nil {

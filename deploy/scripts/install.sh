@@ -36,6 +36,8 @@ sudoers_plan="$work/safeterm-service-manager"
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --sudoers-plan >"$sudoers_plan"
 chmod 0440 "$sudoers_plan"
 visudo -cf "$sudoers_plan" >/dev/null
+writer_plan="$work/writer-paths.conf"
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --writer-plan >"$writer_plan"
 
 cat <<EOF
 SafeTerm deployment plan
@@ -50,7 +52,7 @@ EOF
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
 getent group adm >/dev/null 2>&1 || { echo "required Ubuntu group is missing: adm" >&2; exit 1; }
 
-groups='safeterm safeterm-identity safeterm-audit safeterm-broker safeterm-clients safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
+groups='safeterm-config-writers safeterm safeterm-identity safeterm-audit safeterm-broker safeterm-clients safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
 for name in $groups; do
   groupadd -f "$name"
   [ "$name" = safeterm ] && continue
@@ -71,7 +73,7 @@ usermod -a -G safeterm-clients safeterm-gateway
 usermod -a -G safeterm-gateway,safeterm-clients safeterm-broker
 usermod -a -G safeterm-gateway,safeterm-clients safeterm
 for name in safeterm-config-application safeterm-config-database safeterm-config-network; do
-  usermod -a -G "safeterm-gateway,$name" "$name"
+  usermod -a -G "safeterm-gateway,safeterm-config-writers,$name" "$name"
 done
 
 for binary in "$bundle"/bin/safeterm-*; do
@@ -117,12 +119,15 @@ install -o root -g root -m 0440 "$sudoers_plan" /etc/sudoers.d/safeterm-service-
 for unit in "$bundle"/systemd/*.service; do
   install -o root -g root -m 0644 "$unit" "/etc/systemd/system/$(basename -- "$unit")"
 done
+install -d -o root -g root -m 0755 /etc/systemd/system/safeterm-config-writer.service.d
+install -o root -g root -m 0644 "$writer_plan" /etc/systemd/system/safeterm-config-writer.service.d/50-resources.conf
 systemctl daemon-reload
 /usr/local/bin/safeterm-preflight --installed
 
 if [ "$start_services" = true ]; then
-  systemctl enable safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl enable safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
+  systemctl restart safeterm-config-writer.service
   systemctl restart safeterm-identity.service
   systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl restart safeterm-gateway.service
@@ -131,6 +136,7 @@ if [ "$start_services" = true ]; then
   systemctl --quiet is-active safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 if [ "$start_services" = true ]; then
+  /usr/local/bin/termctl config checkpoint
   /usr/local/bin/termctl catalog checkpoint
 fi
 echo "SafeTerm installation: PASS"

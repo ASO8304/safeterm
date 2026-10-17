@@ -174,6 +174,9 @@ func TestDeployedServicesRetainExplicitResourceAndPrivilegeBounds(t *testing.T) 
 			expectedCapabilities = "CAP_NET_RAW"
 			expectedBounding = expectedCapabilities
 		}
+		if entry.Name() == "safeterm-config-writer.service" {
+			expectedBounding = "CAP_CHOWN CAP_FOWNER CAP_DAC_READ_SEARCH"
+		}
 		if privilegedController {
 			expectedBounding = "CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE"
 			families, _ := systemdSetting(unit, "RestrictAddressFamilies")

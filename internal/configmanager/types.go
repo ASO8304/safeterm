@@ -92,6 +92,7 @@ type BackupPolicy struct {
 }
 
 type Resource struct {
+	PrivilegedWrite         bool             `json:"privileged_write,omitempty"`
 	ID                      string           `json:"id"`
 	Description             string           `json:"description"`
 	Profile                 string           `json:"profile"`

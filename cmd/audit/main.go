@@ -27,6 +27,7 @@ func main() {
 	identityUser := flag.String("identity-user", "safeterm-identity", "Console Identity producer user")
 	flag.Parse()
 	if err := run(*socketPath, *storePath, []producerUser{
+		{name: "root", policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "file-writer"}},
 		{name: *identityUser, policy: audit.Producer{Component: audit.ComponentIdentity}},
 		{name: *gatewayUser, policy: audit.Producer{Component: audit.ComponentGateway}},
 		{name: *diagnosticsUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: "diagnostics"}},

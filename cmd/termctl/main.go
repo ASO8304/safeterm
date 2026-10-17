@@ -34,12 +34,13 @@ var serviceUnits = map[string]string{
 	"config-database":    "safeterm-config-manager-database.service",
 	"config-network":     "safeterm-config-manager-network.service",
 	"identity":           "safeterm-identity.service",
+	"config-writer":      "safeterm-config-writer.service",
 }
 
 // serviceOrder is the dependency order used for bulk lifecycle operations.
 // Stopping and disabling use the reverse order so dependents leave first.
 var serviceOrder = []string{
-	"audit", "identity", "diagnostics", "network", "logs", "services", "gateway",
+	"audit", "config-writer", "identity", "diagnostics", "network", "logs", "services", "gateway",
 	"config-application", "config-database", "config-network", "ssh",
 }
 
@@ -108,7 +109,7 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl role list|describe ROLE")
 	fmt.Fprintln(out, "  termctl service status [NAME|all]")
 	fmt.Fprintln(out, "  termctl service start|stop|restart|enable|disable [NAME|all]")
-	fmt.Fprintln(out, "  termctl config list|describe RESOURCE")
+	fmt.Fprintln(out, "  termctl config list|describe RESOURCE | check | apply | rollback")
 	fmt.Fprintln(out, "  termctl user list")
 	fmt.Fprintln(out, "  termctl user add ssh|console --id ID --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
 	fmt.Fprintln(out, "  termctl user auth ssh|console --id ID [--password-hash-file FILE] [--authorized-key-file FILE]")
@@ -341,8 +342,11 @@ func selectedServices(name, action string) ([]string, error) {
 }
 
 func configCommand(dir string, args []string, out io.Writer) error {
+	if len(args) > 0 && (args[0] == "check" || args[0] == "apply" || args[0] == "rollback" || args[0] == "checkpoint") {
+		return configManageCommand(dir, args, out)
+	}
 	if len(args) == 0 || (args[0] != "list" && args[0] != "describe") {
-		return fmt.Errorf("usage: termctl config list|describe RESOURCE")
+		return fmt.Errorf("usage: termctl config list|describe RESOURCE | check | apply | rollback")
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "config-manager", "resources.json"))
 	if err != nil {
@@ -902,7 +906,7 @@ func writeCompletion(out io.Writer, args []string) error {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
 	commands := "catalog role service config user shell update rollback uninstall completion help"
-	services := "audit identity gateway ssh diagnostics network logs services config-application config-database config-network all"
+	services := "audit config-writer identity gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
 		fmt.Fprintf(out, `_termctl_complete() {
@@ -914,7 +918,8 @@ func writeCompletion(out io.Writer, args []string) error {
     case "${COMP_WORDS[1]}" in
       service) choices="%s" ;;
       catalog) choices="list describe prepare regenerate-hashes export apply rollback" ;;
-      role|roles|config) choices="list describe" ;;
+      config) choices="list describe check apply rollback" ;;
+      role|roles) choices="list describe" ;;
       user) choices="list add auth del password" ;;
       completion) choices="bash zsh" ;;
       update) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
@@ -982,7 +987,8 @@ complete -F _termctl_complete termctl
           *) _values 'update option' --signed-catalog --catalog-source --dry-run ;;
         esac
       fi ;;
-    role|roles|config) _values 'action' list describe ;;
+    config) _values 'action' list describe check apply rollback ;;
+    role|roles) _values 'action' list describe ;;
     completion) _values 'shell' bash zsh ;;
   esac
 }

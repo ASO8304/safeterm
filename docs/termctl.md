@@ -297,3 +297,29 @@ Ordinary apply/update keeps approved hashes. `--refresh-hashes` is local-signing
 only and cannot accompany `--signed-catalog`. Export excludes Config Manager
 resource definitions and filesystem permissions; provision those host settings
 separately. Do not copy another host's users or private keys into `/etc/safeterm`.
+
+
+## Register external application files securely
+
+Add `privileged_write: true` to a resource in the root-owned
+`/etc/safeterm/config-manager/resources.json` when the file must retain root or
+another service's ownership. Then run:
+
+```bash
+sudo termctl config check
+sudo termctl config apply
+```
+
+`check` validates resources and file metadata without modifying them. `apply`
+generates only the dedicated writer's sandbox paths and restarts previously active
+consumers, including SSH; use an ordinary Linux admin session. Application values,
+file owners, ACLs and catalog signatures are unchanged by registry activation.
+Failed activation restores the last verified registry and sandbox. If recovery is
+interrupted, use `sudo termctl config rollback` to recover the pending registry
+transaction; it does not restore application values. Inside the restricted shell,
+`config rollback RESOURCE` remains the separate value-backup restoration command.
+`termctl service status config-writer` inspects the writer service.
+
+See [external configuration files](external-configuration-files.md) for a sample,
+metadata and INI comment guarantees, strict path constraints and trust boundaries.
+These commands require a package containing ADR-029, after Release v0.20.15.

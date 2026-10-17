@@ -99,6 +99,10 @@ func catalogManageCommand(dir string, args []string, out io.Writer) error {
 		return err
 	}
 	defer unlock()
+	if _, err := os.Stat("/var/lib/safeterm-installer/config/pending"); err == nil {
+		return fmt.Errorf("recover pending configuration transaction with termctl config rollback")
+	}
+
 	for _, path := range []string{r.live, filepath.Join(r.live, "trust"), filepath.Dir(r.sudoers)} {
 		if err = catalogSecureDirectory(path); err != nil {
 			return err

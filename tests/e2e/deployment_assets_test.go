@@ -79,7 +79,7 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 
 	builder := readText(t, scripts[0])
 	for _, artifact := range []string{
-		"audit config-manager console gateway runner ssh-broker preflight",
+		"audit config-manager config-writer console gateway runner ssh-broker preflight",
 		`"$staging/bin/safeterm-$entry"`,
 		"SHA256SUMS",
 	} {

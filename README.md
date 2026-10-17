@@ -11,6 +11,9 @@ A configurable platform for secure system command execution.
 
 Available capabilities:
 
+- External INI configuration updates through a separate restricted root writer,
+  retaining file ownership, ACLs and comments; see [external configuration files](docs/external-configuration-files.md).
+
 - Request/response contracts and a Core with the fixed Validation → Policy → Translation → Execution sequence
 - JSON configuration loading and config-driven argument validation
 - Authorization of claimed roles with the real Policy implementation and M5 integration tests

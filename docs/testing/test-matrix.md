@@ -194,3 +194,19 @@ M15 evidence: [verification and hosted deployment/SSH end-to-end outputs](../../
 | TestInstallerPasswordFailureCanBeCancelled | Cancel failed enrollment without persisting bootstrap hash | tests/e2e/installer_enrollment_test.go |
 | TestInstallerDependencyPolicyNeverMutatesDuringDryRunOrImplicitAutomation | No APT on dry run or implicit noninteractive installs; explicit/guided APT and repository failure | tests/e2e/installer_enrollment_test.go |
 | TestTerminalPasswordIsHiddenConfirmedAndValidated | Real PTY hidden input, confirmation, complexity and private hash files | cmd/password-hash/terminal_linux_test.go |
+
+
+## Restricted external configuration writer (REQ-025 / ADR-029)
+
+| Test | Boundary / behavior |
+| --- | --- |
+| TestPrivilegedWriterChangesOnlyDeclaredValueAndRetainsMetadata | Exact values, UID/GID/mode, real POSIX ACL and xattr preservation; private backups and rollback |
+| TestWriterRejectsCrossProfileReadonlyInjectedAndStaleRequests | Profile/resource/field/range/version/preview denial |
+| TestINILargeCommentedFileOnlyChangesSelectedValue | 40 sections, 400 keys, header/inline comments, quotes and LF/CRLF retained byte-for-byte |
+| TestWriterIPCAuthenticatesServerAndSeparatesProfiles | Real authenticated Unix IPC, no path/document API, unknown/duplicate/trailing JSON rejection |
+| TestPrivilegedWriterRejectsUnsafeNamespacesAndLinks | Sensitive/broad paths, symlinks and hard links denied |
+| TestWriterAuditFailureAndStaleRollbackLeaveFileUntouched | Fail-closed audit and stale restore rejection |
+| TestPrivilegedWriterRootIntegration | Root and foreign-owned files edited only via IPC by an actual UID-65534 child; explicitly run as root in CI |
+| TestConfigurationApplyPreservesInactiveServicesAndPublishesCheckpoint | Registry activation and inactive-service retention |
+| TestConfigurationApplyRestoresRegistryAndSandboxAfterFailure | Failure restores prior registry and writer grants |
+| TestConfigurationRecoveryFailureRetainsJournal | Durable operator recovery after failed recovery |

@@ -35,7 +35,7 @@ if find "$config_dir" "$managed_dir" -type l -print -quit | grep -q .; then
 fi
 
 mkdir -p "$staging/bin" "$staging/etc" "$staging/systemd"
-for entry in audit config-manager console gateway runner ssh-broker preflight termctl identity; do
+for entry in audit config-manager config-writer console gateway runner ssh-broker preflight termctl identity; do
   (cd "$repo_dir" && go build -trimpath -o "$staging/bin/safeterm-$entry" "./cmd/$entry")
   chmod 0555 "$staging/bin/safeterm-$entry"
 done

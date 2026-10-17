@@ -1,14 +1,14 @@
 [Unit]
 Description=SafeTerm database Config Manager
-After=safeterm-identity.service local-fs.target safeterm-audit.service
-Requires=safeterm-audit.service safeterm-identity.service
+After=safeterm-config-writer.service safeterm-identity.service local-fs.target safeterm-audit.service
+Requires=safeterm-config-writer.service safeterm-audit.service safeterm-identity.service
 Before=safeterm-ssh-broker.service
 
 [Service]
 Type=simple
 User=safeterm-config-database
 Group=safeterm-clients
-SupplementaryGroups=safeterm-audit safeterm-gateway safeterm-config-database
+SupplementaryGroups=safeterm-audit safeterm-config-writers safeterm-gateway safeterm-config-database
 RuntimeDirectory=safeterm-config-database
 RuntimeDirectoryMode=0750
 UMask=0007

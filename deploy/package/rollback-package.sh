@@ -2,7 +2,7 @@
 set -eu
 
 transaction_root=/var/backups/safeterm-installer
-units='safeterm-audit.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
+units='safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 usage() {
   echo "usage: $0 [latest|TRANSACTION_ID]" >&2
@@ -14,6 +14,7 @@ usage() {
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
 [ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/config/pending ] || { echo "interrupted configuration transaction: run sudo termctl config rollback first" >&2; exit 1; }
 selection=${1:-latest}
 case "$selection" in ''|*[!A-Za-z0-9._-]*) usage ;; esac
 if [ "$selection" = latest ]; then
@@ -31,7 +32,7 @@ transaction="$transaction_root/$transaction_id"
 # Validate every removal path before stopping services or deleting files.
 while IFS= read -r path; do
   case "$path" in
-    /usr/share/safeterm/defaults|/usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
+    /etc/systemd/system/safeterm-config-writer.service.d|/usr/share/safeterm/defaults|/usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
     /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
     *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
   esac
@@ -47,7 +48,7 @@ done
 while IFS= read -r path; do
   [ -n "$path" ] || continue
   case "$path" in
-    /usr/share/safeterm/defaults|/usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
+    /etc/systemd/system/safeterm-config-writer.service.d|/usr/share/safeterm/defaults|/usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;
     /etc/safeterm|/etc/safeterm-managed|/etc/cat|/etc/sudoers.d/safeterm-service-manager|/home/safeterm|/var/lib/safeterm|/var/lib/safeterm-installer|/var/log/safeterm-readable|/var/mail/safeterm|/var/spool/mail/safeterm|/usr/local/sbin/safeterm-install-rollback|/root/?*|/usr/local/bin/safeterm-*|/etc/systemd/system/safeterm-*.service) ;;
     *) echo "unsafe rollback path: $path" >&2; exit 1 ;;
   esac

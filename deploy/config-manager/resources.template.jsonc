@@ -18,6 +18,11 @@
       // Supported access modes: read-only or read-write.
       "access": "read-write",
 
+      // Opt in only for an external file whose original ownership must remain.
+      // Requires the restricted root writer and termctl config check/apply.
+      // All parent directories must be root-owned without group/world write.
+      "privileged_write": false,
+
       "fields": [
         {
           // For JSON, section identifies the top-level object. For INI, it is

@@ -91,7 +91,7 @@ func run(profile, registryPath, socket, brokerUsers, auditSocket, auditUser, gat
 			break
 		}
 	}
-	manager, err := configmanager.NewManager(profile, registry, nil, activator, auditClient, configmanager.ManagerOptions{ProposalTTL: ttl})
+	manager, err := configmanager.NewManager(profile, registry, nil, activator, auditClient, configmanager.ManagerOptions{ProposalTTL: ttl, FileWriter: &configmanager.FileWriterClient{Socket: configmanager.WriterSocket, UID: 0}})
 	if err != nil {
 		return err
 	}

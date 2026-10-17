@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"safeterm/internal/configmanager"
 
 	"safeterm/internal/deployment"
 )
@@ -17,6 +19,7 @@ func main() {
 	sudoersPlan := flag.Bool("sudoers-plan", false, "print exact sudoers rules for typed systemd operations")
 	stageManaged := flag.Bool("stage-managed-upgrade", false, "stage existing registered files into a private installer bundle")
 	installConfig := flag.Bool("install-configuration", false, "install validated configuration preserving host files")
+	writerPlan := flag.Bool("writer-plan", false, "print privileged writer sandbox drop-in")
 	flag.Parse()
 	if *stageManaged || *installConfig {
 		if os.Geteuid() != 0 || *root == "" || *installed || (*stageManaged && *installConfig) {
@@ -44,6 +47,22 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+		return
+	}
+	if *writerPlan {
+		data, err := os.ReadFile(filepath.Join(*root, "etc/safeterm/config-manager/resources.json"))
+		if err == nil {
+			var registry *configmanager.Registry
+			registry, err = configmanager.ParseRegistry(data)
+			if err == nil {
+				data, err = configmanager.WriterUnitDropIn(registry, true)
+			}
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Stdout.Write(data)
 		return
 	}
 	if *managedPlan {

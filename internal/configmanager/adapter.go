@@ -52,6 +52,7 @@ func parseINI(data []byte) (*iniDocument, error) {
 	lines := splitLinesPreservingEndings(text)
 	document := &iniDocument{lines: lines, values: map[string]*iniValue{}}
 	section := ""
+	sections := map[string]bool{}
 	for index, line := range lines {
 		body, ending := trimLineEnding(line)
 		trimmed := strings.TrimSpace(body)
@@ -59,13 +60,19 @@ func parseINI(data []byte) (*iniDocument, error) {
 			continue
 		}
 		if strings.HasPrefix(trimmed, "[") {
-			if !strings.HasSuffix(trimmed, "]") || strings.Count(trimmed, "[") != 1 || strings.Count(trimmed, "]") != 1 {
+			end := strings.IndexByte(trimmed, ']')
+			if end < 1 {
 				return nil, fmt.Errorf("configmanager: invalid INI section on line %d", index+1)
 			}
-			section = strings.TrimSpace(trimmed[1 : len(trimmed)-1])
-			if !fieldIdentifierPattern.MatchString(section) {
+			trailing := strings.TrimSpace(trimmed[end+1:])
+			if trailing != "" && !strings.HasPrefix(trailing, ";") && !strings.HasPrefix(trailing, "#") {
 				return nil, fmt.Errorf("configmanager: invalid INI section on line %d", index+1)
 			}
+			section = strings.TrimSpace(trimmed[1:end])
+			if !fieldIdentifierPattern.MatchString(section) || sections[section] {
+				return nil, fmt.Errorf("configmanager: invalid or duplicate INI section on line %d", index+1)
+			}
+			sections[section] = true
 			continue
 		}
 		equals := strings.IndexByte(body, '=')
@@ -179,6 +186,9 @@ func (d *iniDocument) Set(section, key string, value any) error {
 		return fmt.Errorf("configmanager: INI field %q.%q does not exist", section, key)
 	}
 	encoded := scalarString(value)
+	if strings.ContainsAny(encoded, "\r\n\x00") {
+		return fmt.Errorf("configmanager: multiline INI values are not supported")
+	}
 	switch entry.quote {
 	case '"':
 		encoded = strconv.Quote(encoded)
@@ -187,6 +197,11 @@ func (d *iniDocument) Set(section, key string, value any) error {
 			return fmt.Errorf("configmanager: value cannot be represented with existing INI quoting")
 		}
 		encoded = "'" + encoded + "'"
+	}
+	if entry.quote == 0 {
+		if strings.TrimSpace(encoded) != encoded || strings.ContainsAny(encoded, "\"'") || iniValueEnd(encoded, 0) != len(encoded) {
+			return fmt.Errorf("configmanager: value cannot be represented with existing INI quoting")
+		}
 	}
 	d.lines[entry.line] = entry.prefix + encoded + entry.suffix
 	entry.value = scalarString(value)

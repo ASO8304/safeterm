@@ -1,0 +1,44 @@
+[Unit]
+Description=SafeTerm restricted configuration file writer
+After=local-fs.target safeterm-audit.service
+Requires=safeterm-audit.service
+Before=safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
+
+[Service]
+Type=simple
+User=root
+Group=safeterm-config-writers
+SupplementaryGroups=safeterm-audit
+RuntimeDirectory=safeterm-config-writer
+RuntimeDirectoryMode=0750
+StateDirectory=safeterm-config-writer
+StateDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/local/bin/safeterm-config-writer
+Restart=on-failure
+RestartSec=2s
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_DAC_READ_SEARCH
+AmbientCapabilities=
+ProtectSystem=strict
+ReadWritePaths=/var/lib/safeterm-config-writer
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+MemoryMax=192M
+TasksMax=16
+LimitNOFILE=64
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+
+[Install]
+WantedBy=multi-user.target
