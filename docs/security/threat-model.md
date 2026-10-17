@@ -94,7 +94,7 @@ The dedicated root file writer is a new trusted boundary. Config Managers remain
 unprivileged and retain user-role/proposal authorization. The writer trusts only
 profile-mapped manager UIDs over Unix peer credentials, revalidates registered
 resource/field patches and versions, and accepts no caller path, rendered document
-or command. A compromised manager can access registered files and editable fields
+or command. A compromised manager can access registered files and editable fields and server-created backup restoration
 in its own profile, not arbitrary root files. Root-authored resource schemas are
 security policy and must constrain sensitive values appropriately.
 

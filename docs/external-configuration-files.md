@@ -103,8 +103,8 @@ Config Manager UID to exactly one profile. It independently checks registration,
 access mode, editable fields, types/ranges, complete-document rules and expected
 versions. It reconstructs the edit itself; callers cannot submit a path, replacement
 document, program or arbitrary backup path. The manager remains the trusted
-user-role/proposal authority. A compromised manager is bounded to registered
-editable fields in its own profile; this does not claim protection from a malicious
+user-role/proposal authority. A compromised manager is bounded to registered field updates and restoration
+of writer-created backups in its own profile; this does not claim protection from a malicious
 root administrator or malicious administrator-authored schemas.
 
 All parent directories of privileged files must be root-owned, real directories
@@ -124,6 +124,7 @@ Multiline/NUL values, duplicate sections/keys and values that cannot be expresse
 with the existing quote style are rejected. Unsupported INI dialects are rejected
 before writing; the tool does not rewrite them into a different format. JSON keeps
 its existing deterministic renderer and does not offer this INI formatting contract.
+JSON nesting is limited to 64 levels to bound parser recursion.
 
 Replacement is atomic and uses a new inode, so inode identity and modification
 timestamps naturally change. Metadata is verified before publication. Application

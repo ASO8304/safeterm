@@ -219,7 +219,7 @@ type jsonDocument struct {
 func parseJSON(data []byte) (*jsonDocument, error) {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
-	value, err := decodeJSONValue(decoder)
+	value, err := decodeJSONValue(decoder, 0)
 	if err != nil {
 		return nil, fmt.Errorf("configmanager: parse JSON: %w", err)
 	}
@@ -236,7 +236,10 @@ func parseJSON(data []byte) (*jsonDocument, error) {
 	return &jsonDocument{root: root}, nil
 }
 
-func decodeJSONValue(decoder *json.Decoder) (any, error) {
+func decodeJSONValue(decoder *json.Decoder, depth int) (any, error) {
+	if depth > 64 {
+		return nil, fmt.Errorf("configmanager: JSON nesting exceeds 64 levels")
+	}
 	token, err := decoder.Token()
 	if err != nil {
 		return nil, err
@@ -260,7 +263,7 @@ func decodeJSONValue(decoder *json.Decoder) (any, error) {
 			if _, exists := object[key]; exists {
 				return nil, fmt.Errorf("duplicate object key %q", key)
 			}
-			value, err := decodeJSONValue(decoder)
+			value, err := decodeJSONValue(decoder, depth+1)
 			if err != nil {
 				return nil, err
 			}
@@ -274,7 +277,7 @@ func decodeJSONValue(decoder *json.Decoder) (any, error) {
 	case '[':
 		array := []any{}
 		for decoder.More() {
-			value, err := decodeJSONValue(decoder)
+			value, err := decodeJSONValue(decoder, depth+1)
 			if err != nil {
 				return nil, err
 			}

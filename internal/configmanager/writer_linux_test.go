@@ -204,6 +204,7 @@ func TestWriterIPCAuthenticatesServerAndSeparatesProfiles(t *testing.T) {
 		`{"version":1,"action":"read","resource":"cats-options","path":"/etc/shadow"}`,
 		`{"version":2,"version":1,"action":"read","resource":"cats-options"}`,
 		`{"version":1,"action":"read","resource":"cats-options"} {}`,
+		`{"version":1,"action":"read","resource":` + strings.Repeat("[", 11000) + `"cats-options"` + strings.Repeat("]", 11000) + `}`,
 	} {
 		conn, err := net.Dial("unix", socket)
 		if err != nil {
@@ -213,7 +214,7 @@ func TestWriterIPCAuthenticatesServerAndSeparatesProfiles(t *testing.T) {
 		io.WriteString(conn, frame+"\n")
 		response, err := io.ReadAll(conn)
 		conn.Close()
-		if len(response) > 0 || err == nil && len(response) != 0 {
+		if len(response) > 0 {
 			t.Fatalf("ambiguous wire input accepted: %q", response)
 		}
 	}

@@ -17,6 +17,9 @@ import (
 )
 
 func validDigest(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
 	decoded, err := hex.DecodeString(s)
 	return err == nil && len(decoded) == 32 && s == strings.ToLower(s)
 }
@@ -121,9 +124,6 @@ func (s *FileWriterServer) Serve(ctx context.Context, path string) error {
 			if err != nil || len(frame) > maxIPCMessageBytes {
 				return
 			}
-			if _, err := parseJSON(frame); err != nil {
-				return
-			}
 			var q writerRequest
 			decoder := json.NewDecoder(bytes.NewReader(frame))
 			decoder.DisallowUnknownFields()
@@ -132,6 +132,11 @@ func (s *FileWriterServer) Serve(ctx context.Context, path string) error {
 			}
 			var extra any
 			if decoder.Decode(&extra) != io.EOF {
+				return
+			}
+			// Validate the fixed-depth typed shape before duplicate-key parsing.
+			// Unknown or deeply nested values never reach our recursive decoder.
+			if _, err := parseJSON(frame); err != nil {
 				return
 			}
 			out := s.dispatch(uid, q)

@@ -42,8 +42,8 @@ multiline/ambiguous new values and duplicate sections rather than reformatting.
 ## Consequences
 
 Root privilege exists in a small dedicated local writer, not the terminal or
-Config Manager. Trusted managers can request registered editable fields only in
-their own profile; they remain the user-authorization authority. The trusted root
+Config Manager. Trusted managers can request registered field updates and server-created backup
+restoration only in their own profile; they remain the user-authorization authority. The trusted root
 registry is a security policy, not untrusted user input. Service-owned writable
 directories require a separate safe integration and are refused here. Atomic
 replacement changes inode/mtime, and external application writers must coordinate.

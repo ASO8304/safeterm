@@ -52,3 +52,9 @@ func TestJSONRejectsDuplicateFields(t *testing.T) {
 		t.Fatal("expected duplicate JSON key rejection")
 	}
 }
+
+func TestJSONRejectsExcessiveNesting(t *testing.T) {
+	if _, err := parseJSON([]byte(`{"nested":` + strings.Repeat("[", 65) + `0` + strings.Repeat("]", 65) + `}`)); err == nil {
+		t.Fatal("unbounded nesting accepted")
+	}
+}
