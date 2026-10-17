@@ -130,4 +130,7 @@ if [ "$start_services" = true ]; then
   systemctl restart safeterm-ssh-broker.service
   systemctl --quiet is-active safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
+if [ "$start_services" = true ]; then
+  /usr/local/bin/termctl catalog checkpoint
+fi
 echo "SafeTerm installation: PASS"

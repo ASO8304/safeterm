@@ -60,6 +60,9 @@ func TestBashCompletionActuallyCompletes(t *testing.T) {
 		{"termctl service restart config-n", 3, "config-network"},
 		{"termctl user add s", 3, "ssh"},
 		{"termctl catalog reg", 2, "regenerate-hashes"},
+		{"termctl catalog app", 2, "apply"},
+		{"termctl catalog roll", 2, "rollback"},
+		{"termctl catalog apply --dry", 3, "--dry-run"},
 		{"termctl user add ssh --password", 4, "--password-hash-file"},
 	} {
 		code := script.String() + fmt.Sprintf("\nCOMP_WORDS=(%s); COMP_CWORD=%d; _termctl_complete; printf '%%s\\n' \"${COMPREPLY[@]}\"", tc.words, tc.index)

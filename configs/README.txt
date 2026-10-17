@@ -382,3 +382,31 @@ once with sudo termctl user password console --id EXISTING_ID. passwd safeterm
 changes only the separate Linux entry password, not the internal user password.
 The installer does not change PAM or create a Linux account for each operator.
 See the repository's docs/console-authentication.md and ADR-025 for details.
+
+16. Apply catalog changes on an installed host
+
+After editing approved command definitions or log aliases, run from the ordinary
+administrator shell:
+
+    sudo termctl catalog apply --dry-run
+    sudo termctl catalog apply
+
+Apply reuses the existing local signing key, validates the catalog, checks pinned
+executable hashes and user/resource roles, regenerates sudoers, and restarts only
+previously running catalog services. It does not replace users, passwords, managed
+application values or the trust anchor. Active sessions must reconnect.
+
+Use --source DIR to apply a reviewed copy, --key-file FILE for an existing custom
+local key, or --signed-catalog DIR for a catalog signed with the approved offline
+key. No new key is generated and executable hashes are not refreshed implicitly.
+The earlier prepare/sign instructions remain useful for offline signing.
+
+    sudo termctl catalog rollback
+
+This restores the previous catalog or recovers an interrupted catalog transaction;
+it differs from package-level termctl rollback. Installation seeds a verified
+checkpoint and retains one previous catalog. A pending recovery blocks new apply,
+update, rollback and uninstall until catalog recovery succeeds. Missing historical
+content cannot be reconstructed: if both live signature and checkpoint are invalid,
+restore a valid catalog before applying. Log file ACLs and logrotate remain site
+configuration. See repository docs/catalog-activation.md and ADR-026 for details.

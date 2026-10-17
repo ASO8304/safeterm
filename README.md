@@ -512,6 +512,23 @@ For detailed offline signing, recovery and troubleshooting, see the
 [termctl administration](docs/termctl.md). Manual Actions runs provide downloadable
 artifacts; tagged runs publish the archive and checksum as Release assets.
 
+## Apply catalog edits after installation
+
+After adding log aliases or changing command definitions, run from the ordinary
+administrator shell (with the existing local signing key):
+
+```bash
+sudo termctl catalog apply --dry-run
+sudo termctl catalog apply
+```
+
+This validates, signs, saves a verified baseline, regenerates sudoers and activates
+previously running services. Failed activation restores the earlier catalog;
+`sudo termctl catalog rollback` also handles explicit rollback or interrupted
+transactions. Users, passwords, managed settings and the trust anchor are not
+replaced. For a working copy or offline signature, use `--source DIR` or
+`--signed-catalog DIR`. See [catalog activation](docs/catalog-activation.md).
+
 ## Project Structure
 
 The [catalog administration guide](configs/README.md) explains all catalog

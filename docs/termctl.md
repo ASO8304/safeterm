@@ -58,6 +58,9 @@ termctl catalog list
 termctl catalog describe ping
 termctl catalog prepare --source ./configs --output /tmp/safeterm-catalog
 termctl catalog regenerate-hashes --source ./configs --output /tmp/safeterm-catalog
+sudo termctl catalog apply --dry-run
+sudo termctl catalog apply
+sudo termctl catalog rollback
 termctl role list
 termctl role describe netops
 termctl service status all
@@ -91,6 +94,16 @@ safeterm-catalog-sign \
   -private-key /secure/safeterm/catalog.key \
   -signature /tmp/safeterm-catalog/catalog.sig
 ```
+
+`sudo termctl catalog apply` validates and signs current catalog edits with the
+existing local key, regenerates exact sudoers grants, and activates services with
+verified recovery. Use `--source DIR` for a working copy, `--signed-catalog DIR`
+for offline signing, or `--key-file FILE` for an existing custom local key.
+`--dry-run` validates before mutation. `sudo termctl catalog rollback` restores
+the previous catalog or recovers an interrupted catalog transaction; it is
+separate from package `termctl rollback`. Installation seeds the recovery
+checkpoint automatically. Active sessions disconnect during activation.
+See [catalog activation](catalog-activation.md) for the full procedure and limits.
 
 `role list` shows every configured role and its operation count. `role describe`
 shows the operations authorized by one role. These commands read the signed

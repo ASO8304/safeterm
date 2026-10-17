@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/term"
@@ -100,6 +102,8 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl uninstall (preserves data, identities and rollback snapshots)")
 	fmt.Fprintln(out, "  termctl catalog list|describe OPERATION")
 	fmt.Fprintln(out, "  termctl catalog prepare --source DIR --output DIR")
+	fmt.Fprintln(out, "  termctl catalog apply [--source DIR | --signed-catalog DIR] [--key-file FILE] [--dry-run]")
+	fmt.Fprintln(out, "  termctl catalog rollback")
 	fmt.Fprintln(out, "  termctl role list|describe ROLE")
 	fmt.Fprintln(out, "  termctl service status [NAME|all]")
 	fmt.Fprintln(out, "  termctl service start|stop|restart|enable|disable [NAME|all]")
@@ -153,6 +157,9 @@ func updateCommand(args []string) error {
 }
 
 func catalogCommand(dir string, args []string, out io.Writer) error {
+	if len(args) > 0 && (args[0] == "apply" || args[0] == "rollback" || args[0] == "checkpoint") {
+		return catalogManageCommand(dir, args, out)
+	}
 	if len(args) > 0 && (args[0] == "prepare" || args[0] == "regenerate-hashes") {
 		source, output := dir, ""
 		for i := 1; i < len(args); i++ {
@@ -896,7 +903,7 @@ func writeCompletion(out io.Writer, args []string) error {
   elif (( COMP_CWORD == 2 )); then
     case "${COMP_WORDS[1]}" in
       service) choices="%s" ;;
-      catalog) choices="list describe prepare regenerate-hashes" ;;
+      catalog) choices="list describe prepare regenerate-hashes apply rollback" ;;
       role|roles|config) choices="list describe" ;;
       user) choices="list add auth del password" ;;
       completion) choices="bash zsh" ;;
@@ -913,10 +920,11 @@ func writeCompletion(out io.Writer, args []string) error {
         fi ;;
       catalog)
         case "${COMP_WORDS[2]}" in
-          prepare|regenerate-hashes)
+          prepare|regenerate-hashes|apply)
             case "${COMP_WORDS[COMP_CWORD-1]}" in
-              --source|--output) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
-              *) choices="--source --output" ;;
+              --source|--output|--signed-catalog) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
+              --key-file) mapfile -t COMPREPLY < <(compgen -f -- "$cur"); return ;;
+              *) if [[ "${COMP_WORDS[2]}" == apply ]]; then choices="--source --signed-catalog --key-file --dry-run"; else choices="--source --output"; fi ;;
             esac ;;
         esac ;;
       update)
@@ -933,6 +941,50 @@ complete -F _termctl_complete termctl
 		return nil
 	}
 	fmt.Fprintln(out, "#compdef termctl")
-	fmt.Fprintf(out, "_arguments '1:command:(%s)' '2:service action:(%s)' '3:service:(%s)'\n", commands, serviceActions, services)
+	fmt.Fprintf(out, `_termctl() {
+  if (( CURRENT == 2 )); then
+    _values 'command' %s
+    return
+  fi
+  case "$words[2]" in
+    catalog)
+      if (( CURRENT == 3 )); then
+        _values 'catalog action' list describe prepare regenerate-hashes apply rollback
+      else
+        case "$words[CURRENT-1]" in
+          --source|--output|--signed-catalog) _files -/ ;;
+          --key-file) _files ;;
+          *) _values 'catalog option' --source --output --signed-catalog --key-file --dry-run ;;
+        esac
+      fi ;;
+    service)
+      if (( CURRENT == 3 )); then _values 'service action' %s
+      elif (( CURRENT == 4 )); then _values 'service' %s; fi ;;
+    user)
+      if (( CURRENT == 3 )); then _values 'user action' list add auth del password
+      elif (( CURRENT == 4 )); then _values 'identity' ssh console
+      else _values 'user option' --id --roles --password-hash-file --authorized-key-file; fi ;;
+    update) _files -/ ;;
+    role|roles|config) _values 'action' list describe ;;
+    completion) _values 'shell' bash zsh ;;
+  esac
+}
+compdef _termctl termctl
+`, commands, serviceActions, services)
 	return nil
+}
+
+func catalogRun(name string, args ...string) ([]byte, error) {
+	switch name {
+	case "/usr/bin/systemctl", "/usr/sbin/visudo", "/usr/local/bin/safeterm-preflight":
+	default:
+		return nil, fmt.Errorf("unsupported catalog administration executable")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	data, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+	if err != nil {
+		return data, fmt.Errorf("%s %v: %w: %s", filepath.Base(name), args, err, strings.TrimSpace(string(data)))
+	}
+	return data, nil
 }

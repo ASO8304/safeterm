@@ -34,6 +34,10 @@ translation substitutes its fixed value into `tail -n 50 -F -- PATH`. The
 operation streams through the log-reader Runner and Ctrl+C sends semantic
 termination.
 
+After adding aliases on an installed host, use `sudo termctl catalog apply
+--dry-run`, then `sudo termctl catalog apply` to validate, sign and activate them.
+See [catalog activation](catalog-activation.md) for offline signing and recovery.
+
 For another service, add its alias/path to the signed catalog and grant the
 dedicated reader account access without making the file world-readable:
 
@@ -113,9 +117,10 @@ from the host administration console.
 6. Run `safeterm-preflight --installed`, then use `list`, `describe NAME`, and
    the operation from the restricted terminal.
 
-The installer creates a rollback transaction before activation. Do not edit
-the active `/etc/safeterm` catalog directly: its detached signature will no
-longer match and services fail closed on restart.
+For catalog-only changes on an installed host, prefer `termctl catalog apply`
+rather than rebuilding a package. It keeps its own verified rollback checkpoint.
+Do not restart services after unsigned live edits; apply them first, or work on a
+copy with `--source DIR`. Package/unit changes still use the installer workflow.
 
 ## Streaming tcpdump output
 

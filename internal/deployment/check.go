@@ -51,6 +51,9 @@ func SystemdSudoers(root string) ([]string, error) {
 	return systemdSudoers(cfg)
 }
 
+// CatalogSudoers renders exact root command grants for an already validated catalog.
+func CatalogSudoers(cfg *config.Config) ([]string, error) { return systemdSudoers(cfg) }
+
 func systemdSudoers(cfg *config.Config) ([]string, error) {
 	commands := []string{}
 	for _, operation := range cfg.Operations {

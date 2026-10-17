@@ -4,6 +4,7 @@ set -eu
 [ "$(id -u)" -eq 0 ] || { echo "uninstall requires root" >&2; exit 1; }
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
 # Stop dependents first. Preserve accounts and state so reinstall needs no
 # password enrollment and does not destroy historical audit evidence.
 for name in ssh-broker config-manager-application config-manager-database config-manager-network gateway runner-service-manager runner-log-reader runner-network-observer runner-diagnostics identity audit; do

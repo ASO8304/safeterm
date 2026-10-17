@@ -96,6 +96,7 @@ if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then usage; fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
 for tool in sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
@@ -322,6 +323,7 @@ if [ "$start_services" = true ]; then
   systemctl restart safeterm-ssh-broker.service
   systemctl --quiet is-active safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
+/usr/local/bin/termctl catalog checkpoint --installer-lock-held
 echo "SafeTerm package installation: PASS"
 # Retain one pre-install snapshot; operators never need to track IDs and
 # repeated upgrades do not accumulate snapshots indefinitely.
