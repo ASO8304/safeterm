@@ -51,6 +51,7 @@ cp "$repo_dir/deploy/console/users.template.jsonc" "$staging/payload/templates/c
 cp "$repo_dir/deploy/ssh/users.template.jsonc" "$staging/payload/templates/ssh-users.template.jsonc"
 cp "$repo_dir/deploy/systemd/"*.service "$staging/payload/systemd/"
 cp "$repo_dir/deploy/scripts/install.sh" "$staging/payload/base-install.sh"
+cp "$repo_dir/deploy/package/install-support.sh" "$staging/payload/install-support.sh"
 cp "$repo_dir/deploy/package/install-package.sh" "$staging/install.sh"
 cp "$repo_dir/deploy/package/rollback-package.sh" "$staging/payload/rollback.sh"
 cp "$repo_dir/deploy/package/uninstall-package.sh" "$staging/payload/uninstall.sh"
@@ -63,4 +64,4 @@ chmod 0444 "$staging/PACKAGE-SHA256SUMS"
 mv -- "$staging" "$output"
 trap - EXIT HUP INT TERM
 echo "SafeTerm offline installation package created: $output"
-echo "Transfer this directory to the target host and run: sudo ./install.sh --help"
+echo "Transfer this directory to the target host and run: sudo ./install.sh"

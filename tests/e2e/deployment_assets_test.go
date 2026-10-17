@@ -59,6 +59,7 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 		filepath.Join(repository, "deploy", "demo", "run-demo.sh"),
 		filepath.Join(repository, "deploy", "package", "create-package.sh"),
 		filepath.Join(repository, "deploy", "package", "install-package.sh"),
+		filepath.Join(repository, "deploy", "package", "install-support.sh"),
 		filepath.Join(repository, "deploy", "package", "rollback-package.sh"),
 		filepath.Join(repository, "deploy", "ansible", "install.sh"),
 		filepath.Join(repository, "deploy", "ansible", "rollback.sh"),
@@ -140,7 +141,7 @@ func TestAnsibleInstallerOrchestratesVerifiedTransactionalPackage(t *testing.T) 
 func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 	repository := repositoryRoot(t)
 	creator := readText(t, filepath.Join(repository, "deploy", "package", "create-package.sh"))
-	installer := readText(t, filepath.Join(repository, "deploy", "package", "install-package.sh"))
+	installer := readText(t, filepath.Join(repository, "deploy", "package", "install-package.sh")) + readText(t, filepath.Join(repository, "deploy", "package", "install-support.sh"))
 	rollback := readText(t, filepath.Join(repository, "deploy", "package", "rollback-package.sh"))
 	for _, marker := range []string{
 		"CGO_ENABLED=0 GOOS=linux", "amd64|arm64", "catalog-prepare catalog-sign",

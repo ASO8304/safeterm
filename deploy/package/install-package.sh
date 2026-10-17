@@ -4,26 +4,28 @@ set -eu
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  install.sh [options]                       preserve an existing verified installation
+  sudo ./install.sh                         guided fresh install or preserve existing setup
   install.sh --prepare-catalog DIR
   install.sh --signed-catalog DIR [options]
   install.sh --local-signing [options]
 
 Install options:
   --catalog-source DIR       portable catalog definitions (requires --local-signing)
-  --ssh-user USER             SafeTerm SSH identity for a fresh install (default: alice)
+  --ssh-user USER             SafeTerm SSH identity for a fresh install (default: admin)
   --ssh-password-hash-file FILE  bcrypt hash for a fresh SSH identity
   --ssh-public-key FILE       optional authorized public key
   --single-operator           deprecated compatibility flag (single-operator is always enabled)
   --dry-run                   verify and print the base installation plan without host mutation
+  --non-interactive          never prompt; supply bootstrap credentials for fresh installs
+  --install-dependencies     install missing OS packages using configured APT repositories
   --no-start                  install but do not enable or start services
   --local-key-dir DIR         local-signing key directory (default: /root/.config/safeterm)
 
 Production uses --prepare-catalog, signs the result on the offline signing host,
-and returns that directory for --signed-catalog. --local-signing is intended for
-demos and single-host evaluation because its private signing key stays on target.
+and returns that directory for --signed-catalog. Guided installation defaults to
+local signing; its private signing key stays on the target under /root.
 EOF
-  exit 2
+  exit "${1:-2}"
 }
 
 package_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -33,7 +35,11 @@ signed_catalog=
 catalog_source=
 explicit_source=false
 local_signing=false
-ssh_user=alice
+ssh_user=admin
+ssh_user_set=false
+non_interactive=false
+install_dependencies=false
+bootstrap_console=false
 ssh_public_key=
 ssh_password_hash_file=
 single_operator=false
@@ -60,14 +66,16 @@ while [ "$#" -gt 0 ]; do
     --catalog-source) [ "$#" -ge 2 ] || usage; catalog_source=$2; explicit_source=true; shift 2 ;;
     --signed-catalog) [ "$#" -ge 2 ] || usage; signed_catalog=$2; shift 2 ;;
     --local-signing) local_signing=true; shift ;;
-    --ssh-user) [ "$#" -ge 2 ] || usage; ssh_user=$2; shift 2 ;;
+    --ssh-user) [ "$#" -ge 2 ] || usage; ssh_user=$2; ssh_user_set=true; shift 2 ;;
     --ssh-password-hash-file) [ "$#" -ge 2 ] || usage; ssh_password_hash_file=$2; shift 2 ;;
     --ssh-public-key) [ "$#" -ge 2 ] || usage; ssh_public_key=$2; shift 2 ;;
     --single-operator) single_operator=true; shift ;;
     --dry-run) dry_run=true; shift ;;
+    --non-interactive) non_interactive=true; shift ;;
+    --install-dependencies) install_dependencies=true; shift ;;
     --no-start) start_services=false; shift ;;
     --local-key-dir) [ "$#" -ge 2 ] || usage; local_key_dir=$2; shift 2 ;;
-    --help|-h) usage ;;
+    --help|-h) usage 0 ;;
     *) usage ;;
   esac
 done
@@ -78,12 +86,9 @@ done
 case "$(uname -m)" in x86_64) host_arch=amd64 ;; aarch64|arm64) host_arch=arm64 ;; *) host_arch=unsupported ;; esac
 target_arch=$(cat "$package_dir/TARGET_ARCH")
 [ "$host_arch" = "$target_arch" ] || { echo "package architecture $target_arch does not match host $host_arch" >&2; exit 1; }
-for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo; do
-  [ -x "$executable" ] || { echo "required target executable is missing: $executable" >&2; exit 1; }
-done
+. "$payload/install-support.sh"
 
 if [ "$explicit_source" = true ] && [ -n "$signed_catalog" ]; then usage; fi
-if [ "$explicit_source" = true ] && [ "$local_signing" = false ] && [ -z "$prepare_output" ]; then usage; fi
 if [ -z "$catalog_source" ]; then
   if [ -f /etc/safeterm/catalog.json ]; then
     catalog_source=/etc/safeterm
@@ -109,10 +114,21 @@ EOF
 fi
 
 if [ -n "$signed_catalog" ] && [ "$local_signing" = true ]; then usage; fi
+if [ -z "$signed_catalog" ] && [ "$local_signing" = false ] && [ ! -f /etc/safeterm/catalog.json ]; then
+  if [ "$non_interactive" = false ] && safeterm_has_terminal; then
+    echo "Fresh installation: using local catalog signing; the private key stays under $local_key_dir."
+    local_signing=true
+  fi
+fi
+if [ "$explicit_source" = true ] && [ "$local_signing" = false ]; then usage; fi
 if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then
-  if [ "$explicit_source" = false ] && [ "$catalog_source" = /etc/safeterm ]; then signed_catalog=/etc/safeterm; else usage; fi
+  if [ "$explicit_source" = false ] && [ "$catalog_source" = /etc/safeterm ]; then signed_catalog=/etc/safeterm; else echo "Fresh unattended install requires --local-signing or --signed-catalog DIR and bootstrap credentials." >&2; exit 2; fi
 fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
+IFS= read -r init_name </proc/1/comm
+[ "$init_name" = systemd ] || { echo "SafeTerm installation requires systemd running as PID 1." >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
+safeterm_dependencies
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
 [ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
@@ -124,8 +140,18 @@ case "$ssh_user" in ''|*[!A-Za-z0-9_.@-]*) echo "invalid SSH identity" >&2; exit
 [ "${#ssh_user}" -le 128 ] || { echo "SSH identity is too long" >&2; exit 1; }
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/safeterm-package-install.XXXXXX")
-cleanup() { rm -rf -- "$work"; }
-trap cleanup EXIT HUP INT TERM
+cleanup() {
+  if [ -n "${terminal_state:-}" ]; then stty "$terminal_state" 2>/dev/null || true; fi
+  rm -rf -- "$work"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [ ! -f /etc/safeterm/ssh/users.json ]; then
+  safeterm_enroll
+fi
 
 local_key_dir=$(realpath -m -- "$local_key_dir")
 case "$local_key_dir" in
@@ -285,6 +311,12 @@ fi
 
 if [ -f /etc/safeterm/console/users.json ]; then
   install -m 0600 /etc/safeterm/console/users.json "$work/config/console/users.json"
+elif [ "$bootstrap_console" = true ]; then
+  password_hash=$(cat "$ssh_password_hash_file")
+  cat >"$work/config/console/users.json" <<EOF
+{"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator"],"password_hash":"$password_hash"}]}
+EOF
+  chmod 0600 "$work/config/console/users.json"
 else
   install -m 0600 "$payload/console/users.json" "$work/config/console/users.json"
 fi
@@ -366,3 +398,9 @@ for old_transaction in "$transaction_root"/*; do
 done
 echo "Administration: sudo termctl rollback | sudo termctl uninstall"
 echo "Rollback remains available with: sudo /usr/local/sbin/safeterm-install-rollback $(basename "$transaction")"
+
+if [ "$bootstrap_console" = true ]; then
+  echo "SSH login: ssh -tt -p 2222 $ssh_user@SERVER_IP"
+  echo "Console login: sudo -iu safeterm, then enter username $ssh_user and the password you set."
+  echo "SSH and Console credentials are independent after enrollment."
+fi

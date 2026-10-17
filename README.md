@@ -286,35 +286,17 @@ to clone this repository or compile SafeTerm. Download links:
 - [Download ARM64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz)
 - [Download ARM64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz.sha256)
 
-### 1. Check the target and install OS prerequisites
+### 1. Choose the package for your server
 
 Use Ubuntu 24.04 with systemd running as PID 1 and an administrator account with
-`sudo`. No Git, Go or Python build environment is required to install the Release.
-Check the architecture:
+`sudo`. Download **amd64** for `x86_64`, or **arm64** for `aarch64`/`arm64`. No Git,
+Go or Python is required on the target. Examples below use amd64.
 
-```bash
-uname -m
-ps -p 1 -o comm=
-```
-
-`x86_64` needs **amd64**; `aarch64`/`arm64` needs **arm64**. The examples below use
-amd64; replace both archive and extracted-directory names with arm64 when needed.
-Download the archive **and its `.sha256` file from the same Release**. Use the
-prebuilt assets, not GitHub's automatically generated "Source code" archive.
-
-On an Internet-connected Ubuntu target, install prerequisites before SafeTerm:
-
-```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates coreutils findutils gawk grep gzip \
-  libc-bin openssh-client passwd sed sudo systemd tar tcpdump util-linux \
-  iputils-ping dnsutils traceroute procps
-```
-
-On an air-gapped host, provision these packages from installation media or an
-internal APT mirror first. "Offline package" means SafeTerm's binaries are bundled;
-it does not include Ubuntu packages. Plain containers without systemd as PID 1
-are not covered by this installation procedure.
+The guided installer detects missing OS tools and installs them from the configured
+APT repositories on Ubuntu/Debian. On an air-gapped server, provide prerequisites
+through your internal APT mirror or installation media first. The offline SafeTerm
+package bundles SafeTerm binaries, not Ubuntu packages. A container without systemd
+as PID 1 is not a supported target.
 
 ### 2. Verify and extract the downloaded archive
 
@@ -333,57 +315,52 @@ Stop if checksum verification fails. Keep this shell in the extracted package
 root for the following steps. If SafeTerm is **already installed**, skip fresh
 password enrollment and use **Updating an existing installation** below.
 
-### 3. Create the initial SSH password hash (fresh installation only)
+### 3. Install with one command
 
-The installer requires an initial SSH credential. This example creates internal
-SSH user `admin`, not a Linux account named `admin`. The bundled tool asks for the
-password twice without echo and writes only a bcrypt hash:
+This guided path requires a package containing ADR-028. Release v0.20.14 and older
+retain their original explicit-flag installation procedure.
 
-```bash
-sudo install -d -m 0700 /root/safeterm-secrets
-sudo ./payload/bin/safeterm-password-hash \
-  -output /root/safeterm-secrets/admin-bootstrap.hash
-```
-
-Use 8–72 printable ASCII characters, including uppercase, lowercase and a number.
-Do not put the plaintext password in a command argument. The tool refuses to
-overwrite an existing hash file; reuse the correct file or choose a new filename.
-An SSH public key is optional; a key-only initial installation may instead supply
-`--ssh-public-key /path/to/admin.pub`.
-
-### 4. Preview and install
-
-For a demo or single-host evaluation, use local signing. SafeTerm hashes the
-approved executables on this host, signs the catalog locally, and keeps the key
-under `/root/.config/safeterm` for later updates. Run the preview first:
+After extracting the archive, open a terminal in the extracted package directory
+and run:
 
 ```bash
-sudo ./install.sh --local-signing \
-  --ssh-user admin \
-  --ssh-password-hash-file /root/safeterm-secrets/admin-bootstrap.hash \
-  --dry-run
+sudo ./install.sh
 ```
 
-After `Dry run: PASS`, install:
+On a fresh server the installer asks:
 
-```bash
-sudo ./install.sh --local-signing \
-  --ssh-user admin \
-  --ssh-password-hash-file /root/safeterm-secrets/admin-bootstrap.hash
+```text
+SafeTerm username [admin]:
+Password:
+Confirm password:
 ```
 
-Expect `SafeTerm package installation: PASS`. The installer installs `termctl`,
-configuration and service units, creates the isolated service accounts, and starts
-the services. `--local-signing` alone is insufficient on a fresh host: the SSH
-password-hash or public-key option is required. `--single-operator` is obsolete
-and unnecessary.
+Press Enter to use `admin`, or choose another SafeTerm identity. The password is
+hidden and must contain 8-72 printable ASCII characters, uppercase, lowercase and
+a number. The installer hashes it directly; no manual hash file is needed and no
+plaintext password is passed on a command line or saved in configuration.
 
-For production with the signing key kept off the server, use the
-[production offline signing procedure](docs/offline-installation.md#production-offline-signing)
-instead of this local-signing step. The Release archive checksum verifies the transferred
-package; catalog signing separately protects the deployed command definitions.
+The guided path uses local catalog signing. It installs missing prerequisites,
+validates the prepared deployment, installs the services and `termctl`, and starts
+SafeTerm. A successful installation ends with `SafeTerm package installation: PASS`
+and login instructions. Package integrity, catalog verification and deployment
+preflight run automatically; a separate preview command is optional.
 
-### 5. Verify services and test SSH
+The chosen identity is enrolled in both the SSH and Console user lists using the
+password you entered. These are independent credentials afterward; changing one
+does not change the other. No Linux account is created for this identity.
+On an existing installation the same command updates the runtime while preserving
+its verified catalog, users, passwords and managed values; it does not ask for a
+new bootstrap password.
+
+For a preview use `sudo ./install.sh --dry-run`. It does not install OS packages,
+modify live configuration or start services; missing prerequisites must be
+provisioned before preview can succeed. Fresh preview enrollment remains temporary.
+
+Organizations requiring a signing key off the target should use the explicit
+[production offline signing procedure](#production-offline-signing).
+
+### 4. Verify services and test SSH
 
 Run from the ordinary administrator shell:
 
@@ -401,7 +378,7 @@ ssh -tt -p 2222 admin@SERVER_IP
 ```
 
 Check the displayed host-key fingerprint through a trusted channel before
-accepting a new host. Enter the SSH password from step 3. If a host firewall or
+accepting a new host. Enter the SSH password chosen during installation. If a host firewall or
 network ACL is active, allow TCP port 2222 only from the intended client networks.
 
 Inside the restricted SafeTerm terminal, try:
@@ -419,31 +396,33 @@ exit
 Tab completes authorized inputs; a standalone `?` followed by Enter shows help.
 Ctrl+C stops an active stream; Ctrl+] exits the whole SafeTerm session.
 
-### 6. Create a Console user and test local login
+### 5. Test Console login and add users
 
-Console and SSH have independent user lists and passwords. The SSH `admin` user
-above does not automatically become a Console user. From the ordinary
-administrator shell:
+After guided installation, open the shared restricted entry account:
 
 ```bash
-sudo termctl user add console --id alice --roles viewer,netops,config-viewer
 sudo -iu safeterm
 ```
 
-The first command asks for Alice's internal password twice. The second opens the
-shared restricted Linux entry account, then SafeTerm prompts:
+Enter the SafeTerm username and password chosen during installation. With the
+default name, the resulting prompt is `safeterm::admin>`.
 
-```text
-Username: alice
-Password: (the internal password just set; hidden)
-safeterm::alice>
+Console and SSH have independent user lists and passwords after initial enrollment.
+Additional Console users can be enrolled separately:
+
+```bash
+sudo termctl user add console --id alice --roles viewer,netops,config-viewer
 ```
 
-No Linux account named `alice` is needed. Fresh packages contain a disabled
-`local-admin` placeholder and no default Console password. The Linux entry account
-is initially password-locked; `sudo -iu safeterm` works for an authorized admin.
-If direct physical Linux login is required, set its separate entry password with
-`sudo passwd safeterm`; the internal SafeTerm login is still mandatory afterward.
+This asks for Alice's internal password; it does not create a Linux account named
+`alice`. The Linux entry account `safeterm` is initially password-locked;
+`sudo -iu safeterm` works for an authorized administrator. Direct physical Linux
+login additionally requires a separate entry-account password set with
+`sudo passwd safeterm`; the internal SafeTerm login remains mandatory.
+
+Explicit unattended/key-only installs keep the disabled `local-admin` Console
+placeholder unless an existing Console user database is present. Enroll Console
+identities with `termctl user add console` in that mode.
 
 To discover roles or change the internal password:
 
@@ -452,6 +431,26 @@ termctl role list
 termctl role describe netops
 sudo termctl user password console --id alice
 ```
+
+### Unattended installation and existing automation
+
+The guided path requires a terminal. For Ansible or fleet provisioning, retain
+explicit signing and bootstrap options and use `--non-interactive`. Create a
+protected bcrypt hash through your provisioning/secrets process; the bundled
+helper can also create it interactively:
+
+```bash
+sudo ./payload/bin/safeterm-password-hash -output /root/admin-bootstrap.hash
+sudo ./install.sh --non-interactive --local-signing --ssh-user admin \
+  --ssh-password-hash-file /root/admin-bootstrap.hash
+```
+
+Add `--install-dependencies` to explicitly allow APT when provisioning without a
+terminal; otherwise missing prerequisites produce an error instead of an implicit
+package installation. Key-only bootstrap remains supported with
+`--ssh-public-key FILE`. Public keys are optional in the password-based guided path.
+Never put plaintext passwords into command arguments. Existing installation flags,
+`--signed-catalog`, `--catalog-source`, `--no-start` and `--dry-run` remain supported.
 
 ### Updating an existing installation
 

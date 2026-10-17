@@ -184,3 +184,13 @@ M15 evidence: [verification and hosted deployment/SSH end-to-end outputs](../../
 | TestUpgradeRejectsIncompatibleProfileBeforePreparation | Reject unsupported sandbox migrations | internal/deployment/upgrade_linux_test.go |
 | TestPortableCatalogAppliesWithTargetTrustAndExplicitHashRefresh | Target signing, deliberate rehash, dry run, log aliases and rollback | cmd/termctl/catalog_manage_linux_test.go |
 | TestUpdatePreservesExistingCatalogUnlessReplacementIsExplicit | Execute package installer without local-key dependency by default | cmd/termctl/main_test.go |
+
+
+## Guided release installation (REQ-024 / ADR-028)
+
+| Test | Behavior | Location |
+| --- | --- | --- |
+| TestInstallerGuidedEnrollmentAndUnattendedBoundary | Username defaults/validation, explicit credentials, no nonterminal prompting | tests/e2e/installer_enrollment_test.go |
+| TestInstallerPasswordFailureCanBeCancelled | Cancel failed enrollment without persisting bootstrap hash | tests/e2e/installer_enrollment_test.go |
+| TestInstallerDependencyPolicyNeverMutatesDuringDryRunOrImplicitAutomation | No APT on dry run or implicit noninteractive installs; explicit/guided APT and repository failure | tests/e2e/installer_enrollment_test.go |
+| TestTerminalPasswordIsHiddenConfirmedAndValidated | Real PTY hidden input, confirmation, complexity and private hash files | cmd/password-hash/terminal_linux_test.go |

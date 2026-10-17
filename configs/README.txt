@@ -312,8 +312,13 @@ Install using the verified extracted package:
     sudo ./install.sh --signed-catalog /path/to/catalog-new --dry-run
     sudo ./install.sh --signed-catalog /path/to/catalog-new
 
-Fresh installations also need the SSH enrollment options shown by install.sh
---help. Existing identities and managed values are preserved on upgrades.
+For a guided fresh installation, run sudo ./install.sh in a terminal: it asks for
+a SafeTerm username and hidden password and enrolls SSH and Console identities.
+Missing Ubuntu/Debian OS prerequisites are installed from configured APT sources.
+No separate hash-generation command is needed. For automation, retain explicit
+credential/signing options with --non-interactive; --install-dependencies explicitly
+permits APT without a terminal. Existing identities and managed values are preserved
+on upgrades; dry run never installs OS packages.
 Preparation and signing alone do not activate a deployment. Use the installer
 and preflight instead of partially replacing live files or restarting only one
 service after a cross-cutting catalog change.
