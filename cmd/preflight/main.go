@@ -15,7 +15,22 @@ func main() {
 	jsonOutput := flag.Bool("json", false, "print the successful report as JSON")
 	managedPlan := flag.Bool("managed-plan", false, "print validated managed-file install rows")
 	sudoersPlan := flag.Bool("sudoers-plan", false, "print exact sudoers rules for typed systemd operations")
+	stageManaged := flag.Bool("stage-managed-upgrade", false, "stage existing registered files into a private installer bundle")
+	installConfig := flag.Bool("install-configuration", false, "install validated configuration preserving host files")
 	flag.Parse()
+	if *stageManaged || *installConfig {
+		if os.Geteuid() != 0 || *root == "" || *installed || (*stageManaged && *installConfig) {
+			fmt.Fprintln(os.Stderr, "installer helper requires root and one --bundle mode")
+			os.Exit(2)
+		}
+	}
+	if *stageManaged {
+		if err := deployment.StageManagedUpgrade(*root); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *installed {
 		*root = "/"
 	}
@@ -23,6 +38,13 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "SafeTerm preflight: FAIL:", err)
 		os.Exit(1)
+	}
+	if *installConfig {
+		if err := deployment.InstallConfiguration(*root+"/etc/safeterm", "/etc/safeterm"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
 	}
 	if *managedPlan {
 		if *installed {

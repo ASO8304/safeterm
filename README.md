@@ -467,17 +467,27 @@ sudo termctl service status all
 
 `$PWD` must contain `install.sh`, `PACKAGE-SHA256SUMS`, `TARGET_ARCH` and `payload/`;
 do not pass the archive, `payload/`, or the parent download directory. The update
-preserves installed identities, the SSH host key, the Config Manager registry and
-managed values. It restarts services and interrupts active sessions; use an
+preserves the installed signed catalog (including customized operations and log
+aliases), identities, the SSH host key, the Config Manager registry and existing
+managed files with their ownership and permissions. Release catalog defaults are
+kept separately at `/usr/share/safeterm/defaults`. It restarts services and interrupts active sessions; use an
 ordinary administrator session for the update.
 
-If the host uses an offline-signed catalog, prepare and sign a catalog for this
-Release and the target host as described in the full guide, then use:
+An unchanged offline-signed catalog is also retained without a signing key. Only
+when intentionally replacing the catalog with another reviewed signed version, use:
 
 ```bash
 sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog --dry-run
 sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog
 ```
+
+To reuse customized operations and log aliases on other servers, see
+[configuration preservation and portability](docs/configuration-portability.md).
+Export with `sudo termctl catalog export --output /root/my-catalog`; on a compatible
+locally signed target, use `sudo termctl catalog apply --source /root/my-catalog
+--refresh-hashes --dry-run`, then repeat without `--dry-run`. This transfers
+catalog definitions without cloning users or keys. This behavior requires a new
+package containing ADR-027; older release installers are unchanged.
 
 For an older Console OS-user mapping (for example, `user_id: safeterm`), set its
 internal password once after upgrading; do not add the same ID again:

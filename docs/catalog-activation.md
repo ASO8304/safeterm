@@ -161,9 +161,26 @@ Checkpoints and the journal live under root-only
 sudoers, not private signing keys or identity maps. They are included in package
 installation rollback snapshots and retained by uninstall. A successful package
 installation seeds its new baseline and resets catalog-only rollback history.
-Package upgrades still use the catalog supplied to the package installer; retain
-and merge custom definitions when preparing the catalog for a new Release.
+Package upgrades preserve the verified installed catalog by default. New package
+defaults remain separate at `/usr/share/safeterm/defaults`. Explicit source/signed
+input intentionally replaces catalog definitions. See
+[configuration preservation and portability](configuration-portability.md).
 
 Bash and Zsh completion include `catalog apply`, `catalog rollback` and apply
 options. Existing shells may need to reload their generated completion script
 following a binary update.
+
+
+Portable export excludes host users, credentials, signatures, keys and the
+Config Manager registry:
+
+```bash
+sudo termctl catalog export --output /root/site-catalog
+# After copying the directory to a compatible, locally signed target:
+sudo termctl catalog apply --source /root/site-catalog --refresh-hashes --dry-run
+sudo termctl catalog apply --source /root/site-catalog --refresh-hashes
+```
+
+`--refresh-hashes` explicitly approves executables on that host. It cannot be used
+with an offline-signed catalog. Default apply and update continue to enforce
+existing approved hashes.

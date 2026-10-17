@@ -37,8 +37,9 @@ of package rollback and never restores account databases or application values.
 Ordinary edits need one apply command rather than rebuilding a package. Signature
 and executable integrity boundaries remain intact. Activation interrupts active
 sessions; no live unsigned reload is introduced. Filesystem log access and log
-rotation remain explicit site configuration. A source catalog must be retained
-and merged for future package upgrades. Pending-state recovery cannot repair an
+rotation remain explicit site configuration. ADR-027 supersedes the original
+manual-merge upgrade workflow: normal package updates now preserve the verified
+installed catalog; portable export and explicit target hash refresh support reuse. Pending-state recovery cannot repair an
 unavailable disk, an externally broken service, or already lost unsigned history.
 
 See [catalog activation](../catalog-activation.md) for commands, bounds and limits.

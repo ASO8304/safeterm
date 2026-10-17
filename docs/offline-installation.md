@@ -193,17 +193,27 @@ sudo termctl service status all
 
 `$PWD` must contain `install.sh`, `PACKAGE-SHA256SUMS`, `TARGET_ARCH` and `payload/`;
 do not pass the archive, `payload/`, or the parent download directory. The update
-preserves installed identities, the SSH host key, the Config Manager registry and
-managed values. It restarts services and interrupts active sessions; use an
+preserves the installed signed catalog (including customized operations and log
+aliases), identities, the SSH host key, the Config Manager registry and existing
+managed files with their ownership and permissions. Release catalog defaults are
+kept separately at `/usr/share/safeterm/defaults`. It restarts services and interrupts active sessions; use an
 ordinary administrator session for the update.
 
-If the host uses an offline-signed catalog, prepare and sign a catalog for this
-Release and the target host as described in the full guide, then use:
+An unchanged offline-signed catalog is also retained without a signing key. Only
+when intentionally replacing the catalog with another reviewed signed version, use:
 
 ```bash
 sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog --dry-run
 sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog
 ```
+
+To reuse customized operations and log aliases on other servers, see
+[configuration preservation and portability](configuration-portability.md).
+Export with `sudo termctl catalog export --output /root/my-catalog`; on a compatible
+locally signed target, use `sudo termctl catalog apply --source /root/my-catalog
+--refresh-hashes --dry-run`, then repeat without `--dry-run`. This transfers
+catalog definitions without cloning users or keys. This behavior requires a new
+package containing ADR-027; older release installers are unchanged.
 
 For an older Console OS-user mapping (for example, `user_id: safeterm`), set its
 internal password once after upgrading; do not add the same ID again:
@@ -289,7 +299,7 @@ Run administrative commands in the ordinary Linux administrator shell, outside
 | `termctl: command not found` | Confirm installation ended with `SafeTerm package installation: PASS`. Run `ls -l /usr/local/bin/termctl /usr/local/bin/safeterm-termctl` and try `sudo /usr/local/bin/termctl help` if PATH is the issue. If both are absent, use the package installer; do not assume a failed preflight installed anything. |
 | `--ssh-password-hash-file or --ssh-public-key is required` | Supply the bootstrap credential from step 3 on a fresh host. Console credentials are created after installation. |
 | `invalid package directory` | Pass the extracted package root, for example `sudo termctl update "$PWD"` after `cd` into the new package. Check `ls PACKAGE-SHA256SUMS install.sh`. |
-| `no local signing key; provide --signed-catalog DIR` | Use `sudo` first. If the host uses offline signing or the default local key is genuinely absent, provide the reviewed signed catalog; never replace deployment trust casually. For a deliberately configured custom local key directory, use `sudo ./install.sh --local-signing --local-key-dir /root/YOUR_KEY_DIR` from the new package, with `--dry-run` first. |
+| `no local signing key; provide --signed-catalog DIR` | An older installed termctl requires a key even for unchanged updates. Use the new package's `sudo ./install.sh --dry-run` then `sudo ./install.sh` to preserve the installed verified catalog without a key. Explicit catalog replacement still requires the appropriate signing mode; never replace deployment trust casually. For a deliberately configured custom local key directory, use `sudo ./install.sh --local-signing --local-key-dir /root/YOUR_KEY_DIR` from the new package, with `--dry-run` first. |
 | `password-hash: cannot create output` | Its parent directory must exist; the tool also refuses to overwrite an existing file. Choose another root-protected filename or reuse the intended hash. |
 | `Permission denied (publickey)` | Check that the SSH identity has a password hash if you expect password login. Use the SSH username, not an internal Console-only user. |
 | SSH `Connection refused` or a failed service | Check `sudo termctl service status ssh` and `sudo journalctl -u safeterm-ssh-broker -n 50 --no-pager`. A timeout may instead indicate a firewall/routing issue. |

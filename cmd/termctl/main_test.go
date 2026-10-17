@@ -61,6 +61,10 @@ func TestBashCompletionActuallyCompletes(t *testing.T) {
 		{"termctl user add s", 3, "ssh"},
 		{"termctl catalog reg", 2, "regenerate-hashes"},
 		{"termctl catalog app", 2, "apply"},
+		{"termctl catalog ex", 2, "export"},
+		{"termctl catalog export --out", 3, "--output"},
+		{"termctl catalog apply --ref", 3, "--refresh-hashes"},
+		{"termctl update /tmp --catalog", 3, "--catalog-source"},
 		{"termctl catalog roll", 2, "rollback"},
 		{"termctl catalog apply --dry", 3, "--dry-run"},
 		{"termctl user add ssh --password", 4, "--password-hash-file"},
@@ -100,6 +104,34 @@ func TestLifecycleRejectsInvalidInput(t *testing.T) {
 	for _, command := range []string{"termctl update", "termctl rollback", "termctl uninstall"} {
 		if !strings.Contains(out.String(), command) {
 			t.Fatalf("missing help for %s", command)
+		}
+	}
+}
+
+func TestUpdatePreservesExistingCatalogUnlessReplacementIsExplicit(t *testing.T) {
+	for _, tc := range []struct{ args, want []string }{
+		{[]string{"--dry-run"}, []string{"--dry-run"}},
+		{[]string{"--catalog-source", "/root/site"}, []string{"--catalog-source", "/root/site", "--local-signing"}},
+		{[]string{"--signed-catalog", "/root/signed"}, []string{"--signed-catalog", "/root/signed"}},
+	} {
+		dir := t.TempDir()
+		if err := os.WriteFile(filepath.Join(dir, "PACKAGE-SHA256SUMS"), nil, 0600); err != nil {
+			t.Fatal(err)
+		}
+		// The recorder is the package's executable installer entry point. The
+		// default path must not require or create a local signing key.
+		if err := os.WriteFile(filepath.Join(dir, "install.sh"), []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$0.args\"\n"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := updateCommand(append([]string{dir}, tc.args...)); err != nil {
+			t.Fatal(err)
+		}
+		data, err := os.ReadFile(filepath.Join(dir, "install.sh.args"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(data) != strings.Join(tc.want, "\n")+"\n" {
+			t.Fatalf("installer arguments=%q want=%v", data, tc.want)
 		}
 	}
 }

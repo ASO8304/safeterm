@@ -28,6 +28,7 @@ const catalogStateDir = "/var/lib/safeterm-installer/catalog"
 
 type catalogRuntime struct {
 	live, state, key, sudoers string
+	refreshHashes             bool
 	run                       func(string, ...string) ([]byte, error)
 	out                       io.Writer
 	registry                  func(string) (*configmanager.Registry, error)
@@ -45,7 +46,7 @@ func catalogManageCommand(dir string, args []string, out io.Writer) error {
 		return fmt.Errorf("catalog activation always targets /etc/safeterm; use --source DIR for candidate input")
 	}
 	var source, signed, key string
-	var dry, inherited bool
+	var dry, inherited, refresh bool
 	seenOptions := map[string]bool{}
 	for i := 1; i < len(args); i++ {
 		if seenOptions[args[i]] {
@@ -53,6 +54,8 @@ func catalogManageCommand(dir string, args []string, out io.Writer) error {
 		}
 		seenOptions[args[i]] = true
 		switch args[i] {
+		case "--refresh-hashes":
+			refresh = true
 		case "--dry-run":
 			dry = true
 		case "--installer-lock-held":
@@ -78,8 +81,11 @@ func catalogManageCommand(dir string, args []string, out io.Writer) error {
 	if args[0] != "checkpoint" && inherited {
 		return fmt.Errorf("installer lock inheritance is only supported for checkpoint")
 	}
-	if args[0] != "apply" && (source != "" || signed != "" || key != "" || dry) {
+	if args[0] != "apply" && (source != "" || signed != "" || key != "" || dry || refresh) {
 		return fmt.Errorf("catalog %s takes no apply options", args[0])
+	}
+	if refresh && signed != "" {
+		return fmt.Errorf("cannot refresh hashes of an offline-signed catalog")
 	}
 	if source != "" && signed != "" || signed != "" && key != "" {
 		return fmt.Errorf("use --source with local signing, or --signed-catalog without a key")
@@ -87,7 +93,7 @@ func catalogManageCommand(dir string, args []string, out io.Writer) error {
 	if key == "" {
 		key = "/root/.config/safeterm/catalog-ed25519.key"
 	}
-	r := catalogRuntime{live: dir, state: catalogStateDir, key: key, sudoers: "/etc/sudoers.d/safeterm-service-manager", out: out, run: catalogRun}
+	r := catalogRuntime{refreshHashes: refresh, live: dir, state: catalogStateDir, key: key, sudoers: "/etc/sudoers.d/safeterm-service-manager", out: out, run: catalogRun}
 	unlock, err := catalogLock(inherited)
 	if err != nil {
 		return err
@@ -161,6 +167,13 @@ func (r *catalogRuntime) candidate(source, stage string, signed bool) (*config.C
 	raw := filepath.Join(stage, "input")
 	if err := catalogCopyInput(source, raw); err != nil {
 		return nil, err
+	}
+	if r.refreshHashes {
+		refreshed := filepath.Join(stage, "refreshed")
+		if err := deployment.PrepareConfig(raw, refreshed); err != nil {
+			return nil, err
+		}
+		raw = refreshed
 	}
 	cfg, err := config.LoadConfig(raw)
 	if err != nil {
@@ -241,27 +254,8 @@ func (r *catalogRuntime) validate(cfg, baseline *config.Config, dir string) erro
 	if err != nil {
 		return err
 	}
-	operations := map[string]config.OperationDefinition{}
-	for _, op := range cfg.Operations {
-		operations[op.Name] = op
-	}
-	for _, resource := range registry.Resources {
-		for _, roles := range [][]string{resource.Permissions.ReadRoles, resource.Permissions.ProposeRoles, resource.Permissions.ActivateRoles, resource.Permissions.RollbackRoles} {
-			for _, role := range roles {
-				if !catalog.KnownRoles()[role] {
-					return fmt.Errorf("resource %s references removed role %s", resource.ID, role)
-				}
-			}
-		}
-		for _, name := range []string{resource.ActivationOperation, resource.HealthCheckOperation} {
-			if name == "" {
-				continue
-			}
-			op, ok := operations[name]
-			if !ok || op.ExecutorKind != config.ExecutorSystemd || op.LongRunning || len(op.Parameters) != 0 {
-				return fmt.Errorf("resource %s activation %s must remain a bounded argument-free systemd operation", resource.ID, name)
-			}
-		}
+	if err := deployment.CheckRegistryCatalog(cfg, registry); err != nil {
+		return err
 	}
 	lines, err := deployment.CatalogSudoers(cfg)
 	if err != nil {

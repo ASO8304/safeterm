@@ -201,6 +201,9 @@ func Check(options CheckOptions) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	if err := CheckRegistryCatalog(cfg, registry); err != nil {
+		return Report{}, err
+	}
 	if !options.Installed {
 		if _, err := managedFiles(root, registry); err != nil {
 			return Report{}, err

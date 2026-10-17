@@ -411,3 +411,33 @@ update, rollback and uninstall until catalog recovery succeeds. Missing historic
 content cannot be reconstructed: if both live signature and checkpoint are invalid,
 restore a valid catalog before applying. Log file ACLs and logrotate remain site
 configuration. See repository docs/catalog-activation.md and ADR-026 for details.
+
+
+## Preserve and transfer customized catalogs
+
+Package updates retain the installed verified catalog, including custom operations
+and log aliases. New defaults are stored separately at /usr/share/safeterm/defaults
+and never automatically merged into active permissions. Existing user mappings,
+SSH host keys, Config Manager registry, unrelated site files and managed application
+values are retained. Managed files are seeded only when absent; existing contents,
+ownership, permissions and ACLs are not replaced by package examples.
+
+Export portable catalog definitions on your configured server:
+
+    sudo termctl catalog export --output /root/site-catalog
+
+Copy that directory to another compatible, locally signed installation and run:
+
+    sudo termctl catalog apply --source /root/site-catalog --refresh-hashes --dry-run
+    sudo termctl catalog apply --source /root/site-catalog --refresh-hashes
+
+Export excludes identities, passwords, SSH keys, signing keys, signatures and
+Config Manager resource definitions. The target uses its own signing key/trust.
+The explicit refresh approves executable content on that target; ordinary updates
+preserve approved hashes. Resource registries and log paths/permissions must be
+provisioned separately. Do not clone all of /etc/safeterm across machines.
+
+Finish intended edits with termctl catalog apply before an update. Unapplied
+changes, incompatible profiles and executable digest mismatches stop validation;
+updates do not reset site definitions to make checks pass. Catalog rollback restores
+the previous activation; package rollback restores the pre-update snapshot.

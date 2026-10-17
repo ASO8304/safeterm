@@ -87,27 +87,27 @@ if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
   echo /usr/local/bin/safeterm-console >>/etc/shells
 fi
 install -d -o root -g root -m 0755 /etc/safeterm
-cp -R "$bundle/etc/safeterm/." /etc/safeterm/
-chown -R root:root /etc/safeterm
-find /etc/safeterm -type d -exec chmod 0755 {} \;
-find /etc/safeterm -type f -exec chmod 0644 {} \;
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --install-configuration
 chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chown root:safeterm-identity /etc/safeterm/console/users.json
 chmod 0640 /etc/safeterm/console/users.json
 
-install -d -o root -g root -m 0755 /etc/safeterm-managed
+[ -d /etc/safeterm-managed ] || install -d -o root -g root -m 0755 /etc/safeterm-managed
 managed_plan="$work/managed-plan"
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --managed-plan >"$managed_plan"
 tab=$(printf '\t')
 while IFS="$tab" read -r source target owner; do
   [ -n "$source" ] && [ -n "$target" ] && [ -n "$owner" ] || { echo "invalid managed install plan" >&2; exit 1; }
-  install -d -o "$owner" -g "$owner" -m 0700 "$(dirname -- "$target")"
+  if [ -e "$target" ] || [ -L "$target" ]; then continue; fi
+  if [ ! -d "$(dirname -- "$target")" ]; then
+    install -d -o "$owner" -g "$owner" -m 0700 "$(dirname -- "$target")"
+  fi
   install -o "$owner" -g "$owner" -m 0600 "$source" "$target"
 done <"$managed_plan"
 rm -f -- "$managed_plan"
-install -d -o root -g root -m 0750 /etc/cat
-install -d -o root -g adm -m 0750 /var/log/safeterm-readable
+[ -d /etc/cat ] || install -d -o root -g root -m 0750 /etc/cat
+[ -d /var/log/safeterm-readable ] || install -d -o root -g adm -m 0750 /var/log/safeterm-readable
 if [ ! -e /var/log/safeterm-readable/service_A.log ]; then
   install -o root -g adm -m 0640 /dev/null /var/log/safeterm-readable/service_A.log
 fi

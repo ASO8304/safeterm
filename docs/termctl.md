@@ -271,3 +271,29 @@ read-only, filters operations/resources through the user's permissions, and
 returns to the normal prompt. It does not change Linux-style Tab behavior.
 The question mark must be a separate token; it is not a wildcard. These are
 restricted-terminal commands, not Bash commands or `termctl` CLI subcommands.
+
+## Preserve custom operations on updates and other servers
+
+Default package updates preserve the installed verified catalog, identities,
+resource registry and existing managed files. Release defaults are references at
+`/usr/share/safeterm/defaults`; they do not overwrite your operations/log aliases.
+See [configuration preservation and portability](configuration-portability.md)
+for the complete workflow, including older installed termctl versions.
+
+```bash
+# Export definitions only, without credentials or signing material.
+sudo termctl catalog export --output /root/site-catalog
+# On a compatible target, sign with its own key and explicitly approve its binaries.
+sudo termctl catalog apply --source /root/site-catalog --refresh-hashes --dry-run
+sudo termctl catalog apply --source /root/site-catalog --refresh-hashes
+# An explicit catalog replacement while updating a package:
+sudo termctl update PACKAGE_DIR --catalog-source /root/site-catalog --dry-run
+sudo termctl update PACKAGE_DIR --catalog-source /root/site-catalog
+```
+
+The last mode requires the target's default local signing key. For an unchanged
+update simply use `sudo termctl update PACKAGE_DIR`; no signing key is required.
+Ordinary apply/update keeps approved hashes. `--refresh-hashes` is local-signing
+only and cannot accompany `--signed-catalog`. Export excludes Config Manager
+resource definitions and filesystem permissions; provision those host settings
+separately. Do not copy another host's users or private keys into `/etc/safeterm`.

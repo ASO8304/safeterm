@@ -19,6 +19,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/deployment"
 	"safeterm/internal/integrity"
 )
 
@@ -26,6 +27,45 @@ type catalogFakeHost struct {
 	active map[string]bool
 	calls  []string
 	fail   func(string, []string) bool
+}
+
+func TestPortableCatalogAppliesWithTargetTrustAndExplicitHashRefresh(t *testing.T) {
+	r, _, _ := catalogFixture(t)
+	portable := filepath.Join(t.TempDir(), "portable")
+	if err := deployment.PrepareConfigWithHashes(r.live, portable, false); err != nil {
+		t.Fatal(err)
+	}
+	catalogAddAlias(t, portable)
+	cfg, err := config.LoadConfig(portable)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Executables[0].SHA256 = strings.Repeat("0", 64) // A different host's executable digest.
+	if err := catalogWriteModel(portable, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.apply(portable, false, true); err == nil {
+		t.Fatal("ordinary apply implicitly refreshed hashes")
+	}
+	r.refreshHashes = true
+	if err := r.apply(portable, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if catalogHasAlias(t, r) {
+		t.Fatal("dry run changed live catalog")
+	}
+	if err := r.apply(portable, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if !catalogHasAlias(t, r) {
+		t.Fatal("portable log alias was not applied")
+	}
+	if err := r.rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if catalogHasAlias(t, r) {
+		t.Fatal("portable import did not retain rollback baseline")
+	}
 }
 
 func (h *catalogFakeHost) run(name string, args ...string) ([]byte, error) {

@@ -19,6 +19,12 @@ import (
 // digests match the target host. The result must be signed offline before it
 // can be accepted by CheckBundle or any runtime service.
 func PrepareConfig(source, output string) error {
+	return PrepareConfigWithHashes(source, output, true)
+}
+
+// PrepareConfigWithHashes exports catalog definitions only. Refresh is explicit:
+// ordinary upgrades and exports preserve the approved executable hashes.
+func PrepareConfigWithHashes(source, output string, refresh bool) error {
 	if source == "" || output == "" {
 		return fmt.Errorf("deployment: source and output directories are required")
 	}
@@ -32,6 +38,9 @@ func PrepareConfig(source, output string) error {
 		return err
 	}
 	for index := range cfg.Executables {
+		if !refresh {
+			continue
+		}
 		digest, err := executableDigest(cfg.Executables[index].Path)
 		if err != nil {
 			return fmt.Errorf("deployment: hash executable %q: %w", cfg.Executables[index].ID, err)

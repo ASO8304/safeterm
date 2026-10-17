@@ -4,11 +4,13 @@ set -eu
 usage() {
   cat >&2 <<'EOF'
 Usage:
+  install.sh [options]                       preserve an existing verified installation
   install.sh --prepare-catalog DIR
   install.sh --signed-catalog DIR [options]
   install.sh --local-signing [options]
 
 Install options:
+  --catalog-source DIR       portable catalog definitions (requires --local-signing)
   --ssh-user USER             SafeTerm SSH identity for a fresh install (default: alice)
   --ssh-password-hash-file FILE  bcrypt hash for a fresh SSH identity
   --ssh-public-key FILE       optional authorized public key
@@ -28,6 +30,8 @@ package_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 payload="$package_dir/payload"
 prepare_output=
 signed_catalog=
+catalog_source=
+explicit_source=false
 local_signing=false
 ssh_user=alice
 ssh_public_key=
@@ -53,6 +57,7 @@ stop_units_if_present() {
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --prepare-catalog) [ "$#" -ge 2 ] || usage; prepare_output=$2; shift 2 ;;
+    --catalog-source) [ "$#" -ge 2 ] || usage; catalog_source=$2; explicit_source=true; shift 2 ;;
     --signed-catalog) [ "$#" -ge 2 ] || usage; signed_catalog=$2; shift 2 ;;
     --local-signing) local_signing=true; shift ;;
     --ssh-user) [ "$#" -ge 2 ] || usage; ssh_user=$2; shift 2 ;;
@@ -77,12 +82,24 @@ for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemc
   [ -x "$executable" ] || { echo "required target executable is missing: $executable" >&2; exit 1; }
 done
 
+if [ "$explicit_source" = true ] && [ -n "$signed_catalog" ]; then usage; fi
+if [ "$explicit_source" = true ] && [ "$local_signing" = false ] && [ -z "$prepare_output" ]; then usage; fi
+if [ -z "$catalog_source" ]; then
+  if [ -f /etc/safeterm/catalog.json ]; then
+    catalog_source=/etc/safeterm
+  else
+    catalog_source="$payload/catalog-source"
+  fi
+fi
+
 if [ -n "$prepare_output" ]; then
   [ -z "$signed_catalog" ] && [ "$local_signing" = false ] || usage
-  "$payload/bin/safeterm-catalog-prepare" --source "$payload/catalog-source" --output "$prepare_output"
+  "$payload/bin/safeterm-catalog-prepare" --source "$catalog_source" --compatible-with "$payload/catalog-source" --output "$prepare_output"
   cat <<EOF
 Unsigned target catalog created at: $prepare_output
 Transfer it to the offline signing host, then run:
+  # On a fresh deployment only: generate its signing key pair.
+  # For updates, retain the existing key matching installed trust.
   ./payload/bin/safeterm-catalog-sign -generate-key -private-key /secure/catalog.key -public-key $prepare_output/trust/catalog-ed25519.pub
   ./payload/bin/safeterm-catalog-sign -config $prepare_output -private-key /secure/catalog.key -signature $prepare_output/catalog.sig
 Return the signed directory and install with:
@@ -92,12 +109,14 @@ EOF
 fi
 
 if [ -n "$signed_catalog" ] && [ "$local_signing" = true ]; then usage; fi
-if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then usage; fi
+if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then
+  if [ "$explicit_source" = false ] && [ "$catalog_source" = /etc/safeterm ]; then signed_catalog=/etc/safeterm; else usage; fi
+fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
 [ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
-for tool in sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo; do
+for tool in cmp sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
 getent group adm >/dev/null 2>&1 || { echo "required Ubuntu group is missing: adm" >&2; exit 1; }
@@ -136,6 +155,7 @@ create_install_transaction() {
 /usr/local/bin/safeterm-termctl
 /usr/local/bin/termctl
 /usr/share/bash-completion/completions/termctl
+/usr/share/safeterm/defaults
 /usr/local/sbin/safeterm-install-rollback
 /usr/local/sbin/safeterm-uninstall
 /etc/safeterm
@@ -192,7 +212,12 @@ create_install_transaction() {
 }
 
 if [ "$local_signing" = true ]; then
-  "$payload/bin/safeterm-catalog-prepare" --source "$payload/catalog-source" --output "$work/catalog"
+  if [ "$catalog_source" = /etc/safeterm ]; then
+    # Preserve the approved hashes; an application update cannot approve new OS binaries.
+    "$payload/bin/safeterm-catalog-prepare" --source "$catalog_source" --compatible-with "$payload/catalog-source" --keep-hashes --verify-source --output "$work/catalog"
+  else
+    "$payload/bin/safeterm-catalog-prepare" --source "$catalog_source" --compatible-with "$payload/catalog-source" --output "$work/catalog"
+  fi
   key_dir="$work/local-key"
   install -d -o root -g root -m 0700 "$key_dir"
   if [ -f "$local_key_dir/catalog-ed25519.key" ] && [ -f "$local_key_dir/catalog-ed25519.pub" ]; then
@@ -205,7 +230,11 @@ if [ "$local_signing" = true ]; then
   public_key="$key_dir/catalog-ed25519.pub"
   if [ ! -f "$private_key" ] || [ ! -f "$public_key" ]; then
     [ ! -e "$private_key" ] && [ ! -e "$public_key" ] || { echo "local signing key pair is incomplete" >&2; exit 1; }
+    [ ! -f /etc/safeterm/trust/catalog-ed25519.pub ] || { echo "existing trust has no local key; update without --local-signing or provide --signed-catalog DIR" >&2; exit 1; }
     "$payload/bin/safeterm-catalog-sign" -generate-key -private-key "$private_key" -public-key "$public_key"
+  fi
+  if [ -f /etc/safeterm/trust/catalog-ed25519.pub ]; then
+    cmp -s "$public_key" /etc/safeterm/trust/catalog-ed25519.pub || { echo "local signing key does not match installed trust" >&2; exit 1; }
   fi
   install -m 0644 "$public_key" "$work/catalog/trust/catalog-ed25519.pub"
   "$payload/bin/safeterm-catalog-sign" -config "$work/catalog" -private-key "$private_key" -signature "$work/catalog/catalog.sig"
@@ -213,7 +242,12 @@ if [ "$local_signing" = true ]; then
 fi
 
 [ -d "$signed_catalog" ] || { echo "signed catalog directory is missing" >&2; exit 1; }
-cp -R "$signed_catalog" "$work/config"
+"$payload/bin/safeterm-catalog-prepare" --source "$signed_catalog" --compatible-with "$payload/catalog-source" --keep-hashes --verify-source --output "$work/config"
+install -m 0644 "$signed_catalog/catalog.sig" "$work/config/catalog.sig"
+install -m 0644 "$signed_catalog/trust/catalog-ed25519.pub" "$work/config/trust/catalog-ed25519.pub"
+if [ -f /etc/safeterm/trust/catalog-ed25519.pub ]; then
+  cmp -s "$work/config/trust/catalog-ed25519.pub" /etc/safeterm/trust/catalog-ed25519.pub || { echo "package updates cannot rotate installed catalog trust" >&2; exit 1; }
+fi
 
 mkdir -p "$work/config/ssh" "$work/config/console" "$work/config/config-manager"
 if [ -f /etc/safeterm/ssh/ssh_host_ed25519_key ]; then
@@ -271,6 +305,7 @@ cp -R "$payload/managed/." "$work/bundle/managed/"
 cp "$payload/systemd/"*.service "$work/bundle/systemd/"
 chmod 0644 "$work/bundle/systemd/"*.service
 chmod 0600 "$work/bundle/managed/"*/*
+"$work/bundle/bin/safeterm-preflight" --bundle "$work/bundle" --stage-managed-upgrade
 (cd "$work/bundle" && find bin etc managed systemd -type f -print | LC_ALL=C sort | xargs sha256sum >SHA256SUMS)
 chmod 0444 "$work/bundle/SHA256SUMS"
 "$work/bundle/bin/safeterm-preflight" --bundle "$work/bundle"
@@ -282,6 +317,10 @@ if [ "$dry_run" = true ]; then
 fi
 
 create_install_transaction
+# Reference defaults are versioned separately from the active site configuration.
+install -d -o root -g root -m 0755 /usr/share/safeterm
+rm -rf -- /usr/share/safeterm/defaults
+cp -R "$payload/catalog-source" /usr/share/safeterm/defaults
 if [ "$local_signing" = true ]; then
   install -d -o root -g root -m 0700 "$local_key_dir"
   install -o root -g root -m 0600 "$private_key" "$local_key_dir/catalog-ed25519.key"
@@ -289,9 +328,6 @@ if [ "$local_signing" = true ]; then
   echo "WARNING: local signing key retained at $local_key_dir/catalog-ed25519.key; use offline signing for production."
 fi
 
-if [ -d /etc/safeterm-managed ]; then
-  cp -a /etc/safeterm-managed "$work/preserved-managed"
-fi
 if [ -f /etc/systemd/system/safeterm-ssh-broker.service ]; then
   stop_units_if_present safeterm-ssh-broker.service
   stop_units_if_present safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
@@ -301,9 +337,6 @@ if [ -f /etc/systemd/system/safeterm-ssh-broker.service ]; then
   stop_units_if_present safeterm-audit.service
 fi
 "$payload/base-install.sh" --bundle "$work/bundle" --no-start
-if [ -d "$work/preserved-managed" ]; then
-  cp -a "$work/preserved-managed/." /etc/safeterm-managed/
-fi
 # Keep the administrator entry point explicit even if a custom base installer
 # is supplied with a locally rebuilt package.
 install -o root -g root -m 0555 "$work/bundle/bin/safeterm-termctl" /usr/local/bin/safeterm-termctl

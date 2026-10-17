@@ -97,12 +97,13 @@ func run(args []string, out, errOut io.Writer) error {
 func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "SafeTerm control utility")
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  termctl update PACKAGE_DIR [--signed-catalog DIR] [--dry-run]")
+	fmt.Fprintln(out, "  termctl update PACKAGE_DIR [--signed-catalog DIR | --catalog-source DIR] [--dry-run]")
 	fmt.Fprintln(out, "  termctl rollback")
 	fmt.Fprintln(out, "  termctl uninstall (preserves data, identities and rollback snapshots)")
 	fmt.Fprintln(out, "  termctl catalog list|describe OPERATION")
 	fmt.Fprintln(out, "  termctl catalog prepare --source DIR --output DIR")
-	fmt.Fprintln(out, "  termctl catalog apply [--source DIR | --signed-catalog DIR] [--key-file FILE] [--dry-run]")
+	fmt.Fprintln(out, "  termctl catalog export --output DIR (portable definitions, without secrets)")
+	fmt.Fprintln(out, "  termctl catalog apply [--source DIR | --signed-catalog DIR] [--key-file FILE] [--refresh-hashes] [--dry-run]")
 	fmt.Fprintln(out, "  termctl catalog rollback")
 	fmt.Fprintln(out, "  termctl role list|describe ROLE")
 	fmt.Fprintln(out, "  termctl service status [NAME|all]")
@@ -121,7 +122,7 @@ func writeHelp(out io.Writer) {
 
 func updateCommand(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: termctl update PACKAGE_DIR [--signed-catalog DIR] [--dry-run]")
+		return fmt.Errorf("usage: termctl update PACKAGE_DIR [--signed-catalog DIR | --catalog-source DIR] [--dry-run]")
 	}
 	dir, err := filepath.Abs(args[0])
 	if err != nil {
@@ -132,12 +133,20 @@ func updateCommand(args []string) error {
 	}
 	options := []string{}
 	signed := false
+	sourceProvided := false
 	for i := 1; i < len(args); i++ {
 		switch args[i] {
 		case "--dry-run":
 			options = append(options, "--dry-run")
+		case "--catalog-source":
+			if sourceProvided || signed || i+1 >= len(args) {
+				return fmt.Errorf("--catalog-source requires one directory and cannot accompany --signed-catalog")
+			}
+			sourceProvided = true
+			i++
+			options = append(options, "--catalog-source", args[i])
 		case "--signed-catalog":
-			if signed || i+1 >= len(args) {
+			if signed || sourceProvided || i+1 >= len(args) {
 				return fmt.Errorf("--signed-catalog requires one directory")
 			}
 			signed = true
@@ -147,10 +156,7 @@ func updateCommand(args []string) error {
 			return fmt.Errorf("unknown update option %q", args[i])
 		}
 	}
-	if !signed {
-		if _, err := os.Stat("/root/.config/safeterm/catalog-ed25519.key"); err != nil {
-			return fmt.Errorf("no local signing key; provide --signed-catalog DIR")
-		}
+	if !signed && sourceProvided {
 		options = append(options, "--local-signing")
 	}
 	return execCommand(filepath.Join(dir, "install.sh"), options...)
@@ -160,7 +166,7 @@ func catalogCommand(dir string, args []string, out io.Writer) error {
 	if len(args) > 0 && (args[0] == "apply" || args[0] == "rollback" || args[0] == "checkpoint") {
 		return catalogManageCommand(dir, args, out)
 	}
-	if len(args) > 0 && (args[0] == "prepare" || args[0] == "regenerate-hashes") {
+	if len(args) > 0 && (args[0] == "prepare" || args[0] == "regenerate-hashes" || args[0] == "export") {
 		source, output := dir, ""
 		for i := 1; i < len(args); i++ {
 			if i+1 >= len(args) {
@@ -177,12 +183,16 @@ func catalogCommand(dir string, args []string, out io.Writer) error {
 			i++
 		}
 		if output == "" {
-			return fmt.Errorf("usage: termctl catalog prepare --source DIR --output DIR")
+			return fmt.Errorf("usage: termctl catalog %s --source DIR --output DIR", args[0])
 		}
-		if err := deployment.PrepareConfig(source, output); err != nil {
+		if err := deployment.PrepareConfigWithHashes(source, output, args[0] != "export"); err != nil {
 			return err
 		}
-		fmt.Fprintf(out, "prepared unsigned catalog with refreshed executable hashes: %s\n", output)
+		if args[0] == "export" {
+			fmt.Fprintf(out, "exported portable catalog definitions (no credentials, keys or signatures): %s\n", output)
+		} else {
+			fmt.Fprintf(out, "prepared unsigned catalog with refreshed executable hashes: %s\n", output)
+		}
 		return nil
 	}
 	if len(args) == 0 || args[0] == "list" {
@@ -903,7 +913,7 @@ func writeCompletion(out io.Writer, args []string) error {
   elif (( COMP_CWORD == 2 )); then
     case "${COMP_WORDS[1]}" in
       service) choices="%s" ;;
-      catalog) choices="list describe prepare regenerate-hashes apply rollback" ;;
+      catalog) choices="list describe prepare regenerate-hashes export apply rollback" ;;
       role|roles|config) choices="list describe" ;;
       user) choices="list add auth del password" ;;
       completion) choices="bash zsh" ;;
@@ -920,18 +930,18 @@ func writeCompletion(out io.Writer, args []string) error {
         fi ;;
       catalog)
         case "${COMP_WORDS[2]}" in
-          prepare|regenerate-hashes|apply)
+          prepare|regenerate-hashes|export|apply)
             case "${COMP_WORDS[COMP_CWORD-1]}" in
-              --source|--output|--signed-catalog) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
+              --source|--output|--signed-catalog|--catalog-source) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
               --key-file) mapfile -t COMPREPLY < <(compgen -f -- "$cur"); return ;;
-              *) if [[ "${COMP_WORDS[2]}" == apply ]]; then choices="--source --signed-catalog --key-file --dry-run"; else choices="--source --output"; fi ;;
+              *) if [[ "${COMP_WORDS[2]}" == apply ]]; then choices="--source --signed-catalog --key-file --refresh-hashes --dry-run"; else choices="--source --output"; fi ;;
             esac ;;
         esac ;;
       update)
-        if [[ "${COMP_WORDS[COMP_CWORD-1]}" == --signed-catalog ]]; then
+        if [[ "${COMP_WORDS[COMP_CWORD-1]}" == --signed-catalog || "${COMP_WORDS[COMP_CWORD-1]}" == --catalog-source ]]; then
           mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return
         fi
-        choices="--signed-catalog --dry-run" ;;
+        choices="--signed-catalog --catalog-source --dry-run" ;;
     esac
   fi
   mapfile -t COMPREPLY < <(compgen -W "$choices" -- "$cur")
@@ -949,12 +959,12 @@ complete -F _termctl_complete termctl
   case "$words[2]" in
     catalog)
       if (( CURRENT == 3 )); then
-        _values 'catalog action' list describe prepare regenerate-hashes apply rollback
+        _values 'catalog action' list describe prepare regenerate-hashes export apply rollback
       else
         case "$words[CURRENT-1]" in
-          --source|--output|--signed-catalog) _files -/ ;;
+          --source|--output|--signed-catalog|--catalog-source) _files -/ ;;
           --key-file) _files ;;
-          *) _values 'catalog option' --source --output --signed-catalog --key-file --dry-run ;;
+          *) _values 'catalog option' --source --output --signed-catalog --key-file --refresh-hashes --dry-run ;;
         esac
       fi ;;
     service)
@@ -964,7 +974,14 @@ complete -F _termctl_complete termctl
       if (( CURRENT == 3 )); then _values 'user action' list add auth del password
       elif (( CURRENT == 4 )); then _values 'identity' ssh console
       else _values 'user option' --id --roles --password-hash-file --authorized-key-file; fi ;;
-    update) _files -/ ;;
+    update)
+      if (( CURRENT == 3 )); then _files -/
+      else
+        case "$words[CURRENT-1]" in
+          --signed-catalog|--catalog-source) _files -/ ;;
+          *) _values 'update option' --signed-catalog --catalog-source --dry-run ;;
+        esac
+      fi ;;
     role|roles|config) _values 'action' list describe ;;
     completion) _values 'shell' bash zsh ;;
   esac

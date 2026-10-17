@@ -171,3 +171,16 @@ M15 evidence: [verification and hosted deployment/SSH end-to-end outputs](../../
 
 > Update this table with every milestone. In the future, a script could generate
 > it directly from `go test -json` output to prevent manual drift.
+
+
+## Preserved site configuration (REQ-023 / ADR-027)
+
+| Test | Behavior | Location |
+| --- | --- | --- |
+| TestPortableCatalogPreservesCustomizationAndExcludesHostSecrets | Customized model export without host identities or signing material | internal/deployment/upgrade_linux_test.go |
+| TestUpgradePreservesSignatureAndApprovedHashes | Signature-preserving upgrade and no implicit executable approval | internal/deployment/upgrade_linux_test.go |
+| TestInstallConfigurationPreservesSiteFilesAndRemovesStaleCatalogFragments | Preserve site secrets and modes; remove stale fragments; reject linked directories | internal/deployment/upgrade_linux_test.go |
+| TestUpgradeStagesCustomResourceWithoutChangingApplicationMetadata | Stage an external custom INI resource without modifying the live file | internal/deployment/upgrade_linux_test.go |
+| TestUpgradeRejectsIncompatibleProfileBeforePreparation | Reject unsupported sandbox migrations | internal/deployment/upgrade_linux_test.go |
+| TestPortableCatalogAppliesWithTargetTrustAndExplicitHashRefresh | Target signing, deliberate rehash, dry run, log aliases and rollback | cmd/termctl/catalog_manage_linux_test.go |
+| TestUpdatePreservesExistingCatalogUnlessReplacementIsExplicit | Execute package installer without local-key dependency by default | cmd/termctl/main_test.go |

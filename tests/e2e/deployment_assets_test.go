@@ -155,7 +155,7 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 		"--local-signing", "--ssh-public-key", "--single-operator", "--dry-run",
 		"/etc/safeterm/ssh/ssh_host_ed25519_key", "/etc/safeterm/ssh/users.json",
 		"/etc/safeterm/console/users.json", "/etc/safeterm/config-manager/resources.json",
-		"preserved-managed", "safeterm-preflight", "--no-start",
+		"--stage-managed-upgrade", "--keep-hashes", "--catalog-source", "/usr/share/safeterm/defaults", "safeterm-preflight", "--no-start",
 		"safeterm-runner-log-reader.service", "/usr/bin/tail", "/usr/bin/sudo",
 		"stop_units_if_present()", `systemctl cat "$unit"`,
 	} {

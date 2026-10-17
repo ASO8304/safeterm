@@ -4,6 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
+	"safeterm/internal/config"
+	"safeterm/internal/integrity"
 
 	"safeterm/internal/deployment"
 )
@@ -11,8 +14,27 @@ import (
 func main() {
 	source := flag.String("source", "./configs", "source catalog directory")
 	output := flag.String("output", "", "new unsigned deployment catalog directory")
+	keep := flag.Bool("keep-hashes", false, "preserve approved executable hashes")
+	compatible := flag.String("compatible-with", "", "require the same provisioned profile boundaries as this catalog")
+	verify := flag.Bool("verify-source", false, "require a valid existing source signature")
 	flag.Parse()
-	if err := deployment.PrepareConfig(*source, *output); err != nil {
+	if *verify {
+		cfg, err := config.LoadConfig(*source)
+		if err == nil {
+			err = integrity.VerifyCatalogFiles(cfg, filepath.Join(*source, "trust/catalog-ed25519.pub"), filepath.Join(*source, "catalog.sig"))
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "source catalog is not verified; apply intended changes with termctl catalog apply first:", err)
+			os.Exit(1)
+		}
+	}
+	if *compatible != "" {
+		if err := deployment.CheckProfileCompatibility(*source, *compatible); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	if err := deployment.PrepareConfigWithHashes(*source, *output, !*keep); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
