@@ -51,4 +51,16 @@ jobs:
       - name: Build installable package
         run: make offline-package OUTPUT="$RUNNER_TEMP/systemd-package" ARCH=amd64
       - name: Install on disposable VM and exercise real services and Console PTY
-        run: sudo env SAFETERM_DISPOSABLE_HOST=1 bash tests/systemd/fresh-install.sh "$RUNNER_TEMP/systemd-package"
+        run: sudo env SAFETERM_DISPOSABLE_HOST=1 bash tests/systemd/fresh-install.sh "$RUNNER_TEMP/systemd-package" 2>&1 | tee "$RUNNER_TEMP/systemd-smoke.log"
+      - name: Report smoke failure diagnostics
+        if: failure()
+        run: |
+          python3 - <<'PYDIAG'
+          import os
+          from pathlib import Path
+          path = Path(os.environ["RUNNER_TEMP"]) / "systemd-smoke.log"
+          if path.exists():
+              data = path.read_text(errors="replace")[-50000:]
+              data = data.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print("::error title=Systemd smoke diagnostics::" + data)
+          PYDIAG
