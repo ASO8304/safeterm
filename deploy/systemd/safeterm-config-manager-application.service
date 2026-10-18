@@ -19,7 +19,6 @@ NoNewPrivileges=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
 ProtectSystem=strict
-ReadWritePaths=/etc/safeterm-managed/application
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes

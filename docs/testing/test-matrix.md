@@ -238,3 +238,16 @@ Gateway empty-profile regression: TestGatewayAcceptsEmptyResourceProfilesWithNoA
 covers an empty generated registry and a config-only registry with unused profiles;
 all known profiles start with no activation grants, unknown profiles are rejected,
 and an empty allowlist denies every attempted activation.
+
+## Real systemd installation gate
+
+CI and tagged releases run tests/systemd/fresh-install.sh as root only on a fresh,
+disposable hosted VM. It builds and installs the release-format package with an
+empty registry and no legacy sample directories, then waits for Gateway, Writer
+and all three Config Manager sockets. A real shared-account Console PTY checks
+config/config ?, Gateway execution, and an application-only definition while
+other profiles remain empty. Tab must complete the resource ID, section and key;
+a real end/save must preserve root ownership, mode and unrelated INI comments.
+Managers have no ReadWritePaths: all file mutations are delegated to the writer.
+The destructive smoke test refuses existing installations and requires explicit
+SAFETERM_DISPOSABLE_HOST=1. It is never run on the developer/user workstation.

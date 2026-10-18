@@ -36,3 +36,19 @@ jobs:
 
       - name: Run deployment and public-boundary tests
         run: make e2e
+
+  systemd-smoke:
+    name: Fresh systemd installation and Console completion
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.26.x"
+          cache: true
+      - name: Build installable package
+        run: make offline-package OUTPUT="$RUNNER_TEMP/systemd-package" ARCH=amd64
+      - name: Install on disposable VM and exercise real services and Console PTY
+        run: sudo env SAFETERM_DISPOSABLE_HOST=1 bash tests/systemd/fresh-install.sh "$RUNNER_TEMP/systemd-package"

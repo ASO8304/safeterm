@@ -19,12 +19,12 @@ func TestConfigManagerDeploymentProfilesAreIsolated(t *testing.T) {
 			t.Fatal(err)
 		}
 		unit := string(data)
-		for _, required := range []string{"User=" + user, "Group=safeterm-clients", "SupplementaryGroups=safeterm-audit", "NoNewPrivileges=yes", "ProtectSystem=strict", "RestrictAddressFamilies=AF_UNIX", "CapabilityBoundingSet=", "-profile=" + profile, "-run-as-user=" + user, "ReadWritePaths=/etc/safeterm-managed/" + profile} {
+		for _, required := range []string{"User=" + user, "Group=safeterm-clients", "SupplementaryGroups=safeterm-audit", "NoNewPrivileges=yes", "ProtectSystem=strict", "RestrictAddressFamilies=AF_UNIX", "CapabilityBoundingSet=", "-profile=" + profile, "-run-as-user=" + user} {
 			if !strings.Contains(unit, required) {
 				t.Errorf("%s missing %q", path, required)
 			}
 		}
-		if strings.Contains(unit, "CAP_SYS_ADMIN") || strings.Contains(unit, "/bin/sh") {
+		if strings.Contains(unit, "CAP_SYS_ADMIN") || strings.Contains(unit, "/bin/sh") || strings.Contains(unit, "ReadWritePaths=") || strings.Contains(unit, "/etc/safeterm-managed") {
 			t.Errorf("%s grants unsafe capability", path)
 		}
 	}
