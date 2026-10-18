@@ -1,0 +1,16 @@
+{
+  "operation": {
+    "name": "site_system",
+    "description": "Site system information",
+    "runner_profile": "diagnostics",
+    "executor_kind": "process",
+    "executable_ref": "uname",
+    "args_template": [
+      "-a"
+    ],
+    "parameters": []
+  },
+  "roles": [
+    "site-reader"
+  ]
+}

@@ -23,6 +23,7 @@ import (
 	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
 	"safeterm/internal/layout"
+	"safeterm/internal/siteconfig"
 )
 
 const writerDropIn = "/etc/systemd/system/safeterm-config-writer.service.d/50-resources.conf"
@@ -30,6 +31,7 @@ const writerDropIn = "/etc/systemd/system/safeterm-config-writer.service.d/50-re
 const catalogStateDir = "/var/lib/safeterm-installer/catalog"
 
 type catalogRuntime struct {
+	managedProfiles           bool
 	extraFiles                map[string]string
 	live, state, key, sudoers string
 	refreshHashes             bool
@@ -64,7 +66,18 @@ func (r *catalogRuntime) validate(cfg, baseline *config.Config, dir string) erro
 		sort.Slice(v, func(i, j int) bool { return v[i].Name < v[j].Name })
 		return v
 	}
-	if !reflect.DeepEqual(profiles(cfg), profiles(baseline)) {
+	if r.managedProfiles {
+		if err := siteconfig.ValidateCatalog(cfg); err != nil {
+			return err
+		}
+		for _, p := range cfg.Profiles {
+			if p.Template != "" {
+				if err := r.ensureProfileUser(p, true); err != nil {
+					return err
+				}
+			}
+		}
+	} else if !reflect.DeepEqual(profiles(cfg), profiles(baseline)) {
 		return fmt.Errorf("profile/unit boundary changes require a package deployment")
 	}
 	for _, p := range cfg.Profiles {
@@ -207,11 +220,15 @@ func (r *catalogRuntime) baseline() (string, *config.Config, error) {
 
 func (r *catalogRuntime) activeServices() ([]string, error) {
 	var active []string
-	for _, name := range serviceOrder {
-		if name == "audit" {
+	order, err := r.runtimeServices()
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range order {
+		if name == "audit" && !r.managedProfiles {
 			continue
 		}
-		data, err := r.run("/usr/bin/systemctl", "is-active", serviceUnits[name])
+		data, err := r.run("/usr/bin/systemctl", "is-active", managedServiceUnit(name))
 		state := strings.TrimSpace(string(data))
 		if state == "active" && err == nil {
 			active = append(active, name)
@@ -228,7 +245,7 @@ func (r *catalogRuntime) activeServices() ([]string, error) {
 func (r *catalogRuntime) stop(active []string) error {
 	var failures []error
 	for i := len(active) - 1; i >= 0; i-- {
-		if _, err := r.run("/usr/bin/systemctl", "stop", serviceUnits[active[i]]); err != nil {
+		if _, err := r.run("/usr/bin/systemctl", "stop", managedServiceUnit(active[i])); err != nil {
 			failures = append(failures, err)
 		}
 	}
@@ -236,10 +253,13 @@ func (r *catalogRuntime) stop(active []string) error {
 }
 func (r *catalogRuntime) start(active []string) error {
 	for _, name := range active {
-		if _, err := r.run("/usr/bin/systemctl", "reset-failed", serviceUnits[name]); err != nil {
+		if !r.servicePresent(name) {
+			continue
+		}
+		if _, err := r.run("/usr/bin/systemctl", "reset-failed", managedServiceUnit(name)); err != nil {
 			return err
 		}
-		if _, err := r.run("/usr/bin/systemctl", "start", serviceUnits[name]); err != nil {
+		if _, err := r.run("/usr/bin/systemctl", "start", managedServiceUnit(name)); err != nil {
 			return err
 		}
 	}
@@ -249,7 +269,10 @@ func (r *catalogRuntime) start(active []string) error {
 			time.Sleep(250 * time.Millisecond)
 		}
 		for _, name := range active {
-			if _, err := r.run("/usr/bin/systemctl", "is-active", "--quiet", serviceUnits[name]); err != nil {
+			if !r.servicePresent(name) {
+				continue
+			}
+			if _, err := r.run("/usr/bin/systemctl", "is-active", "--quiet", managedServiceUnit(name)); err != nil {
 				return err
 			}
 		}
@@ -312,6 +335,9 @@ func (r *catalogRuntime) publish(source string) error {
 		return err
 	}
 	if err := catalogAtomicFile(r.sudoers, sudoers, 0440); err != nil {
+		return err
+	}
+	if err = r.reconcileProfiles(cfg); err != nil {
 		return err
 	}
 	return r.publishExtras(source)
@@ -407,7 +433,7 @@ func (r *catalogRuntime) recoverPending() error {
 	}
 	seen := map[string]bool{}
 	for _, name := range journal.Active {
-		if name == "audit" || serviceUnits[name] == "" || seen[name] {
+		if name == "audit" && !r.managedProfiles || managedServiceUnit(name) == "" || seen[name] {
 			return fmt.Errorf("invalid transaction service list")
 		}
 		seen[name] = true

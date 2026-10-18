@@ -53,3 +53,50 @@ cmp "$work/expected.ini" /etc/safeterm-ci/options.ini
 [[ $(stat -c '%U:%G %a' /etc/safeterm-ci/options.ini) == 'root:root 644' ]]
 termctl service status all
 printf 'Systemd fresh installation, Console discovery, completion and INI save: PASS\n'
+
+# Provision independent process and service-manager profiles from declarative sources.
+cat >/etc/safeterm/roles.d/site-viewer.json <<'JSON'
+{"name":"site-viewer","description":"Site read-only role"}
+JSON
+cat >/etc/safeterm/profiles.d/site-demo.json <<'JSON'
+{"name":"site-demo","base":"diagnostics","memory_limit_mib":96,"process_limit":16,"timeout_seconds":10,"max_sessions":2}
+JSON
+cat >/etc/safeterm/profiles.d/site-services.json <<'JSON'
+{"name":"site-services","base":"service-manager"}
+JSON
+cat >/etc/safeterm/operations.d/site-uname.json <<'JSON'
+{"operation":{"name":"site_uname","description":"Isolated site system information","runner_profile":"site-demo","executor_kind":"process","executable_ref":"uname","args_template":["-s"],"parameters":[]},"roles":["viewer","site-viewer"]}
+JSON
+cat >/etc/safeterm/operations.d/site-status.json <<'JSON'
+{"operation":{"name":"site_status","description":"Isolated service status","runner_profile":"site-services","executor_kind":"systemd","systemd":{"unit":"safeterm-gateway.service","action":"status"},"parameters":[]},"roles":["viewer","site-viewer"]}
+JSON
+termctl check
+termctl apply
+wait_ready
+termctl role describe site-viewer | grep -q site_uname
+systemctl --quiet is-active safeterm-runner-site-site-demo.service safeterm-runner-site-site-services.service
+[[ $(id -u sft-site-site-demo) != "$(id -u safeterm-diagnostics)" ]]
+[[ $(systemctl show safeterm-runner-site-site-demo.service -p MemoryMax --value) == 100663296 ]]
+if sudo -n -u sft-site-site-demo head -n 1 /etc/shadow >/dev/null 2>&1; then echo 'site Runner read shadow' >&2; exit 1; fi
+python3 "$repo/tests/systemd/console-smoke.py" site
+if sudo -n -u sft-site-site-services sudo -n /usr/bin/systemctl --no-pager restart safeterm-ssh-broker.service >/dev/null 2>&1; then echo 'site profile inherited another Runner sudo grant' >&2; exit 1; fi
+termctl apply --rollback
+[[ ! -e /etc/systemd/system/safeterm-runner-site-site-demo.service ]]
+[[ ! -e /run/safeterm-site-site-demo/runner.sock ]]
+# Sources remain; applying them again reuses the locked managed UID safely.
+termctl apply
+wait_ready
+python3 "$repo/tests/systemd/console-smoke.py" site
+# New-format updates preserve identities that actually use a custom role.
+termctl user auth console --id ci-admin --roles viewer,netops,config-viewer,config-operator,site-viewer
+# New-format package updates preserve all source directories and re-provision Runner units.
+termctl update "$package"
+wait_ready
+python3 "$repo/tests/systemd/console-smoke.py" site
+# An unchanged generation can also update using its verified prior signature.
+mv /root/.config/safeterm/catalog-ed25519.key "$work/offline.key"
+termctl update "$package"
+wait_ready
+python3 "$repo/tests/systemd/console-smoke.py" site
+mv "$work/offline.key" /root/.config/safeterm/catalog-ed25519.key
+printf 'Declarative roles, profiles, operations, scoped sudo, rollback and signed offline update: PASS\n'

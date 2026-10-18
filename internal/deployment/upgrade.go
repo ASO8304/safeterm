@@ -11,6 +11,7 @@ import (
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
 	"safeterm/internal/layout"
+	"safeterm/internal/siteconfig"
 )
 
 // CheckProfileCompatibility prevents a catalog from requesting isolation
@@ -201,7 +202,7 @@ func InstallAdministration(source, target string) error {
 	if err := layout.RejectLegacy(target); err != nil {
 		return err
 	}
-	for _, dir := range []string{"", "ssh", "console", "trust", "resources.d"} {
+	for _, dir := range append([]string{"", "ssh", "console", "trust", "resources.d"}, siteconfig.Directories...) {
 		path := filepath.Join(target, dir)
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return err
@@ -269,20 +270,26 @@ func InstallAdministration(source, target string) error {
 			return err
 		}
 	}
-	entries, err := os.ReadDir(filepath.Join(source, "resources.d"))
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		name := entry.Name()
-		if name != "README.md" && name != "README.txt" && !strings.HasSuffix(name, ".json") {
+	for _, dir := range append([]string{"resources.d"}, siteconfig.Directories...) {
+		entries, err := os.ReadDir(filepath.Join(source, dir))
+		if os.IsNotExist(err) {
 			continue
 		}
-		preserve := name != "TEMPLATE.json" && name != "README.md" && name != "README.txt"
-		if err := copyOne(filepath.Join("resources.d", name), preserve, 0644); err != nil {
+		if err != nil {
 			return err
 		}
+		for _, entry := range entries {
+			name := entry.Name()
+			if name != "README.md" && name != "README.txt" && !strings.HasSuffix(name, ".json") {
+				continue
+			}
+			preserve := name != "TEMPLATE.json" && name != "README.md" && name != "README.txt"
+			if err := copyOne(filepath.Join(dir, name), preserve, 0644); err != nil {
+				return err
+			}
+		}
 	}
+
 	return nil
 }
 

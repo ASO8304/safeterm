@@ -28,7 +28,7 @@ jobs:
           go test -c -o "$RUNNER_TEMP/configmanager-root.test" ./internal/configmanager
           sudo "$RUNNER_TEMP/configmanager-root.test" -test.run '^TestPrivilegedWriterRootIntegration$' -test.v
           go test -c -o "$RUNNER_TEMP/termctl-root.test" ./cmd/termctl
-          sudo "$RUNNER_TEMP/termctl-root.test" -test.run '^TestResourceRootFileBoundary$' -test.v
+          sudo "$RUNNER_TEMP/termctl-root.test" -test.run '^Test(ResourceRootFileBoundary|SiteLoaderIgnoresTemplateBeforeOpeningAndRejectsSourceLinks)$' -test.v
 
   govulncheck:
     name: Go Vulnerability Check

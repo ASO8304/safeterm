@@ -12,8 +12,8 @@ if os.geteuid() != 0 or os.environ.get('SAFETERM_DISPOSABLE_HOST') != '1':
     raise SystemExit('requires disposable root CI VM')
 
 mode = sys.argv[1]
-if mode not in ('empty', 'configured'):
-    raise SystemExit('expected empty or configured')
+if mode not in ('empty', 'configured', 'site'):
+    raise SystemExit('expected empty, configured or site')
 pid, fd = pty.fork()
 if pid == 0:
     os.execv('/usr/bin/sudo', ['sudo', '-iu', 'safeterm'])
@@ -64,6 +64,13 @@ try:
     result = command('execute disk')
     if b'result: success' not in result:
         raise RuntimeError('Gateway/Runner execution failed')
+    if mode == 'site':
+        result = command('execute site_uname')
+        if b'Linux' not in result or b'result: success exit=0' not in result:
+            raise RuntimeError('isolated custom Runner execution failed')
+        result = command('execute site_status')
+        if b'result: success exit=0' not in result:
+            raise RuntimeError('profile-scoped typed systemd operation failed')
     if mode == 'configured':
         result = command('config ?')
         if b'fresh-options' not in result:

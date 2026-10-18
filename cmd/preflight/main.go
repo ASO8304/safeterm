@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+	priorIdentityCatalog := flag.String("prior-identity-catalog", "", "verified previous catalog for credential validation during package staging only")
 	root := flag.String("bundle", "", "deployment bundle root")
 	installed := flag.Bool("installed", false, "check the installed system paths and service accounts")
 	jsonOutput := flag.Bool("json", false, "print the successful report as JSON")
@@ -38,7 +39,11 @@ func main() {
 	if *installed {
 		*root = "/"
 	}
-	report, err := deployment.Check(deployment.CheckOptions{Root: *root, Installed: *installed})
+	if *priorIdentityCatalog != "" && (os.Geteuid() != 0 || *installed) {
+		fmt.Fprintln(os.Stderr, "prior identity roles require privileged package staging")
+		os.Exit(2)
+	}
+	report, err := deployment.Check(deployment.CheckOptions{Root: *root, Installed: *installed, PriorIdentityCatalog: *priorIdentityCatalog})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "SafeTerm preflight: FAIL:", err)
 		os.Exit(1)

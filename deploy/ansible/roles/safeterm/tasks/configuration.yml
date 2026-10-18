@@ -60,3 +60,21 @@
     mode: '0644'
   notify: Restart SafeTerm control plane
   when: safeterm_resources_directory | length > 0
+
+- name: Validate site definition directory names
+  ansible.builtin.assert:
+    that:
+      - item.key in ['resources.d', 'roles.d', 'profiles.d', 'executables.d', 'operations.d', 'policies.d']
+    fail_msg: Only supported JSON definition directories can be deployed.
+  loop: "{{ safeterm_definition_directories | dict2items }}"
+
+- name: Install site JSON definition directories
+  ansible.builtin.copy:
+    src: "{{ item.value }}/"
+    dest: "/etc/safeterm/{{ item.key }}/"
+    owner: root
+    group: root
+    mode: '0644'
+    directory_mode: '0755'
+  loop: "{{ safeterm_definition_directories | dict2items }}"
+  notify: Restart SafeTerm control plane

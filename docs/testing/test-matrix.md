@@ -257,3 +257,15 @@ with LF/CRLF, blank lines, consecutive comments and optional final newline. The
 initial BOM is retained, including before a root-level key. Malformed and duplicate
 syntax remains rejected. The real systemd installation/Console test now uses a
 BOM-prefixed INI and compares every output byte after saving through the writer.
+
+## Declarative site catalogs (ADR-033 / REQ-029)
+
+- internal/siteconfig tests exact default preservation, role/operation/profile
+  compilation, removal and policy replacement, duplicate/reference denial,
+  capability/identity/runtime ceilings and fixed unit hardening.
+- termctl tests source ownership/template/link boundaries, default JSON extraction,
+  reserved service-name rejection and isolated profile deployment semantics.
+- The disposable systemd smoke adds site process and service-manager Runners,
+  checks distinct UIDs and memory ceilings, executes through authenticated Console,
+  verifies a process Runner cannot read shadow, rolls profiles back and reapplies,
+  and updates the package while preserving site definitions and users.

@@ -11,6 +11,9 @@ A configurable platform for secure system command execution.
 
 Available capabilities:
 
+- Ready packaged defaults with JSON overrides for roles, operations, executables,
+  policies and provisioned Runner profiles; see [site configuration](docs/site-configuration.md).
+
 - Independent JSON definitions under `resources.d`: config-only, log-only,
   service-only or combined, with `termctl check/apply`, an always-ignored template
   and recoverable joint activation. See [resource definitions](docs/resource-definitions.md)
@@ -330,7 +333,9 @@ sudo termctl apply
 sudo termctl update /path/to/new/extracted/package
 ```
 
-Define service/config/log blocks independently. The [resource reference](configs/resources.d/README.md)
+Define service/config/log blocks independently. Roles, operations, executable
+approvals, policies and Runner profiles can also be configured through the
+corresponding JSON .d directories; see [site configuration](docs/site-configuration.md). The [resource reference](configs/resources.d/README.md)
 explains roles, fields, file permissions, signing and examples. Source JSON,
 credentials and trust stay under /etc/safeterm. Generated runtime data lives under
 /var/lib/safeterm/generated and must never be edited. Package built-ins are under

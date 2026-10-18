@@ -37,15 +37,20 @@ if find "$bundle" -type l -print -quit | grep -q .; then
 fi
 [ -f "$bundle/SHA256SUMS" ] || { echo "bundle checksum manifest is missing" >&2; exit 1; }
 (cd "$bundle" && sha256sum -c SHA256SUMS)
-"$bundle/bin/safeterm-preflight" --bundle "$bundle"
 work=$(mktemp -d "${TMPDIR:-/tmp}/safeterm-install.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT HUP INT TERM
+prior_identity_catalog=
+if [ "$(id -u)" -eq 0 ] && [ -f /var/lib/safeterm/generated/catalog.sig ]; then
+ cp -R /var/lib/safeterm/generated "$work/prior-identity-catalog"
+ prior_identity_catalog="$work/prior-identity-catalog"
+fi
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog"
 sudoers_plan="$work/safeterm-service-manager"
-"$bundle/bin/safeterm-preflight" --bundle "$bundle" --sudoers-plan >"$sudoers_plan"
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --sudoers-plan >"$sudoers_plan"
 chmod 0440 "$sudoers_plan"
 visudo -cf "$sudoers_plan" >/dev/null
 writer_plan="$work/writer-paths.conf"
-"$bundle/bin/safeterm-preflight" --bundle "$bundle" --writer-plan >"$writer_plan"
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --writer-plan >"$writer_plan"
 
 cat <<EOF
 SafeTerm deployment plan
@@ -101,7 +106,7 @@ if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
   echo /usr/local/bin/safeterm-console >>/etc/shells
 fi
 install -d -o root -g root -m 0755 /etc/safeterm /var/lib/safeterm /var/lib/safeterm/generated
-"$bundle/bin/safeterm-preflight" --bundle "$bundle" --install-configuration
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --install-configuration
 chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chown root:safeterm-identity /etc/safeterm/console/users.json
@@ -109,7 +114,7 @@ chmod 0640 /etc/safeterm/console/users.json
 
 [ -d /etc/safeterm-managed ] || install -d -o root -g root -m 0755 /etc/safeterm-managed
 managed_plan="$work/managed-plan"
-"$bundle/bin/safeterm-preflight" --bundle "$bundle" --managed-plan >"$managed_plan"
+"$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --managed-plan >"$managed_plan"
 tab=$(printf '\t')
 while IFS="$tab" read -r source target owner; do
   [ -n "$source" ] && [ -n "$target" ] && [ -n "$owner" ] || { echo "invalid managed install plan" >&2; exit 1; }
@@ -134,10 +139,9 @@ done
 install -d -o root -g root -m 0755 /etc/systemd/system/safeterm-config-writer.service.d
 install -o root -g root -m 0644 "$writer_plan" /etc/systemd/system/safeterm-config-writer.service.d/50-resources.conf
 systemctl daemon-reload
-/usr/local/bin/safeterm-preflight --installed
-
 if [ "$start_services" = true ]; then
   /usr/local/bin/termctl initialize --installer-lock-held --key-file "$signing_key"
+  /usr/local/bin/safeterm-preflight --installed
 fi
 if [ "$start_services" = true ]; then
   systemctl enable safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service

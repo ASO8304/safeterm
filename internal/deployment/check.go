@@ -56,25 +56,35 @@ func SystemdSudoers(root string) ([]string, error) {
 func CatalogSudoers(cfg *config.Config) ([]string, error) { return systemdSudoers(cfg) }
 
 func systemdSudoers(cfg *config.Config) ([]string, error) {
-	commands := []string{}
-	for _, operation := range cfg.Operations {
-		if operation.ExecutorKind == config.ExecutorSystemd {
-			commands = append(commands, "/usr/bin/systemctl --no-pager "+operation.Systemd.Action+" "+operation.Systemd.Unit)
+
+	byProfile := map[config.RunnerProfile][]string{}
+	for _, op := range cfg.Operations {
+		if op.ExecutorKind == config.ExecutorSystemd {
+			byProfile[op.RunnerProfile] = append(byProfile[op.RunnerProfile], "/usr/bin/systemctl --no-pager "+op.Systemd.Action+" "+op.Systemd.Unit)
 		}
 	}
-	if len(commands) == 0 {
-		return nil, fmt.Errorf("deployment: catalog has no typed systemd operations")
+	lines := []string{}
+	profiles := append([]config.ProfileDefinition{}, cfg.Profiles...)
+	sort.Slice(profiles, func(i, j int) bool { return profiles[i].Name < profiles[j].Name })
+	for _, profile := range profiles {
+		commands := byProfile[profile.Name]
+		if len(commands) == 0 {
+			continue
+		}
+		sort.Strings(commands)
+		alias := "SAFETERM_SYSTEMD"
+		if profile.Name != config.ProfileServiceManager {
+			alias = "SAFETERM_SITE_" + strings.ToUpper(strings.ReplaceAll(string(profile.Name), "-", "_"))
+		}
+		lines = append(lines, "Cmnd_Alias "+alias+" = "+strings.Join(commands, ", "), profile.RunAsUser+" ALL=(root) NOPASSWD: "+alias)
 	}
-	sort.Strings(commands)
-	return []string{
-		"Cmnd_Alias SAFETERM_SYSTEMD = " + strings.Join(commands, ", "),
-		"safeterm-service-manager ALL=(root) NOPASSWD: SAFETERM_SYSTEMD",
-	}, nil
+	return lines, nil
 }
 
 type CheckOptions struct {
-	Root      string
-	Installed bool
+	PriorIdentityCatalog string
+	Root                 string
+	Installed            bool
 }
 
 type Report struct {
@@ -166,7 +176,25 @@ func Check(options CheckOptions) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	if _, err := broker.LoadSSHAuthenticator(filepath.Join(adminDir, "ssh", "users.json"), catalog.KnownRoles()); err != nil {
+	knownRoles := catalog.KnownRoles()
+	// During package staging only, existing credentials can reference roles from
+	// the prior signed generation. No operations/profiles/permissions are imported.
+	if options.PriorIdentityCatalog != "" {
+		if options.Installed {
+			return Report{}, fmt.Errorf("prior identity roles are permitted only while staging a package")
+		}
+		prior, err := config.LoadConfig(options.PriorIdentityCatalog)
+		if err != nil {
+			return Report{}, err
+		}
+		if err = integrity.VerifyCatalogFiles(prior, filepath.Join(configDir, "trust/catalog-ed25519.pub"), filepath.Join(options.PriorIdentityCatalog, "catalog.sig")); err != nil {
+			return Report{}, err
+		}
+		for _, role := range prior.Roles {
+			knownRoles[role.Name] = true
+		}
+	}
+	if _, err := broker.LoadSSHAuthenticator(filepath.Join(adminDir, "ssh", "users.json"), knownRoles); err != nil {
 		return Report{}, err
 	}
 	if _, err := broker.LoadSSHHostKey(filepath.Join(adminDir, "ssh", "ssh_host_ed25519_key")); err != nil {
@@ -190,7 +218,7 @@ func Check(options CheckOptions) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	if _, err := identity.ParseUsers(consoleData, catalog.KnownRoles()); err != nil {
+	if _, err := identity.ParseUsers(consoleData, knownRoles); err != nil {
 		return Report{}, err
 	}
 	registryPath := filepath.Join(configDir, "resources.json")

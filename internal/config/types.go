@@ -79,6 +79,11 @@ type ExecutableDefinition struct {
 }
 
 type ProfileDefinition struct {
+	Template                RunnerProfile `json:"template,omitempty"`
+	TimeoutSeconds          int           `json:"timeout_seconds,omitempty"`
+	OutputLimitBytes        int           `json:"output_limit_bytes,omitempty"`
+	MaxSessions             int           `json:"max_sessions,omitempty"`
+	IdleTimeoutSeconds      int           `json:"idle_timeout_seconds,omitempty"`
 	Name                    RunnerProfile `json:"name"`
 	ExecutorKind            ExecutorKind  `json:"executor_kind"`
 	ControllerExecutableRef string        `json:"controller_executable_ref,omitempty"`

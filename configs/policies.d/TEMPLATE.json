@@ -1,0 +1,8 @@
+{
+  "role": "site-reader",
+  "operations": [
+    "system_info",
+    "memory_info",
+    "disk_usage"
+  ]
+}

@@ -94,3 +94,13 @@ state, so use it before unrelated account changes. Uninstall retains data and
 snapshots. See [installation](offline-installation.md) for signing and recovery.
 The restricted editor has independent authorization-aware Tab and `?` Enter help.
 Ctrl+C stops a stream; Ctrl+] exits the whole session.
+
+## Default definitions and site overrides
+
+See [site configuration](site-configuration.md) for roles.d, operations.d,
+executables.d, profiles.d and policies.d, complete schemas, precedence and safety
+bounds. `termctl defaults TYPE NAME` prints an editable packaged default.
+`termctl profile list/describe`, `termctl executable list/describe`, and
+`termctl executable hash PATH` provide discovery and digest inspection. All new
+sources share check/apply/recovery and shell completion. `termctl service ...`
+also accepts site-NAME for a provisioned Runner.

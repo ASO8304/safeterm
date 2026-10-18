@@ -40,6 +40,8 @@ safeterm_bootstrap_ssh_password_hash_file: ""
 safeterm_ssh_users: []
 safeterm_console_users: []
 safeterm_resources_directory: ""
+# Optional map of supported definition directory -> controller source directory.
+safeterm_definition_directories: {}
 
 safeterm_services:
   - safeterm-audit.service

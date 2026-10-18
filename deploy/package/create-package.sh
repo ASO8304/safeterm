@@ -44,7 +44,9 @@ done
 
 cp -R "$repo_dir/internal/defaults/catalog/." "$staging/payload/catalog-source/"
 cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/payload/catalog-source/"
-cp -R "$repo_dir/configs/resources.d" "$staging/payload/catalog-source/"
+for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
+  cp -R "$repo_dir/configs/$definitions" "$staging/payload/catalog-source/"
+done
 cp -R "$repo_dir/deploy/demo/managed/." "$staging/payload/managed/"
 cp "$repo_dir/deploy/runtime/resources.json" "$staging/payload/resources.json"
 cp "$repo_dir/deploy/console/users.example.json" "$staging/payload/console/users.json"

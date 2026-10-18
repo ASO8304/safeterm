@@ -10,3 +10,5 @@ import (
 func resourceCommand(string, []string, io.Writer) error {
 	return fmt.Errorf("resource activation requires Linux")
 }
+
+func registerSiteServices(string) error { return nil }

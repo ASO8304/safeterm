@@ -18,9 +18,11 @@ import (
 	"safeterm/internal/integrity"
 	"safeterm/internal/layout"
 	"safeterm/internal/resources"
+	"safeterm/internal/siteconfig"
 )
 
 type resourceRuntime struct {
+	overlays    siteconfig.Inputs
 	export      string
 	exportCheck func(string) error
 	catalog     *catalogRuntime
@@ -113,7 +115,7 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 			return fmt.Errorf("recovery state must have mode 0700")
 		}
 	}
-	r := &catalogRuntime{live: layout.Generated, state: catalogStateDir, key: key, sudoers: "/etc/sudoers.d/safeterm-service-manager", out: out, run: catalogRun, extraFiles: resourceFiles(layout.Generated)}
+	r := &catalogRuntime{managedProfiles: true, live: layout.Generated, state: catalogStateDir, key: key, sudoers: "/etc/sudoers.d/safeterm-service-manager", out: out, run: catalogRun, extraFiles: resourceFiles(layout.Generated)}
 	pending := filepath.Join(r.state, "pending")
 	if rollback {
 		return r.rollback()
@@ -134,7 +136,13 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 		return err
 	}
 	if action == "initialize" {
-		if err = r.checkpoint(); err != nil {
+		// The installer has staged verified package defaults; identities may already
+		// use site roles. Full credential validation runs against the compiled result
+		// before any service starts, not against this temporary bootstrap baseline.
+		if err = r.saveCheckpoint("current", r.live); err != nil {
+			return err
+		}
+		if err = os.RemoveAll(filepath.Join(r.state, "previous")); err != nil {
 			return err
 		}
 	}
@@ -142,7 +150,12 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
-	runtime := resourceRuntime{defaults: layout.Defaults, export: export, exportCheck: catalogSecureDirectory, catalog: r, plan: configmanager.WriterUnitDropIn, logs: checkResourceLog, services: checkResourceService}
+	overlays, err := loadSiteInputs(dir)
+	if err != nil {
+		return err
+	}
+	r.managedProfiles = true
+	runtime := resourceRuntime{overlays: overlays, defaults: layout.Defaults, export: export, exportCheck: catalogSecureDirectory, catalog: r, plan: configmanager.WriterUnitDropIn, logs: checkResourceLog, services: checkResourceService}
 	return runtime.apply(items, action == "check", signed)
 }
 
@@ -187,8 +200,15 @@ func (r resourceRuntime) apply(items []resources.Named, check bool, signed strin
 	if err != nil {
 		return err
 	}
-	cfg, reg, next, err := resources.Compile(builtins, items)
+	preparedBase, err := siteconfig.Prepare(builtins, r.overlays)
 	if err != nil {
+		return err
+	}
+	cfg, reg, next, err := resources.Compile(preparedBase, items)
+	if err != nil {
+		return err
+	}
+	if err = siteconfig.Finish(cfg, r.overlays); err != nil {
 		return err
 	}
 	if err = broker.ValidateOperationPaths(cfg); err != nil {

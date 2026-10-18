@@ -80,11 +80,20 @@ func run(args []string, out, errOut io.Writer) error {
 		return execCommand("/usr/local/sbin/safeterm-uninstall")
 	case "completion":
 		return writeCompletion(out, args[1:])
+	case "defaults":
+		return defaultsCommand(configDir, args[1:], out)
+	case "profile":
+		return profileCommand(configDir, args[1:], out)
+	case "executable":
+		return executableCommand(configDir, args[1:], out)
 	case "catalog":
 		return catalogCommand(configDir, args[1:], out)
 	case "role", "roles":
 		return roleCommand(configDir, args[1:], out)
 	case "service":
+		if err := registerSiteServices(configDir); err != nil {
+			return err
+		}
 		return serviceCommand(args[1:], out, errOut)
 	case "config":
 		return configCommand(configDir, args[1:], out)
@@ -100,7 +109,7 @@ func run(args []string, out, errOut io.Writer) error {
 func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "SafeTerm control utility")
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  termctl check (validate resources.d without activation)")
+	fmt.Fprintln(out, "  termctl check (validate all administrator JSON definitions without activation)")
 	fmt.Fprintln(out, "  termctl apply [--signed-catalog DIR | --key-file FILE]")
 	fmt.Fprintln(out, "  termctl apply --export DIR (export unsigned candidate for offline signing)")
 	fmt.Fprintln(out, "  termctl apply --rollback (restore previous generated configuration)")
@@ -110,6 +119,9 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl uninstall (preserves data, identities and rollback snapshots)")
 	fmt.Fprintln(out, "  termctl catalog list|describe OPERATION")
 	fmt.Fprintln(out, "  termctl role list|describe ROLE")
+	fmt.Fprintln(out, "  termctl profile list|describe NAME")
+	fmt.Fprintln(out, "  termctl executable list|describe ID | hash PATH")
+	fmt.Fprintln(out, "  termctl defaults role|operation|profile|executable|policy NAME")
 	fmt.Fprintln(out, "  termctl service status [NAME|all]")
 	fmt.Fprintln(out, "  termctl service start|stop|restart|enable|disable [NAME|all]")
 	fmt.Fprintln(out, "  termctl config list|describe RESOURCE")
@@ -851,7 +863,7 @@ func writeCompletion(out io.Writer, args []string) error {
 	if len(args) != 1 || (args[0] != "bash" && args[0] != "zsh") {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
-	commands := "check apply catalog role service config user shell update rollback uninstall completion help"
+	commands := "check apply defaults profile executable catalog role service config user shell update rollback uninstall completion help"
 	services := "audit config-writer identity gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
@@ -866,7 +878,9 @@ func writeCompletion(out io.Writer, args []string) error {
       apply) choices="--signed-catalog --key-file --export --recover --rollback" ;;
       catalog) choices="list describe" ;;
       config) choices="list describe" ;;
-      role|roles) choices="list describe" ;;
+      role|roles|profile) choices="list describe" ;;
+      executable) choices="list describe hash" ;;
+      defaults) choices="role operation profile executable policy" ;;
       user) choices="list add auth del password" ;;
       completion) choices="bash zsh" ;;
       update) mapfile -t COMPREPLY < <(compgen -d -- "$cur"); return ;;
@@ -879,7 +893,13 @@ func writeCompletion(out io.Writer, args []string) error {
           --key-file) mapfile -t COMPREPLY < <(compgen -f -- "$cur"); return ;;
         esac
         choices="--signed-catalog --key-file --export --recover --rollback" ;;
-      service) if (( COMP_CWORD == 3 )); then choices="%s"; fi ;;
+      service) if (( COMP_CWORD == 3 )); then choices="%s $(termctl profile list 2>/dev/null | awk '$0 ~ /template=/ && $1 !~ /^(diagnostics|network-observer|log-reader|service-manager)$/ {print "site-" $1}')"; fi ;;
+      profile) if [[ "${COMP_WORDS[2]}" == describe ]]; then choices="$(termctl profile list 2>/dev/null | awk '{print $1}')"; fi ;;
+      executable) if [[ "${COMP_WORDS[2]}" == hash ]]; then mapfile -t COMPREPLY < <(compgen -f -- "$cur"); return; else choices="$(termctl executable list 2>/dev/null | awk '{print $1}')"; fi ;;
+      defaults) choices="$(termctl defaults "${COMP_WORDS[2]}" 2>/dev/null)" ;;
+      role|roles) if [[ "${COMP_WORDS[2]}" == describe ]]; then choices="$(termctl role list 2>/dev/null | awk '{print $1}')"; fi ;;
+      catalog) if [[ "${COMP_WORDS[2]}" == describe ]]; then choices="$(termctl catalog list 2>/dev/null | awk '{print $1}')"; fi ;;
+      config) if [[ "${COMP_WORDS[2]}" == describe ]]; then choices="$(termctl config list 2>/dev/null | awk '{print $1}')"; fi ;;
       user)
         if (( COMP_CWORD == 3 )); then
           case "${COMP_WORDS[2]}" in add|auth|del|password) choices="ssh console" ;; esac
@@ -912,7 +932,7 @@ complete -F _termctl_complete termctl
     catalog) if (( CURRENT == 3 )); then _values 'catalog action' list describe; fi ;;
     service)
       if (( CURRENT == 3 )); then _values 'service action' %s
-      elif (( CURRENT == 4 )); then _values 'service' %s; fi ;;
+      elif (( CURRENT == 4 )); then _values 'service' %s $(termctl profile list 2>/dev/null | awk '$1 !~ /^(diagnostics|network-observer|log-reader|service-manager)$/ {print "site-" $1}'); fi ;;
     user)
       if (( CURRENT == 3 )); then _values 'user action' list add auth del password
       elif (( CURRENT == 4 )); then _values 'identity' ssh console
@@ -926,7 +946,16 @@ complete -F _termctl_complete termctl
         esac
       fi ;;
     config) _values 'action' list describe ;;
-    role|roles) _values 'action' list describe ;;
+    role|roles|profile)
+      if (( CURRENT == 3 )); then _values 'action' list describe
+      else _values 'name' $(termctl "$words[2]" list 2>/dev/null | awk '{print $1}'); fi ;;
+    executable)
+      if (( CURRENT == 3 )); then _values 'action' list describe hash
+      elif [[ "$words[3]" == hash ]]; then _files
+      else _values 'executable' $(termctl executable list 2>/dev/null | awk '{print $1}'); fi ;;
+    defaults)
+      if (( CURRENT == 3 )); then _values 'definition' role operation profile executable policy
+      else _values 'name' $(termctl defaults "$words[3]" 2>/dev/null); fi ;;
     completion) _values 'shell' bash zsh ;;
   esac
 }
@@ -937,7 +966,7 @@ compdef _termctl termctl
 
 func catalogRun(name string, args ...string) ([]byte, error) {
 	switch name {
-	case "/usr/bin/systemctl", "/usr/sbin/visudo", "/usr/local/bin/safeterm-preflight":
+	case "/usr/bin/systemctl", "/usr/sbin/visudo", "/usr/local/bin/safeterm-preflight", "/usr/sbin/useradd", "/usr/bin/getent", "/usr/bin/id":
 	default:
 		return nil, fmt.Errorf("unsupported catalog administration executable")
 	}

@@ -1,0 +1,8 @@
+{
+  "id": "site-uptime",
+  "path": "/usr/bin/uptime",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "allowed_profiles": [
+    "diagnostics"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "site-diagnostics",
+  "base": "diagnostics",
+  "memory_limit_mib": 128,
+  "process_limit": 32,
+  "timeout_seconds": 30,
+  "output_limit_bytes": 1048576,
+  "max_sessions": 16,
+  "idle_timeout_seconds": 300
+}

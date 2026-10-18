@@ -10,10 +10,16 @@ import (
 	"strconv"
 	"syscall"
 
+	"path/filepath"
 	"safeterm/internal/audit"
+	"safeterm/internal/config"
+	"safeterm/internal/integrity"
+	"safeterm/internal/layout"
+	"safeterm/internal/siteconfig"
 )
 
 func main() {
+	catalogDir := flag.String("config", layout.Generated, "signed runtime catalog for site Runner identities")
 	socketPath := flag.String("socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
 	storePath := flag.String("store", "/var/lib/safeterm/audit/audit.jsonl", "append-only audit store")
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "Gateway event producer user")
@@ -26,7 +32,7 @@ func main() {
 	networkConfigUser := flag.String("network-config-user", "safeterm-config-network", "network Config Manager user")
 	identityUser := flag.String("identity-user", "safeterm-identity", "Console Identity producer user")
 	flag.Parse()
-	if err := run(*socketPath, *storePath, []producerUser{
+	producers := []producerUser{
 		{name: "root", policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "file-writer"}},
 		{name: *identityUser, policy: audit.Producer{Component: audit.ComponentIdentity}},
 		{name: *gatewayUser, policy: audit.Producer{Component: audit.ComponentGateway}},
@@ -37,7 +43,23 @@ func main() {
 		{name: *applicationConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "application"}},
 		{name: *databaseConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "database"}},
 		{name: *networkConfigUser, policy: audit.Producer{Component: audit.ComponentConfigManager, Profile: "network"}},
-	}); err != nil {
+	}
+	cfg, err := config.LoadConfig(*catalogDir)
+	if err == nil {
+		err = integrity.VerifyCatalogFiles(cfg, layout.PublicKey(*catalogDir), filepath.Join(*catalogDir, "catalog.sig"))
+	}
+	if err == nil {
+		err = siteconfig.ValidateCatalog(cfg)
+	}
+	if err == nil {
+		for _, p := range cfg.Profiles {
+			if p.Template != "" {
+				producers = append(producers, producerUser{name: p.RunAsUser, policy: audit.Producer{Component: audit.ComponentRunner, Profile: string(p.Name)}})
+			}
+		}
+		err = run(*socketPath, *storePath, producers)
+	}
+	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

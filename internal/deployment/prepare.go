@@ -112,3 +112,6 @@ func executableDigest(path string) (string, error) {
 	}
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
+
+// ExecutableSHA256 reports a digest without changing any approved registry.
+func ExecutableSHA256(path string) (string, error) { return executableDigest(path) }
