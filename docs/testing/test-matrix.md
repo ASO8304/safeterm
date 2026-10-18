@@ -233,3 +233,8 @@ M15 evidence: [verification and hosted deployment/SSH end-to-end outputs](../../
 - deployment: administrator definitions/credentials separated from generated data;
   shipped references refreshed while custom JSON is preserved.
 - audit: its unit owns only safeterm/audit, never the generated-data namespace.
+
+Gateway empty-profile regression: TestGatewayAcceptsEmptyResourceProfilesWithNoActivationGrants
+covers an empty generated registry and a config-only registry with unused profiles;
+all known profiles start with no activation grants, unknown profiles are rejected,
+and an empty allowlist denies every attempted activation.

@@ -176,17 +176,22 @@ func brokerPeerAuthorizer(brokerType string) func(*contract.ExecutionRequest) er
 }
 
 func validatedManagerOperations(cfg *config.Config, registry *configmanager.Registry, profile string) (map[string]bool, error) {
+	// Profiles are fixed deployment boundaries. A known profile with no resource
+	// definitions is valid and receives no activation permissions.
+	switch profile {
+	case "application", "database", "network":
+	default:
+		return nil, fmt.Errorf("gateway: unknown Config Manager profile %q", profile)
+	}
 	operations := map[string]config.OperationDefinition{}
 	for _, operation := range cfg.Operations {
 		operations[operation.Name] = operation
 	}
 	allowed := map[string]bool{}
-	profileFound := false
 	for _, resource := range registry.Resources {
 		if resource.Profile != profile {
 			continue
 		}
-		profileFound = true
 		for _, name := range []string{resource.ActivationOperation, resource.HealthCheckOperation} {
 			if name == "" {
 				continue
@@ -197,9 +202,6 @@ func validatedManagerOperations(cfg *config.Config, registry *configmanager.Regi
 			}
 			allowed[name] = true
 		}
-	}
-	if !profileFound {
-		return nil, fmt.Errorf("gateway: Config Manager profile %q has no registered resources", profile)
 	}
 	return allowed, nil
 }
