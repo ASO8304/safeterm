@@ -40,7 +40,7 @@ func (ex *captureExecutor) Execute(_ context.Context, command string, args []str
 
 func translationConfig(t *testing.T) *config.Config {
 	t.Helper()
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

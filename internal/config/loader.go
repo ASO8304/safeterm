@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"safeterm/internal/layout"
 	"strings"
 )
 
@@ -18,6 +19,9 @@ import (
 // deliberate — adding a new operation should mean "drop a new JSON file
 // into configs/operations/", not "edit one giant file" (see REQ-003).
 func LoadConfig(baseDir string) (*Config, error) {
+	if filepath.Clean(baseDir) == layout.Admin {
+		return nil, fmt.Errorf("config: /etc/safeterm is definition input only; compiled catalogs are under %s", layout.Generated)
+	}
 	metadata, err := loadJSONObject[struct {
 		Version string `json:"version"`
 	}](filepath.Join(baseDir, "catalog.json"))

@@ -40,7 +40,7 @@ func (p *observedPolicy) Authorize(req *contract.ExecutionRequest) error {
 
 func buildCoreWithRealPolicy(t *testing.T) (*agent.Core, *observedPolicy, *policyTestTranslator, *policyTestExecutor) {
 	t.Helper()
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

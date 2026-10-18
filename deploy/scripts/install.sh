@@ -9,15 +9,23 @@ usage() {
 bundle=
 dry_run=false
 start_services=true
+signing_key=/root/.config/safeterm/catalog-ed25519.key
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --bundle) [ "$#" -ge 2 ] || usage; bundle=$2; shift 2 ;;
     --dry-run) dry_run=true; shift ;;
     --no-start) start_services=false; shift ;;
+    --signing-key) [ "$#" -ge 2 ] || usage; signing_key=$2; shift 2 ;;
     *) usage ;;
   esac
 done
 [ -n "$bundle" ] && [ -d "$bundle" ] || usage
+for legacy in config-manager operations policies profiles executables roles catalog.json catalog.sig resources.json .resources-manifest.json; do
+  [ ! -e "/etc/safeterm/$legacy" ] && [ ! -L "/etc/safeterm/$legacy" ] || { echo "Legacy administrator layout is unsupported; use a clean resources.d installation." >&2; exit 1; }
+done
+if [ "$start_services" = true ] && [ "$dry_run" = false ] && [ -e /var/lib/safeterm/generated/catalog.json ]; then
+  echo "Use the transactional release installer for updates." >&2; exit 1
+fi
 bundle=$(CDPATH= cd -- "$bundle" && pwd)
 
 for tool in sha256sum install groupadd useradd usermod getent systemctl visudo; do
@@ -50,6 +58,10 @@ SafeTerm deployment plan
 EOF
 [ "$dry_run" = false ] || { echo "Dry run: PASS"; exit 0; }
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
+if [ "$start_services" = true ]; then
+  exec 9>/run/lock/safeterm-lifecycle.lock
+  flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
+fi
 getent group adm >/dev/null 2>&1 || { echo "required Ubuntu group is missing: adm" >&2; exit 1; }
 
 groups='safeterm-config-writers safeterm safeterm-identity safeterm-audit safeterm-broker safeterm-clients safeterm-gateway safeterm-diagnostics safeterm-network safeterm-log-reader safeterm-service-manager safeterm-config-application safeterm-config-database safeterm-config-network'
@@ -88,7 +100,7 @@ usermod --shell /usr/local/bin/safeterm-console safeterm
 if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
   echo /usr/local/bin/safeterm-console >>/etc/shells
 fi
-install -d -o root -g root -m 0755 /etc/safeterm
+install -d -o root -g root -m 0755 /etc/safeterm /var/lib/safeterm /var/lib/safeterm/generated
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --install-configuration
 chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
@@ -125,6 +137,9 @@ systemctl daemon-reload
 /usr/local/bin/safeterm-preflight --installed
 
 if [ "$start_services" = true ]; then
+  /usr/local/bin/termctl initialize --installer-lock-held --key-file "$signing_key"
+fi
+if [ "$start_services" = true ]; then
   systemctl enable safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
   systemctl restart safeterm-config-writer.service
@@ -134,9 +149,5 @@ if [ "$start_services" = true ]; then
   systemctl restart safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl restart safeterm-ssh-broker.service
   systemctl --quiet is-active safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
-fi
-if [ "$start_services" = true ]; then
-  /usr/local/bin/termctl config checkpoint
-  /usr/local/bin/termctl catalog checkpoint
 fi
 echo "SafeTerm installation: PASS"

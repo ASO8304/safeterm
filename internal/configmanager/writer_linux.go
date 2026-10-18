@@ -16,6 +16,7 @@ import (
 
 	"golang.org/x/sys/unix"
 	"safeterm/internal/audit"
+	"safeterm/internal/layout"
 )
 
 const WriterSocket = "/run/safeterm-config-writer/writer.sock"
@@ -52,7 +53,7 @@ func ValidateWriterPath(path string) error {
 }
 
 // ValidateWriterRegistry checks the trust namespace before root loads policy.
-func ValidateWriterRegistry() error { return validateWriterParents("/etc/safeterm/config-manager") }
+func ValidateWriterRegistry() error { return validateWriterParents(layout.Generated) }
 
 func validateWriterParents(parent string) error {
 	for dir := parent; ; dir = filepath.Dir(dir) {
@@ -153,52 +154,8 @@ func renderWriterPatch(r Resource, data []byte, p Patch) ([]byte, error) {
 	if r.Access != AccessReadWrite || p.ResourceID != r.ID || contentVersion(data) != p.BaseVersion {
 		return nil, fmt.Errorf("configwriter: write denied or version conflict")
 	}
-	var field *FieldSchema
-	for i := range r.Fields {
-		if r.Fields[i].Section == p.Section && r.Fields[i].Key == p.Key {
-			field = &r.Fields[i]
-			break
-		}
-	}
-	if field == nil || field.ReadOnly {
-		return nil, fmt.Errorf("configwriter: field denied")
-	}
-	doc, err := parseDocument(r.Format, data)
-	if err != nil {
-		return nil, err
-	}
-	if _, exists := doc.Get(p.Section, p.Key); !exists {
-		return nil, fmt.Errorf("configwriter: missing field")
-	}
-	value, normalized, err := normalizeValue(*field, p.Value)
-	if err != nil {
-		return nil, err
-	}
-	if r.Format == FormatJSON {
-		value = typedValueForJSON(value)
-	}
-	if err := doc.Set(p.Section, p.Key, value); err != nil {
-		return nil, err
-	}
-	if err := validateCompleteDocument(r, doc); err != nil {
-		return nil, err
-	}
-	rendered, err := doc.Render()
-	if err != nil {
-		return nil, err
-	}
-	reparsed, err := parseDocument(r.Format, rendered)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateCompleteDocument(r, reparsed); err != nil {
-		return nil, err
-	}
-	actual, exists := reparsed.Get(p.Section, p.Key)
-	if !exists || scalarString(actual) != normalized {
-		return nil, fmt.Errorf("configwriter: value changed during rendering")
-	}
-	return rendered, nil
+	rendered, _, _, _, err := renderPatch(r, data, p)
+	return rendered, err
 }
 
 func (s *FileWriterServer) snapshots(id string) ([]string, error) {

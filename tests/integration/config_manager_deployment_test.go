@@ -31,7 +31,7 @@ func TestConfigManagerDeploymentProfilesAreIsolated(t *testing.T) {
 }
 
 func TestExampleResourceRegistryIsStrictAndProfileScoped(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("..", "..", "deploy", "config-manager", "resources.example.json"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "deploy", "runtime", "resources.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestExampleResourceRegistryIsStrictAndProfileScoped(t *testing.T) {
 	if err := configmanager.ValidateRegistry(&registry); err != nil {
 		t.Fatal(err)
 	}
-	if len(registry.Resources) != 3 {
+	if len(registry.Resources) != 0 {
 		t.Fatalf("resources=%d", len(registry.Resources))
 	}
 	paths := map[string]bool{}

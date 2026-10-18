@@ -22,10 +22,11 @@ import (
 	"safeterm/internal/configmanager"
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
+	"safeterm/internal/layout"
 )
 
 const (
-	configDir     = "/etc/safeterm"
+	configDir     = layout.Generated
 	gatewaySocket = "/run/safeterm-gateway/gateway.sock"
 )
 
@@ -62,7 +63,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if err := integrity.VerifyCatalogFiles(cfg, filepath.Join(configDir, "trust", "catalog-ed25519.pub"), filepath.Join(configDir, "catalog.sig")); err != nil {
+	if err := integrity.VerifyCatalogFiles(cfg, layout.PublicKey(configDir), filepath.Join(configDir, "catalog.sig")); err != nil {
 		return err
 	}
 	catalog, err := broker.NewCatalog(cfg)

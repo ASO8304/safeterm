@@ -10,6 +10,7 @@ import (
 
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/layout"
 )
 
 // CheckProfileCompatibility prevents a catalog from requesting isolation
@@ -43,7 +44,7 @@ func CheckProfileCompatibility(source, defaults string) error {
 // StageManagedUpgrade copies existing registered resources into a private bundle
 // for validation. Installation never replaces existing application files.
 func StageManagedUpgrade(root string) error {
-	data, err := os.ReadFile(filepath.Join(root, "etc/safeterm/config-manager/resources.json"))
+	data, err := os.ReadFile(filepath.Join(root, "etc/safeterm/resources.json"))
 	if err != nil {
 		return err
 	}
@@ -85,9 +86,9 @@ func StageManagedUpgrade(root string) error {
 // InstallConfiguration publishes catalog files while preserving unrelated site
 // files, credentials and the Config Manager registry, including their metadata.
 // The caller must validate the bundle and hold the installation lifecycle lock.
-func InstallConfiguration(source, target string) error {
+func InstallGenerated(source, target string) error {
 	sections := []string{"operations", "executables", "profiles", "roles", "policies"}
-	for _, dir := range append([]string{"", "trust", "ssh", "console", "config-manager"}, sections...) {
+	for _, dir := range append([]string{"", "trust"}, sections...) {
 		path := filepath.Join(target, dir)
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return err
@@ -122,7 +123,7 @@ func InstallConfiguration(source, target string) error {
 		}
 		defer os.Remove(file.Name())
 		mode := os.FileMode(0600)
-		if name == "config-manager/resources.json" || name == "ssh/ssh_host_ed25519_key.pub" {
+		if name == "resources.json" || name == "ssh/ssh_host_ed25519_key.pub" {
 			mode = 0644
 		}
 		if _, err = file.Write(data); err == nil {
@@ -185,11 +186,100 @@ func InstallConfiguration(source, target string) error {
 			}
 		}
 	}
-	for _, name := range []string{"ssh/users.json", "ssh/ssh_host_ed25519_key", "ssh/ssh_host_ed25519_key.pub", "console/users.json", "config-manager/resources.json"} {
-		if _, err := os.Lstat(filepath.Join(source, name)); os.IsNotExist(err) {
+	if err := copyFile("resources.json", false); err != nil {
+		return err
+	}
+	if err := os.Chmod(filepath.Join(target, "resources.json"), 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+// InstallAdministration publishes only human-owned definitions, credentials and
+// trust. It refuses legacy layouts and never imports registry/catalog fragments.
+func InstallAdministration(source, target string) error {
+	if err := layout.RejectLegacy(target); err != nil {
+		return err
+	}
+	for _, dir := range []string{"", "ssh", "console", "trust", "resources.d"} {
+		path := filepath.Join(target, dir)
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return err
+		}
+		info, err := os.Lstat(path)
+		if err != nil || !info.IsDir() || info.Mode().Perm()&0022 != 0 {
+			return fmt.Errorf("unsafe administrator directory %s", path)
+		}
+	}
+	copyOne := func(name string, preserve bool, mode os.FileMode) error {
+		dst := filepath.Join(target, name)
+		if info, err := os.Lstat(dst); err == nil {
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("unsafe administrator file %s", name)
+			}
+			if preserve {
+				return nil
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
+		data, err := os.ReadFile(filepath.Join(source, name))
+		if err != nil {
+			return err
+		}
+		f, err := os.CreateTemp(filepath.Dir(dst), ".install-")
+		if err != nil {
+			return err
+		}
+		defer os.Remove(f.Name())
+		if _, err = f.Write(data); err == nil {
+			err = f.Chmod(mode)
+		}
+		if err == nil {
+			err = f.Sync()
+		}
+		closeErr := f.Close()
+		if err != nil {
+			return err
+		}
+		if closeErr != nil {
+			return closeErr
+		}
+		return os.Rename(f.Name(), dst)
+	}
+	for _, name := range []string{"ssh/users.json", "ssh/ssh_host_ed25519_key", "ssh/ssh_host_ed25519_key.pub", "console/users.json"} {
+		if _, err := os.Stat(filepath.Join(source, name)); os.IsNotExist(err) {
 			continue
 		}
-		if err := copyFile(name, true); err != nil {
+		if err := copyOne(name, true, 0640); err != nil {
+			return err
+		}
+	}
+	if existing, err := os.ReadFile(filepath.Join(target, "trust/catalog-ed25519.pub")); err == nil {
+		incoming, err := os.ReadFile(filepath.Join(source, "trust/catalog-ed25519.pub"))
+		if err != nil || string(existing) != string(incoming) {
+			return fmt.Errorf("installation cannot rotate trust")
+		}
+	}
+	if err := copyOne("trust/catalog-ed25519.pub", false, 0644); err != nil {
+		return err
+	}
+	for _, name := range []string{"README.md", "README.txt"} {
+		if err := copyOne(name, false, 0644); err != nil {
+			return err
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(source, "resources.d"))
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name != "README.md" && name != "README.txt" && !strings.HasSuffix(name, ".json") {
+			continue
+		}
+		preserve := name != "TEMPLATE.json" && name != "README.md" && name != "README.txt"
+		if err := copyOne(filepath.Join("resources.d", name), preserve, 0644); err != nil {
 			return err
 		}
 	}

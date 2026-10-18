@@ -107,3 +107,29 @@ application directories. Atomic replacement changes inode/mtime. An external
 application ignoring deployment coordination can still race an optimistic update;
 version/inode/metadata rechecks detect changes but do not supply a universal OS
 transaction against other independent writers.
+
+## Declarative resource compiler
+
+resources.d is root-admin input, compiled only by termctl. Unknown/duplicate JSON,
+unsafe source ownership/links, excessive input and conflicting generated IDs fail
+closed. TEMPLATE.json is skipped before read. Generated service/log operations
+are exact signed capabilities, never shell strings or dynamic paths/units.
+Existing gateway/manager identity and role boundaries continue to apply.
+
+Compilation grants no new log-reader OS privileges. Initial path/link/access
+checks cannot make future rotation safe automatically; the administrator must
+maintain trusted paths and narrow read/traverse permissions. Application-file
+updates retain the restricted writer's stronger root-controlled namespace and
+metadata checks. Definitions cannot request general chown, ACL repair, arbitrary
+validators or commands. One recovery journal binds registry, writer sandbox,
+manifest/checkpoint and catalog. A pending failure blocks other lifecycle changes.
+
+## Single configuration source (ADR-032)
+
+Runtime consumers read only root-owned /var/lib/safeterm/generated. Human resource
+JSON, credentials and trust are separate under /etc/safeterm. Verified packaged
+built-ins plus current JSON sources rebuild the entire catalog and registry;
+prior generated data is not an input. Old layouts and mutation routes are
+rejected without automatic migration. Audit owns only /var/lib/safeterm/audit,
+so compromise of that UID does not permit replacing generated runtime metadata.
+Incomplete activation snapshots fail rather than borrowing current live files.

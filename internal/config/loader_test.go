@@ -8,7 +8,7 @@ import (
 )
 
 func TestShippedTcpdumpOperationsFlushOutputWithoutNameResolution(t *testing.T) {
-	cfg, err := LoadConfig("../../configs")
+	cfg, err := LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestShippedTcpdumpOperationsFlushOutputWithoutNameResolution(t *testing.T) 
 }
 
 func TestShippedTracerouteUsesStreaming(t *testing.T) {
-	cfg, err := LoadConfig("../../configs")
+	cfg, err := LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestShippedTracerouteUsesStreaming(t *testing.T) {
 }
 
 func TestShippedPingUsesStreaming(t *testing.T) {
-	cfg, err := LoadConfig("../../configs")
+	cfg, err := LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestLoadConfig_MultipleFilesInSameFolder_AreMerged(t *testing.T) {
 // hand-edits a shipped config file into an inconsistent state, this test
 // fails in CI before it ever reaches a real deployment.
 func TestLoadConfig_ShippedRepositoryConfig_IsValid(t *testing.T) {
-	cfg, err := LoadConfig("../../configs")
+	cfg, err := LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatalf("expected shipped repository config to load and validate, got error: %v", err)
 	}

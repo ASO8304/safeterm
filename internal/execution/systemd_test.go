@@ -43,7 +43,7 @@ func (c *fakeServiceController) Control(_ context.Context, action, unit string) 
 
 func systemdConfig(t *testing.T) *config.Config {
 	t.Helper()
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

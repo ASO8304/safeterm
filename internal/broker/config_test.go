@@ -74,7 +74,7 @@ func TestConfigBrokerRoutesAuthenticatedIdentityIntoRestrictedShell(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := shell.executeLine(context.Background(), "config list", make(chan byte)); err != nil {
+	if _, err := shell.executeLine(context.Background(), "config", make(chan byte)); err != nil {
 		t.Fatal(err)
 	}
 	if service.actor.BrokerType != "ssh" || service.actor.UserID != "alice" || len(service.actor.Roles) != 1 || service.actor.Roles[0] != "netops" {

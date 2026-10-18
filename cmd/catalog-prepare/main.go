@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	source := flag.String("source", "./configs", "source catalog directory")
+	source := flag.String("source", "./internal/defaults/catalog", "source catalog directory")
 	output := flag.String("output", "", "new unsigned deployment catalog directory")
 	keep := flag.Bool("keep-hashes", false, "preserve approved executable hashes")
 	compatible := flag.String("compatible-with", "", "require the same provisioned profile boundaries as this catalog")
@@ -24,7 +24,7 @@ func main() {
 			err = integrity.VerifyCatalogFiles(cfg, filepath.Join(*source, "trust/catalog-ed25519.pub"), filepath.Join(*source, "catalog.sig"))
 		}
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "source catalog is not verified; apply intended changes with termctl catalog apply first:", err)
+			fmt.Fprintln(os.Stderr, "source catalog is not verified; direct edits are unsupported; rebuild from trusted packaged built-ins:", err)
 			os.Exit(1)
 		}
 	}

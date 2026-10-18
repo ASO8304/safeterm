@@ -83,41 +83,23 @@ func TestInstallConfigurationPreservesSiteFilesAndRemovesStaleCatalogFragments(t
 		}
 	}
 	target := filepath.Join(t.TempDir(), "installed")
-	if err := InstallConfiguration(source, target); err != nil {
+	if err := InstallGenerated(source, target); err != nil {
 		t.Fatal(err)
 	}
-	registryInfo, err := os.Stat(filepath.Join(target, "config-manager/resources.json"))
+	registryInfo, err := os.Stat(filepath.Join(target, "resources.json"))
 	if err != nil || registryInfo.Mode().Perm() != 0644 {
 		t.Fatalf("fresh registry must be readable by services: info=%v err=%v", registryInfo, err)
-	}
-	secrets := []string{"ssh/users.json", "ssh/ssh_host_ed25519_key", "console/users.json", "config-manager/resources.json", "site-private.ini"}
-	for _, name := range secrets {
-		if err := os.WriteFile(filepath.Join(target, name), []byte("customer-specific "+name), 0600); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chmod(filepath.Join(target, name), 0600); err != nil {
-			t.Fatal(err)
-		}
 	}
 	stale := filepath.Join(target, "operations/old-fragment.json")
 	if err := os.WriteFile(stale, []byte("[]"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := InstallConfiguration(source, target); err != nil {
+	if err := InstallGenerated(source, target); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range secrets {
-		path := filepath.Join(target, name)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		info, err := os.Stat(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(data) != "customer-specific "+name || info.Mode().Perm() != 0600 {
-			t.Fatalf("upgrade changed site file contents or permissions: %s", name)
+	for _, name := range []string{"ssh", "console", "resources.d", "config-manager"} {
+		if _, err := os.Lstat(filepath.Join(target, name)); !os.IsNotExist(err) {
+			t.Fatalf("generated data includes administrator/legacy namespace %s", name)
 		}
 	}
 	if _, err := os.Lstat(stale); !os.IsNotExist(err) {
@@ -129,7 +111,7 @@ func TestInstallConfigurationPreservesSiteFilesAndRemovesStaleCatalogFragments(t
 	if err := os.Symlink(t.TempDir(), filepath.Join(target, "operations")); err != nil {
 		t.Fatal(err)
 	}
-	if err := InstallConfiguration(source, target); err == nil {
+	if err := InstallGenerated(source, target); err == nil {
 		t.Fatal("symlinked catalog directory accepted")
 	}
 }
@@ -141,7 +123,7 @@ func TestUpgradeStagesCustomResourceWithoutChangingApplicationMetadata(t *testin
 		t.Fatal(err)
 	}
 	registry := configmanager.Registry{Version: "site", Resources: []configmanager.Resource{{ID: "site-options", Description: "Site", Profile: "application", Path: target, Format: configmanager.FormatINI, Access: configmanager.AccessReadOnly, Fields: []configmanager.FieldSchema{{Section: "service", Key: "port", Type: configmanager.FieldInteger, Required: true}}, Permissions: configmanager.Permissions{ReadRoles: []string{"viewer"}}}}}
-	writeJSON(t, filepath.Join(bundle, "etc/safeterm/config-manager/resources.json"), registry, 0644)
+	writeJSON(t, filepath.Join(bundle, "etc/safeterm/resources.json"), registry, 0644)
 	before, err := os.Stat(target)
 	if err != nil {
 		t.Fatal(err)
@@ -183,5 +165,50 @@ func TestUpgradeRejectsIncompatibleProfileBeforePreparation(t *testing.T) {
 	writeJSON(t, filepath.Join(source, "profiles/profiles.json"), cfg.Profiles, 0644)
 	if err := CheckProfileCompatibility(source, defaults); err == nil {
 		t.Fatal("incompatible sandbox boundaries accepted")
+	}
+}
+
+func TestInstallRefreshesResourceTemplateAndPreservesCustomizedDefinitions(t *testing.T) {
+	bundle := buildTestBundle(t)
+	source := filepath.Join(bundle, "etc/safeterm")
+	target := filepath.Join(t.TempDir(), "installed")
+	for _, name := range []string{"README.md", "README.txt"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte("reference"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sourceDir := filepath.Join(source, "resources.d")
+	if err := os.MkdirAll(sourceDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"TEMPLATE.json", "README.md", "README.txt"} {
+		if err := os.WriteFile(filepath.Join(sourceDir, name), []byte("new reference"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := InstallAdministration(source, target); err != nil {
+		t.Fatal(err)
+	}
+	custom := filepath.Join(target, "resources.d", "custom.json")
+	if err := os.WriteFile(custom, []byte("custom definition"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(sourceDir, "custom.json"), []byte("must not replace custom"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "resources.d", "TEMPLATE.json"), []byte("old reference"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := InstallAdministration(source, target); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(custom)
+	info, _ := os.Stat(custom)
+	if string(data) != "custom definition" || info.Mode().Perm() != 0600 {
+		t.Fatal("custom resource or permissions overwritten")
+	}
+	data, _ = os.ReadFile(filepath.Join(target, "resources.d", "TEMPLATE.json"))
+	if string(data) != "new reference" {
+		t.Fatal("template not refreshed")
 	}
 }

@@ -10,82 +10,22 @@ performs registered field updates and preserves UID, GID, permission bits,
 POSIX access ACLs and extended attributes. Users and Config Managers do not get
 sudo, root credentials, a general-purpose editor or unrestricted path access.
 
-## Register the file
+Register files only through [independent JSON resources](resource-definitions.md)
+and `termctl apply`. The former registry workflow is removed (ADR-032).
 
-As the Linux administrator, add a resource to the existing `resources` array in
-`/etc/safeterm/config-manager/resources.json`. Do not overwrite other resources.
-For a file containing `[Server]` and `Port=8080`, a minimal definition is:
+## Register an external file
 
-```json
-{
-  "id": "product-options",
-  "description": "External product options",
-  "profile": "application",
-  "path": "/path/to/option.ini",
-  "format": "ini",
-  "access": "read-write",
-  "privileged_write": true,
-  "fields": [
-    {
-      "section": "Server",
-      "key": "Port",
-      "type": "integer",
-      "required": true,
-      "min": 1,
-      "max": 65535
-    }
-  ],
-  "backup": { "enabled": true, "keep": 5 },
-  "permissions": {
-    "read_roles": ["config-viewer", "config-operator"],
-    "propose_roles": ["config-operator"],
-    "rollback_roles": ["config-operator"]
-  }
-}
-```
+Define the exact file path, format, fields and permissions in a JSON file under
+`/etc/safeterm/resources.d`. No service block is required. Copy the installed
+TEMPLATE.json, remove unused blocks, and see [the complete resource reference](../configs/resources.d/README.md).
+Run `sudo termctl check`, then `sudo termctl apply` from a Linux administrator
+shell. Do not edit a registry or change the application file's ownership.
+The compiler generates the restricted writer's registration and sandbox in the
+same signed activation transaction. No ACL change is needed for writer access;
+unsafe parent directories and unsupported metadata are refused.
 
-Replace the example section/key with actual names in your file. Every editable
-field must be explicitly declared. Unregistered keys, comments and sections stay
-in the file; they are not exposed as editable fields. Mark sensitive registered
-fields with `secret: true`. For hundreds of fields the registry can contain
-hundreds of entries; there is no wildcard write permission.
-
-The registry must remain root-owned and not group/world-writable. Then run:
-
-```bash
-sudo termctl config check
-sudo termctl config apply
-```
-
-`check` verifies registry structure, roles/operations, privileged path boundaries,
-current document/schema and readable metadata. `apply` generates the writer's
-systemd sandbox allowlist and restarts only previously active consumers, including
-Gateway and SSH. Run it from an ordinary Linux administration session; active
-SafeTerm sessions disconnect. It does not edit application values, change their
-ownership, add an ACL or require catalog signing merely for the resource registry.
-If activation fails, the previous verified registry and writer sandbox are restored.
-An interrupted/unrecovered activation is recovered using
-`sudo termctl config rollback`; this command recovers registry activation, not an
-application-value backup. Package installation seeds the verified registry.
-
-## Edit through SafeTerm
-
-Log in with a role authorized by the resource and use:
-
-```text
-config describe product-options
-config show product-options
-config edit product-options Server Port
-new value: 9090
-```
-
-Review the preview and confirm it. A new document version prevents stale proposals
-from overwriting an intervening application edit. `config rollback product-options`
-inside the restricted shell restores the newest retained application backup.
-Application reload/restart is optional and must be configured as a fixed typed
-catalog activation operation; do not put shell commands in resource definitions.
-
-## Security and preservation contract
+The interactive user enters `config RESOURCE`, `edit SECTION`, `set KEY VALUE`,
+`diff`, `end`. See [the terminal guide](restricted-terminal.md).
 
 ```mermaid
 flowchart LR

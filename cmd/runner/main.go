@@ -18,13 +18,14 @@ import (
 	"safeterm/internal/execution"
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
+	"safeterm/internal/layout"
 	"safeterm/internal/policy"
 	"safeterm/internal/translation"
 	"safeterm/internal/validation"
 )
 
 func main() {
-	configDir := flag.String("config", "/etc/safeterm", "catalog directory")
+	configDir := flag.String("config", layout.Generated, "catalog directory")
 	profileName := flag.String("profile", "", "runner profile")
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "allowed local Gateway user")
 	timeout := flag.Duration("timeout", 30*time.Second, "maximum operation runtime")
@@ -54,7 +55,7 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 		return err
 	}
 	if catalogPublicKey == "" {
-		catalogPublicKey = filepath.Join(configDir, "trust", "catalog-ed25519.pub")
+		catalogPublicKey = layout.PublicKey(configDir)
 	}
 	if catalogSignature == "" {
 		catalogSignature = filepath.Join(configDir, "catalog.sig")

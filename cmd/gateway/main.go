@@ -19,15 +19,16 @@ import (
 	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
+	"safeterm/internal/layout"
 )
 
 func main() {
-	configDir := flag.String("config", "/etc/safeterm", "catalog directory")
+	configDir := flag.String("config", layout.Generated, "catalog directory")
 	socketPath := flag.String("socket", "/run/safeterm-gateway/gateway.sock", "Gateway socket")
 	brokerUser := flag.String("broker-user", "safeterm-broker", "allowed local Broker user")
 	consoleUser := flag.String("console-user", "safeterm", "allowed local console Broker user")
 	configManagerUsers := flag.String("config-manager-users", "application=safeterm-config-application,database=safeterm-config-database,network=safeterm-config-network", "comma-separated profile=user Config Manager activation clients")
-	configRegistry := flag.String("config-resource-registry", "/etc/safeterm/config-manager/resources.json", "root-owned Config Manager resource registry")
+	configRegistry := flag.String("config-resource-registry", layout.Registry, "root-owned Config Manager resource registry")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
 	auditUser := flag.String("audit-user", "safeterm-audit", "trusted Audit Service user")
 	catalogPublicKey := flag.String("catalog-public-key", "", "trusted catalog Ed25519 public key (defaults under config directory)")
@@ -45,7 +46,7 @@ func run(configDir, socketPath, brokerUser, consoleUser, configManagerUsers, con
 		return err
 	}
 	if catalogPublicKey == "" {
-		catalogPublicKey = filepath.Join(configDir, "trust", "catalog-ed25519.pub")
+		catalogPublicKey = layout.PublicKey(configDir)
 	}
 	if catalogSignature == "" {
 		catalogSignature = filepath.Join(configDir, "catalog.sig")

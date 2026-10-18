@@ -17,7 +17,7 @@ func FuzzRequestValidationNeverPanicsOrAcceptsMetacharacters(f *testing.F) {
 	for _, seed := range []string{"127.0.0.1", ";id", "$(id)", "a\nb", "<x>", strings.Repeat("x", 4096)} {
 		f.Add(seed)
 	}
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		f.Fatal(err)
 	}

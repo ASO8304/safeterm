@@ -36,7 +36,7 @@
   ansible.builtin.set_fact:
     safeterm_release_id: "{{ safeterm_controller_package.stat.checksum }}"
     safeterm_deployment_fingerprint: >-
-      {{ safeterm_controller_package.stat.checksum }}:{{ safeterm_signing_mode }}:{{ (safeterm_controller_catalog.stat.checksum if safeterm_signing_mode == 'offline' else 'local') }}:{{ safeterm_single_operator | bool }}
+      {{ safeterm_controller_package.stat.checksum }}:{{ safeterm_signing_mode }}:{{ (safeterm_controller_catalog.stat.checksum if safeterm_signing_mode == 'offline' else 'local') }}
     safeterm_stage_dir: "{{ safeterm_remote_stage_root }}/{{ safeterm_controller_package.stat.checksum }}"
 
 - name: Create protected staging directory
@@ -190,8 +190,7 @@
          + (['--local-signing', '--local-key-dir', safeterm_local_key_dir] if safeterm_signing_mode == 'local' else ['--signed-catalog', safeterm_stage_dir + '/' + safeterm_signed_catalog_root_name])
          + ['--ssh-user', safeterm_bootstrap_ssh_user]
          + (['--ssh-password-hash-file', safeterm_stage_dir + '/bootstrap.hash'] if safeterm_bootstrap_password_available | bool else [])
-         + (['--ssh-public-key', safeterm_stage_dir + '/bootstrap.pub'] if safeterm_bootstrap_key_available | bool else [])
-         + (['--single-operator'] if safeterm_single_operator | bool else []) }}
+         + (['--ssh-public-key', safeterm_stage_dir + '/bootstrap.pub'] if safeterm_bootstrap_key_available | bool else []) }}
 
 - name: Dry-run the verified package installer before mutation
   ansible.builtin.command:

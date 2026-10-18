@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"safeterm/internal/config"
-	"safeterm/internal/configmanager"
 	"safeterm/internal/contract"
 	"safeterm/internal/isolation"
 )
@@ -26,6 +25,7 @@ type GatewayClient interface {
 }
 
 type Shell struct {
+	editing       *configEditSession
 	consoleLogin  func(context.Context, string, []byte) (Principal, time.Time, error)
 	consoleLogout func(context.Context, Principal) error
 	client        GatewayClient
@@ -70,6 +70,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
+	defer func() { s.editing = nil }()
 	defer func() {
 		if errors.Is(context.Cause(ctx), errShellEscape) {
 			fmt.Fprint(s.output, "\r\nsession closed (Ctrl+])\r\n")
@@ -119,7 +120,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			return fmt.Errorf("broker: Console login denied")
 		}
 	}
-	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: 'list' shows your operations; 'describe NAME' explains one; 'help' shows examples. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
+	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: '?' lists commands; 'execute ?' lists operations; 'config ?' lists files. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
 	for {
 		line, err := s.readLine(ctx, input, s.prompt(), false, true)
 		if err != nil {
@@ -173,6 +174,9 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	if line == "" {
 		return false, nil
 	}
+	if s.editing != nil {
+		return s.configEditor(ctx, line, input)
+	}
 	fields := strings.Fields(line)
 	if fields[len(fields)-1] == "?" {
 		return false, s.questionHelp(ctx, fields[:len(fields)-1])
@@ -187,45 +191,26 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 			topic = fields[1]
 		}
 		return false, s.writeHelp(topic)
-	case "list":
-		if len(fields) != 1 {
-			return false, fmt.Errorf("usage: list")
-		}
-		operations := s.catalog.AuthorizedOperations(s.principal.Roles)
-		if len(operations) == 0 {
-			fmt.Fprint(s.output, "No authorized operations.\r\n")
-		}
-		for _, operation := range operations {
-			mode := "bounded"
-			if operation.LongRunning {
-				mode = "stream"
-			}
-			fmt.Fprintf(s.output, "%-24s [%s] %s\r\n", operation.Name, mode, operation.Description)
-		}
-	case "describe":
-		if len(fields) != 2 {
-			return false, fmt.Errorf("usage: describe NAME")
-		}
-		operation, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
-		if !ok {
-			return false, fmt.Errorf("operation %q is unknown or unauthorized", fields[1])
-		}
-		s.describe(operation)
 	case "execute":
-		if len(fields) < 2 {
-			return false, fmt.Errorf("usage: execute NAME [KEY=VALUE ...]")
-		}
-		operation, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
+		operation, args, ok := s.resolveOperation(fields[1:])
 		if !ok {
-			return false, fmt.Errorf("operation %q is unknown or unauthorized", fields[1])
+			return false, s.operationTreeHelp(fields[1:])
 		}
-		arguments, err := parseOperationArguments(operation, fields[2:])
+		arguments, err := parseOperationArguments(operation, args)
 		if err != nil {
 			return false, err
 		}
 		return false, s.runOperation(ctx, operation, arguments, input)
+	case "show":
+		return false, s.operationTreeHelp(fields[1:])
 	case "config":
-		return false, s.runConfig(ctx, fields[1:], input)
+		if len(fields) == 1 {
+			return false, s.listConfig(ctx)
+		}
+		if len(fields) != 2 {
+			return false, fmt.Errorf("usage: config RESOURCE")
+		}
+		return false, s.enterConfig(ctx, fields[1])
 	case "whoami":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: whoami")
@@ -255,66 +240,25 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	}
 	if len(fields) == 0 {
 		for _, item := range [][2]string{
-			{"execute", "Execute an authorized operation; use execute ? to list operations"},
-			{"list", "List authorized operations"},
-			{"describe", "Show an operation's parameters and an example"},
-			{"config", "Inspect and edit registered configuration; use config ?"},
+			{"execute", "Execute an authorized command; use execute ?"},
+			{"config", "Select a configuration file; use config ?"},
+			{"show", "Show available operations; show COMMAND gives details"},
 			{"whoami", "Show your identity and roles"},
-			{"clear", "Clear the terminal screen"},
-			{"help", "Show usage and keyboard shortcuts"},
-			{"exit", "Close this SafeTerm session"},
+			{"clear", "Clear the screen"},
+			{"exit", "Close this session"},
 		} {
 			row(item[0], item[1])
 		}
 		return nil
 	}
 	switch fields[0] {
-	case "execute", "describe":
-		if len(fields) == 1 {
-			operations := s.catalog.AuthorizedOperations(s.principal.Roles)
-			if len(operations) == 0 {
-				fmt.Fprint(s.output, "No authorized operations.\r\n")
-			}
-			for _, op := range operations {
-				row(op.Name, op.Description)
-			}
-			return nil
-		}
-		op, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
-		if !ok {
-			return fmt.Errorf("operation %q is unknown or unauthorized", fields[1])
-		}
-		s.describe(op)
-		return nil
+	case "execute":
+		return s.operationTreeHelp(fields[1:])
+	case "show":
+		return s.operationTreeHelp(fields[1:])
 	case "config":
 		if len(fields) == 1 {
-			for _, item := range [][2]string{
-				{"list", "List configuration resources you may access"},
-				{"describe RESOURCE", "Show registered fields and types"},
-				{"show RESOURCE", "Read values with secrets redacted"},
-				{"edit RESOURCE SECTION KEY", "Validate, preview and confirm a field change"},
-				{"apply TOKEN", "Apply your own unexpired proposal"},
-				{"rollback RESOURCE", "Restore the latest configuration backup"},
-			} {
-				row(item[0], item[1])
-			}
-			return nil
-		}
-		if fields[1] == "show" || fields[1] == "describe" || fields[1] == "edit" || fields[1] == "rollback" {
-			if s.configs == nil {
-				return fmt.Errorf("configuration management is unavailable")
-			}
-			if len(fields) == 2 {
-				resources, err := s.configs.List(ctx, s.principal)
-				if err != nil {
-					return err
-				}
-				for _, resource := range resources {
-					row(resource.ID, resource.Description)
-				}
-				return nil
-			}
-			return s.runConfig(ctx, []string{"describe", fields[2]}, nil)
+			return s.listConfig(ctx)
 		}
 	case "help":
 		return s.writeHelp("")
@@ -322,156 +266,16 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	return fmt.Errorf("no contextual help here; use ?, execute ?, or config ?")
 }
 
-func (s *Shell) runConfig(ctx context.Context, fields []string, input <-chan byte) error {
+func (s *Shell) listConfig(ctx context.Context) error {
 	if s.configs == nil {
 		return fmt.Errorf("configuration management is unavailable")
 	}
-	if len(fields) == 0 {
-		return fmt.Errorf("usage: config list|show|describe|edit|apply|rollback")
+	items, err := s.configs.List(ctx, s.principal)
+	if err != nil {
+		return err
 	}
-	switch fields[0] {
-	case "list":
-		if len(fields) != 1 {
-			return fmt.Errorf("usage: config list")
-		}
-		items, err := s.configs.List(ctx, s.principal)
-		if err != nil {
-			return err
-		}
-		if len(items) == 0 {
-			fmt.Fprint(s.output, "No authorized configuration resources.\r\n")
-		}
-		for _, item := range items {
-			fmt.Fprintf(s.output, "%-24s [%s/%s] %s\r\n", item.ID, item.Format, item.Access, item.Description)
-		}
-	case "describe":
-		if len(fields) != 2 {
-			return fmt.Errorf("usage: config describe ID")
-		}
-		description, err := s.configs.Describe(ctx, s.principal, fields[1])
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(s.output, "%s: %s\r\nprofile: %s format: %s access: %s\r\n", description.Resource.ID, description.Resource.Description, description.Resource.Profile, description.Resource.Format, description.Resource.Access)
-		for _, field := range description.Fields {
-			coordinate := field.Key
-			if field.Section != "" {
-				coordinate = field.Section + "." + field.Key
-			}
-			flags := []string{string(field.Type)}
-			if field.Required {
-				flags = append(flags, "required")
-			}
-			if field.Secret {
-				flags = append(flags, "secret")
-			}
-			if field.ReadOnly {
-				flags = append(flags, "read-only")
-			}
-			fmt.Fprintf(s.output, "- %-32s %s\r\n", coordinate, strings.Join(flags, ", "))
-		}
-	case "show":
-		if len(fields) != 2 {
-			return fmt.Errorf("usage: config show ID")
-		}
-		result, err := s.configs.Read(ctx, s.principal, fields[1])
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(s.output, "resource: %s\r\nversion: %s\r\n", result.ResourceID, result.Version)
-		for _, field := range result.Fields {
-			coordinate := field.Key
-			if field.Section != "" {
-				coordinate = field.Section + "." + field.Key
-			}
-			fmt.Fprintf(s.output, "%-32s = %s\r\n", coordinate, field.Value)
-		}
-	case "edit":
-		if len(fields) != 4 {
-			return fmt.Errorf("usage: config edit ID SECTION KEY (use - for the root section)")
-		}
-		section := fields[2]
-		if section == "-" {
-			section = ""
-		}
-		read, err := s.configs.Read(ctx, s.principal, fields[1])
-		if err != nil {
-			return err
-		}
-		description, err := s.configs.Describe(ctx, s.principal, fields[1])
-		if err != nil {
-			return err
-		}
-		var schema *configmanager.FieldDescription
-		for i := range description.Fields {
-			if description.Fields[i].Section == section && description.Fields[i].Key == fields[3] {
-				schema = &description.Fields[i]
-				break
-			}
-		}
-		if schema == nil {
-			return fmt.Errorf("field is unknown or unauthorized")
-		}
-		if schema.ReadOnly {
-			return fmt.Errorf("field is read-only")
-		}
-		value, err := s.readConfigValue(ctx, input, "new value: ", schema.Secret)
-		if err != nil {
-			return err
-		}
-		patch := configmanager.Patch{ResourceID: fields[1], Section: section, Key: fields[3], Value: value, BaseVersion: read.Version}
-		validation, err := s.configs.ValidatePatch(ctx, s.principal, patch)
-		if err != nil {
-			return err
-		}
-		if !validation.Valid {
-			return fmt.Errorf("validation failed: %s", validation.Message)
-		}
-		preview, err := s.configs.Preview(ctx, s.principal, patch)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(s.output, "preview:\r\n%s\r\nproposal: %s\r\nexpires: %s\r\n", strings.ReplaceAll(preview.Diff, "\n", "\r\n"), preview.Token, preview.ExpiresAt.Format(time.RFC3339))
-		answer, err := s.readConfigValue(ctx, input, "apply this change? [y/N]: ", false)
-		if err != nil {
-			return err
-		}
-		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-			fmt.Fprint(s.output, "proposal not applied\r\n")
-			return nil
-		}
-		result, err := s.configs.Apply(ctx, s.principal, preview.Token)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(s.output, "applied: %s -> %s\r\n", result.PreviousVersion, result.Version)
-	case "apply":
-		if len(fields) != 2 {
-			return fmt.Errorf("usage: config apply TOKEN")
-		}
-		result, err := s.configs.Apply(ctx, s.principal, fields[1])
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(s.output, "applied %s: %s -> %s\r\n", result.ResourceID, result.PreviousVersion, result.Version)
-	case "rollback":
-		if len(fields) != 2 {
-			return fmt.Errorf("usage: config rollback ID")
-		}
-		answer, err := s.readConfigValue(ctx, input, "restore newest backup? [y/N]: ", false)
-		if err != nil {
-			return err
-		}
-		if strings.ToLower(strings.TrimSpace(answer)) != "y" {
-			return nil
-		}
-		result, err := s.configs.Rollback(ctx, s.principal, fields[1])
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(s.output, "rolled back %s: %s -> %s\r\n", result.ResourceID, result.PreviousVersion, result.Version)
-	default:
-		return fmt.Errorf("unknown config command %q", fields[0])
+	for _, item := range items {
+		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", item.ID, item.Description)))
 	}
 	return nil
 }
@@ -575,25 +379,25 @@ func parseOperationArguments(operation config.OperationDefinition, fields []stri
 func (s *Shell) writeHelp(topic string) error {
 	switch topic {
 	case "":
-		fmt.Fprint(s.output, "Getting started\r\n  1. list                         see what you may execute\r\n  2. describe NAME                see parameters and an example\r\n  3. execute NAME [VALUE ...]     execute with simple positional values\r\n     execute NAME [KEY=VALUE ...] execute with explicit named values\r\n\r\nConfiguration\r\n  config list                    list resources you may access\r\n  config describe ID             show editable fields and types\r\n  config show ID                 read current non-secret values\r\n  config edit ID SECTION KEY     validate, preview, and propose/apply a value\r\n  config apply TOKEN             apply an approved proposal\r\n  config rollback ID             restore the newest retained backup\r\n\r\nSession\r\n  whoami                         show your identity and roles\r\n  clear                          clear the screen\r\n  exit                           close this session\r\n\r\nTry: 'help execute', 'help config', 'help keys', or 'help OPERATION'.\r\n")
-	case "execute":
-		fmt.Fprint(s.output, "Execute operations\r\n  list\r\n  describe ping\r\n  execute ping host=192.168.45.140       (default -c 100)\r\n  execute ping host=192.168.45.140 -c 5  (override the count)\r\n  execute trace_host host=192.168.45.140\r\n  execute trace_port port=999\r\n  execute trace_filtered host=192.168.45.140 port=999 protocol=tcp\r\n  execute nslookup host=example.com\r\n  execute traceroute host=192.168.45.140\r\n  execute memory_info\r\n  execute disk_usage\r\n  execute log service_A\r\n  execute status_safeterm_gateway\r\n  execute restart_safeterm_gateway\r\n\r\nLong-running operations stream output. Press Ctrl+C once to request a safe terminate.\r\nArguments are values, never shell text; pipes, redirects, and command substitution are unavailable.\r\n")
+		fmt.Fprint(s.output, "Commands\r\n  execute ?       List authorized operations\r\n  show COMMAND    Show parameters and examples\r\n  config ?        List registered configuration files\r\n  config RESOURCE Enter the configuration editor\r\n  whoami          Show identity and roles\r\n  exit            Close session\r\n\r\nTab completes; ? then Enter explains the current choices. Ctrl+C stops an operation; Ctrl+] closes the session.\r\n")
 	case "config":
-		fmt.Fprint(s.output, "Configuration workflow\r\n  config list\r\n  config describe cats-options\r\n  config show cats-options\r\n  config edit cats-options cats Cat_Port\r\n\r\nThe editor validates the new value and shows a preview before applying it. Tab completes resource, section, and field names.\r\n")
+		fmt.Fprint(s.output, "config RESOURCE -> edit SECTION -> set KEY VALUE -> diff -> end\r\nUse next to select another section, cancel to discard. Only end saves.\r\nFor secrets: set KEY prompts privately. Use - for the root section.\r\n")
+	case "execute":
+		return s.operationTreeHelp(nil)
 	case "keys":
-		fmt.Fprint(s.output, "Editing keys\r\n  Tab             complete commands, operations, parameters, and allowed values\r\n  ? then Enter    show contextual commands and descriptions\r\n  Up / Down       browse command history\r\n  Left / Right    move the cursor\r\n  Home / End      jump to the beginning or end\r\n  Backspace/Del   delete around the cursor\r\n  Ctrl+C          cancel input or terminate the active stream\r\n  Ctrl+]          close the entire session, including during an operation\r\n")
+		fmt.Fprint(s.output, "Tab: complete; ? then Enter: contextual help; arrows: cursor/history; Ctrl+C: cancel input or stop stream; Ctrl+]: close session.\r\n")
 	default:
-		operation, ok := s.catalog.AuthorizedOperation(topic, s.principal.Roles)
-		if !ok {
-			return fmt.Errorf("help topic or authorized operation %q was not found", topic)
+		if op, _, ok := s.resolveOperation(strings.Fields(topic)); ok {
+			s.describe(op)
+			return nil
 		}
-		s.describe(operation)
+		return fmt.Errorf("unknown help topic")
 	}
 	return nil
 }
 
 func operationExample(operation config.OperationDefinition) string {
-	parts := []string{"execute", operation.Name}
+	parts := append([]string{"execute"}, operationWords(operation.Name)...)
 	for _, parameter := range operation.Parameters {
 		value := "VALUE"
 		if len(parameter.ValueMap) != 0 {
@@ -679,7 +483,21 @@ func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 	return s.client.Terminate(ctx, terminate(sessionID, contract.SessionOwner{BrokerType: s.principal.BrokerType, UserID: s.principal.UserID, ConsoleSession: s.principal.ConsoleSession}))
 }
 
-func (s *Shell) prompt() string { return fmt.Sprintf("safeterm::%s> ", s.principal.UserID) }
+func (s *Shell) prompt() string {
+	context := ""
+	if e := s.editing; e != nil {
+		context = "(" + e.resource
+		if e.inSection {
+			section := e.section
+			if section == "" {
+				section = "-"
+			}
+			context += "/" + section
+		}
+		context += ")"
+	}
+	return fmt.Sprintf("safeterm::%s%s> ", s.principal.UserID, context)
+}
 
 func (s *Shell) writeResponse(response *contract.ExecutionResponse) {
 	if response == nil {

@@ -210,3 +210,26 @@ M15 evidence: [verification and hosted deployment/SSH end-to-end outputs](../../
 | TestConfigurationApplyPreservesInactiveServicesAndPublishesCheckpoint | Registry activation and inactive-service retention |
 | TestConfigurationApplyRestoresRegistryAndSandboxAfterFailure | Failure restores prior registry and writer grants |
 | TestConfigurationRecoveryFailureRetainsJournal | Durable operator recovery after failed recovery |
+
+## Independent JSON resources (ADR-032 / REQ-028)
+
+- internal/resources: config-only/log-only/service-only and combined compilation,
+  explicit activation, per-action roles, verified built-in isolation, removal, strict JSON,
+  path/type/reference/collision checks and fuzz seeds.
+- cmd/termctl: never open TEMPLATE.json/inactive files, unsigned export/offline
+  exact matching, check/no-op apply, coupled catalog/registry/sandbox/manifest
+  recovery and journal retention; root-owned input/link/FIFO boundaries in CI.
+- internal/broker: generated friendly commands resolve to signed IDs; operation
+  and log roles remain isolated and streams remain cancellable.
+- internal/deployment: reference refresh and custom source/permission preservation.
+- Existing verify/e2e/security/race and privileged writer integration remain required.
+
+## Single source architecture
+
+- layout: fixed runtime paths, old-layout refusal without mutation.
+- termctl: retired mutation commands rejected; active-only catalog aliases and
+  malformed active registry are never imported by resource compilation.
+- recovery: incomplete resource checkpoints cannot fall back to live data.
+- deployment: administrator definitions/credentials separated from generated data;
+  shipped references refreshed while custom JSON is preserved.
+- audit: its unit owns only safeterm/audit, never the generated-data namespace.

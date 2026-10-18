@@ -15,7 +15,7 @@ import (
 
 func main() {
 	socketPath := flag.String("socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")
-	storePath := flag.String("store", "/var/lib/safeterm/audit.jsonl", "append-only audit store")
+	storePath := flag.String("store", "/var/lib/safeterm/audit/audit.jsonl", "append-only audit store")
 	gatewayUser := flag.String("gateway-user", "safeterm-gateway", "Gateway event producer user")
 	diagnosticsUser := flag.String("diagnostics-user", "safeterm-diagnostics", "diagnostics Runner user")
 	networkUser := flag.String("network-user", "safeterm-network", "network-observer Runner user")

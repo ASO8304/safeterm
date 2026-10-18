@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"safeterm/internal/layout"
 	"sort"
 	"strconv"
 	"strings"
@@ -19,6 +20,9 @@ var identifierPattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]{0,127}$`)
 var fieldIdentifierPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_.-]{0,127}$`)
 
 func LoadRegistry(path string) (*Registry, error) {
+	if filepath.Clean(path) == layout.Admin+"/resources.json" || filepath.Clean(path) == layout.Admin+"/config-manager/resources.json" {
+		return nil, fmt.Errorf("configmanager: legacy registry path is unsupported")
+	}
 	data, info, err := readManagedFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("configmanager: securely read registry: %w", err)
@@ -67,16 +71,14 @@ func ParseRegistry(data []byte) (*Registry, error) {
 }
 
 func ValidateRegistry(registry *Registry) error {
-	if registry == nil || strings.TrimSpace(registry.Version) == "" || len(registry.Resources) == 0 {
-		return fmt.Errorf("configmanager: registry version and resources are required")
+	if registry == nil || strings.TrimSpace(registry.Version) == "" {
+		return fmt.Errorf("configmanager: registry version is required")
 	}
 	ids := map[string]bool{}
 	paths := map[string]bool{}
 	for index := range registry.Resources {
 		resource := &registry.Resources[index]
-		// Legacy approval settings remain readable across upgrades. A writer
-		// now applies its own proposal; there is no independent approver role.
-		resource.RequireSeparateApproval = false
+		// Edit permission also controls applying the creator-bound proposal.
 		if resource.Access == AccessReadWrite {
 			resource.Permissions.ApplyRoles = append([]string(nil), resource.Permissions.ProposeRoles...)
 		}

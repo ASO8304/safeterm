@@ -1,6 +1,0 @@
-[
-  {
-    "role": "example-viewer",                 // must exist in roles
-    "operations": ["example_status"]          // every operation must exist
-  }
-]

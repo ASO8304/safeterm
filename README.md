@@ -11,6 +11,11 @@ A configurable platform for secure system command execution.
 
 Available capabilities:
 
+- Independent JSON definitions under `resources.d`: config-only, log-only,
+  service-only or combined, with `termctl check/apply`, an always-ignored template
+  and recoverable joint activation. See [resource definitions](docs/resource-definitions.md)
+  (requires a package containing ADR-031).
+
 - External INI configuration updates through a separate restricted root writer,
   retaining file ownership, ACLs and comments; see [external configuration files](docs/external-configuration-files.md).
 
@@ -40,9 +45,10 @@ Available capabilities:
   semantic resource/field APIs, preserving INI and deterministic JSON adapters,
   typed validation, redacted secrets, expiring proposals, optimistic concurrency,
   atomic writes, bounded backups, rollback, and optional typed activation checks
-- An interactive `config` workflow in the SSH restricted terminal for listing,
-  describing, reading, validating, previewing, applying, and rolling
-  back registered fields without exposing a file editor or operating-system shell
+- A shared contextual SSH/Console editor: `config RESOURCE`, `edit SECTION`,
+  `set KEY VALUE`, `diff`, `end`; atomic multi-field saves and contextual help
+  without exposing a file editor or operating-system shell. See the
+  [terminal guide](docs/restricted-terminal.md) (requires a build containing ADR-030).
 - A repository threat model and dedicated adversarial suite covering injection,
   IPC confusion, privilege boundaries, hardlinks, catalog integrity, resource
   exhaustion, fuzz seeds, race detection, and secret-safe audit behavior
@@ -64,7 +70,7 @@ Available capabilities:
   module download, or Internet access on the target and preserves installed state on upgrade
 - A checksum-protected pre-install transaction and offline rollback command that
   restores SafeTerm files, data, accounts, signing keys, and systemd state
-- Commented catalog-authoring templates, allowlisted `tail -F` log aliases,
+- Inactive JSON resource templates, allowlisted `tail -F` log aliases,
   role-separated typed systemd controls, and task-oriented terminal help
 
 Policy does not authenticate users; it continues to authorize the roles carried
@@ -280,266 +286,71 @@ SafeTerm Verification: PASS
 
 ## Install from a downloaded GitHub Release
 
-Use this procedure if you already downloaded a Release package. You do not need
-to clone this repository or compile SafeTerm. Download links:
+This source includes a breaking configuration layout change (ADR-032). Use a
+Release that explicitly contains it. Old-layout installations are refused before
+deployment; preserve a backup and provision a clean installation with new JSON
+resource definitions. Do not copy the old configuration tree over the new one.
 
-- [All Releases](https://github.com/ASO8304/safeterm/releases)
-- [Download AMD64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-amd64.tar.gz)
-- [Download AMD64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-amd64.tar.gz.sha256)
-- [Download ARM64 package](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz)
-- [Download ARM64 checksum](https://github.com/ASO8304/safeterm/releases/latest/download/safeterm-offline-arm64.tar.gz.sha256)
+Download the AMD64 or ARM64 offline archive and its checksum from
+[GitHub Releases](https://github.com/ASO8304/safeterm/releases), verify the published
+checksum, extract, then run the included script:
 
-### 1. Choose the package for your server
-
-Use Ubuntu 24.04 with systemd running as PID 1 and an administrator account with
-`sudo`. Download **amd64** for `x86_64`, or **arm64** for `aarch64`/`arm64`. No Git,
-Go or Python is required on the target. Examples below use amd64.
-
-The guided installer detects missing OS tools and installs them from the configured
-APT repositories on Ubuntu/Debian. On an air-gapped server, provide prerequisites
-through your internal APT mirror or installation media first. The offline SafeTerm
-package bundles SafeTerm binaries, not Ubuntu packages. A container without systemd
-as PID 1 is not a supported target.
-
-### 2. Verify and extract the downloaded archive
-
-Run these commands in the directory containing the downloaded archive and checksum.
-The new staging directory avoids mixing a new Release with an old extracted copy:
-
-```bash
+```sh
 sha256sum -c safeterm-offline-amd64.tar.gz.sha256
-release_dir=$(mktemp -d "$HOME/safeterm-release.XXXXXX")
-tar -xzf safeterm-offline-amd64.tar.gz -C "$release_dir"
-cd "$release_dir/safeterm-offline-amd64"
-ls install.sh PACKAGE-SHA256SUMS TARGET_ARCH payload/bin/safeterm-termctl
-```
-
-Stop if checksum verification fails. Keep this shell in the extracted package
-root for the following steps. If SafeTerm is **already installed**, skip fresh
-password enrollment and use **Updating an existing installation** below.
-
-### 3. Install with one command
-
-This guided path requires a package containing ADR-028. Release v0.20.14 and older
-retain their original explicit-flag installation procedure.
-
-After extracting the archive, open a terminal in the extracted package directory
-and run:
-
-```bash
+tar -xzf safeterm-offline-amd64.tar.gz
+cd safeterm-offline-amd64
 sudo ./install.sh
 ```
 
-On a fresh server the installer asks:
+Use the corresponding arm64 filename on ARM. The guided installer checks OS
+dependencies, asks for the initial SafeTerm username/password and selects local
+catalog signing. Only the protected key under /root/.config/safeterm can sign.
+The initial username is created in both internal SSH and Console identity maps;
+it is not a Linux user. Passwords are stored as hashes. Offline signing is
+available through --prepare-catalog DIR and --signed-catalog DIR.
 
-```text
-SafeTerm username [admin]:
-Password:
-Confirm password:
-```
-
-Press Enter to use `admin`, or choose another SafeTerm identity. The password is
-hidden and must contain 8-72 printable ASCII characters, uppercase, lowercase and
-a number. The installer hashes it directly; no manual hash file is needed and no
-plaintext password is passed on a command line or saved in configuration.
-
-The guided path uses local catalog signing. It installs missing prerequisites,
-validates the prepared deployment, installs the services and `termctl`, and starts
-SafeTerm. A successful installation ends with `SafeTerm package installation: PASS`
-and login instructions. Package integrity, catalog verification and deployment
-preflight run automatically; a separate preview command is optional.
-
-The chosen identity is enrolled in both the SSH and Console user lists using the
-password you entered. These are independent credentials afterward; changing one
-does not change the other. No Linux account is created for this identity.
-On an existing installation the same command updates the runtime while preserving
-its verified catalog, users, passwords and managed values; it does not ask for a
-new bootstrap password.
-
-For a preview use `sudo ./install.sh --dry-run`. It does not install OS packages,
-modify live configuration or start services; missing prerequisites must be
-provisioned before preview can succeed. Fresh preview enrollment remains temporary.
-
-Organizations requiring a signing key off the target should use the explicit
-[production offline signing procedure](#production-offline-signing).
-
-### 4. Verify services and test SSH
-
-Run from the ordinary administrator shell:
-
-```bash
-command -v termctl
-sudo /usr/local/bin/safeterm-preflight --installed
+```sh
 sudo termctl service status all
-```
-
-`termctl` is installed at `/usr/local/bin/termctl`. From another machine, replace
-`SERVER_IP` with the target address:
-
-```bash
 ssh -tt -p 2222 admin@SERVER_IP
-```
-
-Check the displayed host-key fingerprint through a trusted channel before
-accepting a new host. Enter the SSH password chosen during installation. If a host firewall or
-network ACL is active, allow TCP port 2222 only from the intended client networks.
-
-Inside the restricted SafeTerm terminal, try:
-
-```text
-whoami
-execute ?
-execute system_info
-execute memory_info
-execute ping host=127.0.0.1 count=5
-config list
-exit
-```
-
-Tab completes authorized inputs; a standalone `?` followed by Enter shows help.
-Ctrl+C stops an active stream; Ctrl+] exits the whole SafeTerm session.
-
-### 5. Test Console login and add users
-
-After guided installation, open the shared restricted entry account:
-
-```bash
 sudo -iu safeterm
 ```
 
-Enter the SafeTerm username and password chosen during installation. With the
-default name, the resulting prompt is `safeterm::admin>`.
+The Console entry prompts for your internal username and password. Add independent
+users with `sudo termctl user add console --id alice --roles viewer,netops` or
+`sudo termctl user add ssh --id alice --roles viewer,netops`. SSH map changes
+need `sudo termctl service restart ssh`. Do not grant service account shells or sudo.
 
-Console and SSH have independent user lists and passwords after initial enrollment.
-Additional Console users can be enrolled separately:
+## Configure and update
 
-```bash
-sudo termctl user add console --id alice --roles viewer,netops,config-viewer
+```sh
+sudo cp /etc/safeterm/resources.d/TEMPLATE.json /etc/safeterm/resources.d/myapp.json
+sudo nano /etc/safeterm/resources.d/myapp.json
+sudo termctl check
+sudo termctl apply
+sudo termctl update /path/to/new/extracted/package
 ```
 
-This asks for Alice's internal password; it does not create a Linux account named
-`alice`. The Linux entry account `safeterm` is initially password-locked;
-`sudo -iu safeterm` works for an authorized administrator. Direct physical Linux
-login additionally requires a separate entry-account password set with
-`sudo passwd safeterm`; the internal SafeTerm login remains mandatory.
+Define service/config/log blocks independently. The [resource reference](configs/resources.d/README.md)
+explains roles, fields, file permissions, signing and examples. Source JSON,
+credentials and trust stay under /etc/safeterm. Generated runtime data lives under
+/var/lib/safeterm/generated and must never be edited. Package built-ins are under
+/usr/share/safeterm/defaults. Updates preserve new-format custom sources and
+identities and rebuild generated data; they require a matching signing method.
+Offline operators must supply exact matching signatures; an unsigned changed
+candidate fails rather than importing prior generated state.
 
-Explicit unattended/key-only installs keep the disabled `local-admin` Console
-placeholder unless an existing Console user database is present. Enroll Console
-identities with `termctl user add console` in that mode.
+`sudo termctl apply --rollback` restores a completed definition activation;
+`sudo termctl apply --recover` recovers an interrupted one. Neither changes source
+JSON or application values. `sudo termctl rollback` is separate package rollback,
+using the automatically retained installation snapshot. `sudo termctl uninstall`
+removes runtime software and retains configuration/data/snapshots. Package
+rollback also restores account databases, so avoid unrelated account changes
+before using it. Keep ordinary administrator access for recovery.
 
-To discover roles or change the internal password:
-
-```bash
-termctl role list
-termctl role describe netops
-sudo termctl user password console --id alice
-```
-
-### Unattended installation and existing automation
-
-The guided path requires a terminal. For Ansible or fleet provisioning, retain
-explicit signing and bootstrap options and use `--non-interactive`. Create a
-protected bcrypt hash through your provisioning/secrets process; the bundled
-helper can also create it interactively:
-
-```bash
-sudo ./payload/bin/safeterm-password-hash -output /root/admin-bootstrap.hash
-sudo ./install.sh --non-interactive --local-signing --ssh-user admin \
-  --ssh-password-hash-file /root/admin-bootstrap.hash
-```
-
-Add `--install-dependencies` to explicitly allow APT when provisioning without a
-terminal; otherwise missing prerequisites produce an error instead of an implicit
-package installation. Key-only bootstrap remains supported with
-`--ssh-public-key FILE`. Public keys are optional in the password-based guided path.
-Never put plaintext passwords into command arguments. Existing installation flags,
-`--signed-catalog`, `--catalog-source`, `--no-start` and `--dry-run` remain supported.
-
-### Updating an existing installation
-
-Verify and extract the **new** archive using step 2, then run these commands from
-its package root. For an installation using the default local signing key:
-
-```bash
-sudo termctl update "$PWD" --dry-run
-sudo termctl update "$PWD"
-sudo /usr/local/bin/safeterm-preflight --installed
-sudo termctl service status all
-```
-
-`$PWD` must contain `install.sh`, `PACKAGE-SHA256SUMS`, `TARGET_ARCH` and `payload/`;
-do not pass the archive, `payload/`, or the parent download directory. The update
-preserves the installed signed catalog (including customized operations and log
-aliases), identities, the SSH host key, the Config Manager registry and existing
-managed files with their ownership and permissions. Release catalog defaults are
-kept separately at `/usr/share/safeterm/defaults`. It restarts services and interrupts active sessions; use an
-ordinary administrator session for the update.
-
-An unchanged offline-signed catalog is also retained without a signing key. Only
-when intentionally replacing the catalog with another reviewed signed version, use:
-
-```bash
-sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog --dry-run
-sudo termctl update "$PWD" --signed-catalog /path/to/signed-catalog
-```
-
-To reuse customized operations and log aliases on other servers, see
-[configuration preservation and portability](docs/configuration-portability.md).
-Export with `sudo termctl catalog export --output /root/my-catalog`; on a compatible
-locally signed target, use `sudo termctl catalog apply --source /root/my-catalog
---refresh-hashes --dry-run`, then repeat without `--dry-run`. This transfers
-catalog definitions without cloning users or keys. This behavior requires a new
-package containing ADR-027; older release installers are unchanged.
-
-For an older Console OS-user mapping (for example, `user_id: safeterm`), set its
-internal password once after upgrading; do not add the same ID again:
-
-```bash
-sudo termctl user password console --id safeterm
-sudo -iu safeterm
-```
-
-Log in at the SafeTerm prompt using username `safeterm` and that internal password.
-The old Linux account password does not replace internal authentication.
-
-### Rollback and uninstall
-
-From the ordinary administrator shell:
-
-```bash
-sudo termctl rollback
-sudo termctl uninstall
-```
-
-These are separate actions: rollback restores the latest retained pre-install
-snapshot; uninstall removes runtime binaries/units while retaining configuration,
-accounts and audit data. Rollback also discards changes since the snapshot and
-restores captured account databases, so use it before unrelated host account
-changes. No transaction ID needs to be saved. See the full installation and
-termctl guides for recovery after a partially failed installation.
-
-For detailed offline signing, recovery and troubleshooting, see the
-[full Release installation guide](docs/offline-installation.md). See also
-[Console authentication and migration](docs/console-authentication.md) and
-[termctl administration](docs/termctl.md). Manual Actions runs provide downloadable
-artifacts; tagged runs publish the archive and checksum as Release assets.
-
-## Apply catalog edits after installation
-
-After adding log aliases or changing command definitions, run from the ordinary
-administrator shell (with the existing local signing key):
-
-```bash
-sudo termctl catalog apply --dry-run
-sudo termctl catalog apply
-```
-
-This validates, signs, saves a verified baseline, regenerates sudoers and activates
-previously running services. Failed activation restores the earlier catalog;
-`sudo termctl catalog rollback` also handles explicit rollback or interrupted
-transactions. Users, passwords, managed settings and the trust anchor are not
-replaced. For a working copy or offline signature, use `--source DIR` or
-`--signed-catalog DIR`. See [catalog activation](docs/catalog-activation.md).
+Inside SafeTerm, use `?` Enter or Tab to discover authorized commands. Configuration
+editing is `config myapp`, `edit SECTION`, `set KEY VALUE`, `diff`, `end`.
+Ctrl+C stops an operation and Ctrl+] closes the entire SafeTerm session.
+See [terminal](docs/restricted-terminal.md) and [termctl](docs/termctl.md).
 
 ## Project Structure
 

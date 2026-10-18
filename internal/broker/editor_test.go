@@ -71,7 +71,7 @@ func TestPositionalMappedArgumentAndHelpExample(t *testing.T) {
 	if err != nil || arguments["source"] != "service_A" {
 		t.Fatalf("arguments=%v err=%v", arguments, err)
 	}
-	if got := operationExample(operation); got != "execute log source=service_A" {
+	if got := operationExample(operation); got != "execute logs source=service_A" {
 		t.Fatalf("example=%q", got)
 	}
 }

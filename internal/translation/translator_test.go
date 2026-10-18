@@ -38,7 +38,7 @@ func mustTranslator(t *testing.T, cfg *config.Config) *Translator {
 
 func shippedConfig(t *testing.T) *config.Config {
 	t.Helper()
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

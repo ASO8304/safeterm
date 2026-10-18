@@ -35,7 +35,7 @@ func (validationOnlyExecutor) Execute(context.Context, string, []string) (string
 // The M5 pipeline with real Policy is tested in agent_policy_test.go.
 func buildCoreWithRealValidator(t *testing.T) *agent.Core {
 	t.Helper()
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatalf("failed to load shipped config: %v", err)
 	}

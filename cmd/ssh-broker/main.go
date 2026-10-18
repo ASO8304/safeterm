@@ -17,10 +17,11 @@ import (
 	"safeterm/internal/configmanager"
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
+	"safeterm/internal/layout"
 )
 
 func main() {
-	configDir := flag.String("config", "/etc/safeterm", "signed catalog directory")
+	configDir := flag.String("config", layout.Generated, "signed catalog directory")
 	listenAddress := flag.String("listen", ":2222", "SSH listen address")
 	hostKey := flag.String("host-key", "/etc/safeterm/ssh/ssh_host_ed25519_key", "SSH host private key")
 	identities := flag.String("identities", "/etc/safeterm/ssh/users.json", "SSH password-hash and optional public-key identity mapping")
@@ -47,7 +48,7 @@ func run(configDir, listenAddress, hostKeyPath, identitiesPath, gatewaySocket, g
 		return err
 	}
 	if catalogPublicKey == "" {
-		catalogPublicKey = filepath.Join(configDir, "trust", "catalog-ed25519.pub")
+		catalogPublicKey = layout.PublicKey(configDir)
 	}
 	if catalogSignature == "" {
 		catalogSignature = filepath.Join(configDir, "catalog.sig")

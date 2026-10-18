@@ -16,11 +16,12 @@ import (
 	"safeterm/internal/configmanager"
 	"safeterm/internal/identity"
 	"safeterm/internal/isolation"
+	"safeterm/internal/layout"
 )
 
 func main() {
 	profile := flag.String("profile", "", "resource profile")
-	registryPath := flag.String("registry", "/etc/safeterm/config-manager/resources.json", "trusted resource registry")
+	registryPath := flag.String("registry", layout.Registry, "trusted resource registry")
 	socket := flag.String("socket", "", "Unix socket")
 	brokerUsers := flag.String("broker-users", "safeterm-broker,safeterm", "comma-separated trusted Broker OS users")
 	auditSocket := flag.String("audit-socket", "/run/safeterm-audit/audit.sock", "Audit Service socket")

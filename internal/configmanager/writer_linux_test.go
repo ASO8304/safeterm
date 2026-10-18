@@ -286,3 +286,40 @@ func TestWriterAuditFailureAndStaleRollbackLeaveFileUntouched(t *testing.T) {
 		t.Fatal("stale rollback changed file")
 	}
 }
+
+func TestWriterBatchIsOneCommitAndRejectsUnauthorizedFields(t *testing.T) {
+	s, r, before := writerFixture(t)
+	p := Patch{ResourceID: r.ID, BaseVersion: contentVersion(before), Changes: []FieldChange{{Section: "cats", Key: "Cat_Port", Value: "100"}, {Section: "cats", Key: "Password", Value: "new-secret"}}}
+	rendered, err := renderWriterPatch(r, before, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bad := p
+	bad.Changes = append(append([]FieldChange(nil), p.Changes...), FieldChange{Section: "cats", Key: "Immutable", Value: "bad"})
+	if _, err = s.commit(uint32(os.Getuid()), bad, contentVersion(rendered)); err == nil {
+		t.Fatal("unauthorized batch accepted")
+	}
+	after, _ := os.ReadFile(r.Path)
+	if !bytes.Equal(after, before) {
+		t.Fatal("failed batch partially committed")
+	}
+	token, err := s.commit(uint32(os.Getuid()), p, contentVersion(rendered))
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, _ := s.snapshots(r.ID)
+	if len(names) != 1 {
+		t.Fatalf("backups=%v", names)
+	}
+	after, _ = os.ReadFile(r.Path)
+	if !bytes.Equal(after, rendered) {
+		t.Fatal("batch not committed")
+	}
+	if err = s.restore(uint32(os.Getuid()), r.ID, token, contentVersion(after)); err != nil {
+		t.Fatal(err)
+	}
+	after, _ = os.ReadFile(r.Path)
+	if !bytes.Equal(after, before) {
+		t.Fatal("batch not restored")
+	}
+}

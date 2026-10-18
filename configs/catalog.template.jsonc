@@ -1,4 +1,0 @@
-{
-  // Increment this for every signed catalog release. It is reported in audit events and preflight output.
-  "version": "MAJOR.MINOR.PATCH"
-}

@@ -27,7 +27,6 @@ safeterm_local_key_dir: /root/.config/safeterm
 safeterm_bootstrap_ssh_user: alice
 safeterm_bootstrap_ssh_password_hash_file: /secure/alice.hash
 safeterm_bootstrap_ssh_public_key_file: ""
-safeterm_single_operator: true
 safeterm_force_install: false
 
 # Empty lists preserve the identity maps installed by the package. Define a

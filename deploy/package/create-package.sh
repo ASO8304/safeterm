@@ -33,7 +33,7 @@ cleanup() { rm -rf -- "$staging"; }
 trap cleanup EXIT HUP INT TERM
 
 mkdir -p "$staging/payload/bin" "$staging/payload/catalog-source" "$staging/payload/managed" \
-  "$staging/payload/config-manager" "$staging/payload/console" "$staging/payload/systemd" \
+  "$staging/payload/console" "$staging/payload/systemd" \
   "$staging/payload/templates"
 
 for entry in audit config-manager config-writer console gateway runner ssh-broker preflight termctl catalog-prepare catalog-sign password-hash identity; do
@@ -42,11 +42,12 @@ for entry in audit config-manager config-writer console gateway runner ssh-broke
   chmod 0555 "$staging/payload/bin/safeterm-$entry"
 done
 
-cp -R "$repo_dir/configs/." "$staging/payload/catalog-source/"
+cp -R "$repo_dir/internal/defaults/catalog/." "$staging/payload/catalog-source/"
+cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/payload/catalog-source/"
+cp -R "$repo_dir/configs/resources.d" "$staging/payload/catalog-source/"
 cp -R "$repo_dir/deploy/demo/managed/." "$staging/payload/managed/"
-cp "$repo_dir/deploy/config-manager/resources.example.json" "$staging/payload/config-manager/resources.json"
+cp "$repo_dir/deploy/runtime/resources.json" "$staging/payload/resources.json"
 cp "$repo_dir/deploy/console/users.example.json" "$staging/payload/console/users.json"
-cp "$repo_dir/deploy/config-manager/resources.template.jsonc" "$staging/payload/templates/"
 cp "$repo_dir/deploy/console/users.template.jsonc" "$staging/payload/templates/console-users.template.jsonc"
 cp "$repo_dir/deploy/ssh/users.template.jsonc" "$staging/payload/templates/ssh-users.template.jsonc"
 cp "$repo_dir/deploy/systemd/"*.service "$staging/payload/systemd/"

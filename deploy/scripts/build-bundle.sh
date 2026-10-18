@@ -41,6 +41,8 @@ for entry in audit config-manager config-writer console gateway runner ssh-broke
 done
 cp -R "$config_dir" "$staging/etc/safeterm"
 cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/etc/safeterm/"
+mkdir -p "$staging/etc/safeterm/resources.d"
+cp "$repo_dir/configs/resources.d/TEMPLATE.json" "$repo_dir/configs/resources.d/README.md" "$repo_dir/configs/resources.d/README.txt" "$staging/etc/safeterm/resources.d/"
 cp -R "$managed_dir" "$staging/managed"
 cp "$repo_dir"/deploy/systemd/*.service "$staging/systemd/"
 chmod 0644 "$staging"/systemd/*.service

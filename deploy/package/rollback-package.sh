@@ -13,8 +13,7 @@ usage() {
 [ "$(id -u)" -eq 0 ] || { echo "rollback requires root" >&2; exit 1; }
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
-[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
-[ ! -e /var/lib/safeterm-installer/config/pending ] || { echo "interrupted configuration transaction: run sudo termctl config rollback first" >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl apply --recover first" >&2; exit 1; }
 selection=${1:-latest}
 case "$selection" in ''|*[!A-Za-z0-9._-]*) usage ;; esac
 if [ "$selection" = latest ]; then

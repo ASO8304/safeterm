@@ -46,11 +46,11 @@ func (s *recordingSink) Record(_ context.Context, event audit.Event) error {
 
 func int64Pointer(value int64) *int64 { return &value }
 
-func testRegistry(path string, separate bool) *Registry {
+func testRegistry(path string, _ bool) *Registry {
 	return &Registry{Version: "test-v1", Resources: []Resource{{
 		ID: "cats-options", Description: "Cat daemon options", Profile: "application", Path: path, Format: FormatINI, Access: AccessReadWrite,
-		Fields: []FieldSchema{{Section: "cats", Key: "Cat_Path", Type: FieldPath, Required: true, Path: &PathPolicy{AllowedPrefixes: []string{"/etc"}}}, {Section: "cats", Key: "Cat_Port", Type: FieldInteger, Required: true, Min: int64Pointer(1), Max: int64Pointer(65535)}, {Section: "cats", Key: "Password", Type: FieldString, Required: true, Secret: true}, {Section: "cats", Key: "Immutable", Type: FieldString, Required: true, ReadOnly: true}},
-		Backup: BackupPolicy{Enabled: true, Keep: 2}, RequireSeparateApproval: separate,
+		Fields:      []FieldSchema{{Section: "cats", Key: "Cat_Path", Type: FieldPath, Required: true, Path: &PathPolicy{AllowedPrefixes: []string{"/etc"}}}, {Section: "cats", Key: "Cat_Port", Type: FieldInteger, Required: true, Min: int64Pointer(1), Max: int64Pointer(65535)}, {Section: "cats", Key: "Password", Type: FieldString, Required: true, Secret: true}, {Section: "cats", Key: "Immutable", Type: FieldString, Required: true, ReadOnly: true}},
+		Backup:      BackupPolicy{Enabled: true, Keep: 2},
 		Permissions: Permissions{ReadRoles: []string{"viewer"}, ProposeRoles: []string{"operator"}, ApplyRoles: []string{"operator", "approver"}, RollbackRoles: []string{"operator"}},
 	}}}
 }

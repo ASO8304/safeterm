@@ -153,10 +153,10 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 	}
 	for _, marker := range []string{
 		"sha256sum -c PACKAGE-SHA256SUMS", "--prepare-catalog", "--signed-catalog",
-		"--local-signing", "--ssh-public-key", "--single-operator", "--dry-run",
+		"--local-signing", "--ssh-public-key", "--dry-run",
 		"/etc/safeterm/ssh/ssh_host_ed25519_key", "/etc/safeterm/ssh/users.json",
-		"/etc/safeterm/console/users.json", "/etc/safeterm/config-manager/resources.json",
-		"--stage-managed-upgrade", "--keep-hashes", "--catalog-source", "/usr/share/safeterm/defaults", "safeterm-preflight", "--no-start",
+		"/etc/safeterm/console/users.json", "$payload/resources.json",
+		"--stage-managed-upgrade", "--keep-hashes", "/usr/share/safeterm/defaults", "safeterm-preflight", "--no-start",
 		"safeterm-runner-log-reader.service", "/usr/bin/tail", "/usr/bin/sudo",
 		"stop_units_if_present()", `systemctl cat "$unit"`,
 	} {
@@ -205,18 +205,15 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 func TestOperatorCatalogTemplatesAndPrivilegeAssets(t *testing.T) {
 	repository := repositoryRoot(t)
 	for _, path := range []string{
-		"configs/catalog.template.jsonc", "configs/operations/TEMPLATE.jsonc",
-		"configs/executables/TEMPLATE.jsonc", "configs/profiles/TEMPLATE.jsonc",
-		"configs/roles/TEMPLATE.jsonc", "configs/policies/TEMPLATE.jsonc",
+		"configs/resources.d/TEMPLATE.json", "configs/resources.d/README.md", "configs/resources.d/README.txt",
 		"deploy/ssh/users.template.jsonc", "deploy/console/users.template.jsonc",
-		"deploy/config-manager/resources.template.jsonc",
 	} {
 		if _, err := os.Stat(filepath.Join(repository, filepath.FromSlash(path))); err != nil {
 			t.Errorf("missing administrator template %s: %v", path, err)
 		}
 	}
 	creator := readText(t, filepath.Join(repository, "deploy", "package", "create-package.sh"))
-	for _, marker := range []string{"payload/templates", "resources.template.jsonc", "ssh-users.template.jsonc", "console-users.template.jsonc"} {
+	for _, marker := range []string{"payload/templates", "ssh-users.template.jsonc", "console-users.template.jsonc"} {
 		if !strings.Contains(creator, marker) {
 			t.Errorf("offline package omits administrator template %q", marker)
 		}
@@ -228,7 +225,7 @@ func TestOperatorCatalogTemplatesAndPrivilegeAssets(t *testing.T) {
 		}
 	}
 	shell := readText(t, filepath.Join(repository, "internal", "broker", "shell.go"))
-	for _, marker := range []string{"help [execute|config|keys|OPERATION]", "execute log service_A", "simple positional values"} {
+	for _, marker := range []string{"execute ?", "show COMMAND", "config RESOURCE", "Ctrl+]"} {
 		if !strings.Contains(shell, marker) {
 			t.Errorf("guided shell help missing %q", marker)
 		}
@@ -276,7 +273,7 @@ func TestOperatorDemoExercisesPublicWorkflowAndReportsPass(t *testing.T) {
 	demo := readText(t, filepath.Join(repository, "deploy", "demo", "run-demo.sh"))
 	for _, required := range []string{
 		"ssh-keygen", "ssh-keyscan", "StrictHostKeyChecking=yes",
-		"whoami", "list", "execute system_info", "config list",
+		"whoami", "execute ?", "execute system", "config ?",
 		"result: success", "safeterm-preflight --installed",
 		"SafeTerm end-to-end demo: PASS",
 	} {

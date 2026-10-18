@@ -8,7 +8,7 @@ Type=simple
 User=safeterm-broker
 Group=safeterm-broker
 SupplementaryGroups=safeterm-gateway safeterm-clients
-ExecStart=/usr/local/bin/safeterm-ssh-broker -listen=:2222 -config=/etc/safeterm -identities=/etc/safeterm/ssh/users.json -host-key=/etc/safeterm/ssh/ssh_host_ed25519_key -gateway-socket=/run/safeterm-gateway/gateway.sock -config-managers=/run/safeterm-config-application/manager.sock:safeterm-config-application,/run/safeterm-config-database/manager.sock:safeterm-config-database,/run/safeterm-config-network/manager.sock:safeterm-config-network
+ExecStart=/usr/local/bin/safeterm-ssh-broker -listen=:2222 -config=/var/lib/safeterm/generated -identities=/etc/safeterm/ssh/users.json -host-key=/etc/safeterm/ssh/ssh_host_ed25519_key -gateway-socket=/run/safeterm-gateway/gateway.sock -config-managers=/run/safeterm-config-application/manager.sock:safeterm-config-application,/run/safeterm-config-database/manager.sock:safeterm-config-database,/run/safeterm-config-network/manager.sock:safeterm-config-network
 Restart=on-failure
 RestartSec=2s
 UMask=0077

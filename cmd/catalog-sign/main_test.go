@@ -28,10 +28,10 @@ func TestGenerateAndSignCatalogWithoutOverwritingKeys(t *testing.T) {
 	if err := run(true, "", privateKey, publicKey, ""); err == nil {
 		t.Fatal("key generation overwrote existing files")
 	}
-	if err := run(false, "../../configs", privateKey, "", signature); err != nil {
+	if err := run(false, "../../internal/defaults/catalog", privateKey, "", signature); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

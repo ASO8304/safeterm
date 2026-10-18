@@ -1,3 +1,7 @@
+> Historical workflow, superseded by ADR-032. Its write commands and source
+> paths are removed. Use [resource definitions](resource-definitions.md) and
+> [termctl](termctl.md) for the supported interface.
+
 # Catalog Authoring Guide
 
 SafeTerm exposes logical operations, never raw commands. The commented

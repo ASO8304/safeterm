@@ -50,27 +50,13 @@
   diff: false
   when: safeterm_console_users | length > 0
 
-- name: Inspect Config Manager registry on the controller
-  ansible.builtin.stat:
-    path: "{{ safeterm_config_registry_file }}"
-  delegate_to: localhost
-  become: false
-  register: safeterm_controller_registry
-  when: safeterm_config_registry_file | length > 0
-
-- name: Validate requested Config Manager registry
-  ansible.builtin.assert:
-    that: safeterm_controller_registry.stat.isreg | default(false)
-    fail_msg: safeterm_config_registry_file must name a controller-side regular file.
-  when: safeterm_config_registry_file | length > 0
-
-- name: Manage complete Config Manager registry
+- name: Install resource definitions
   ansible.builtin.copy:
-    src: "{{ safeterm_config_registry_file }}"
-    dest: /etc/safeterm/config-manager/resources.json
+    src: "{{ safeterm_resources_directory }}/"
+    dest: /etc/safeterm/resources.d/
+    directory_mode: '0755'
     owner: root
     group: root
     mode: '0644'
-    validate: /usr/bin/python3 -m json.tool %s
   notify: Restart SafeTerm control plane
-  when: safeterm_config_registry_file | length > 0
+  when: safeterm_resources_directory | length > 0

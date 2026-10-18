@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/term"
 	"safeterm/internal/broker"
+	"safeterm/internal/terminalinput"
 )
 
 func main() {
@@ -33,26 +33,9 @@ func run(stdin bool, output string) error {
 		password = bytes.TrimSuffix(password, []byte("\n"))
 		password = bytes.TrimSuffix(password, []byte("\r"))
 	} else {
-		if !term.IsTerminal(int(os.Stdin.Fd())) {
-			return fmt.Errorf("password-hash: a terminal is required; use -stdin for piped input")
-		}
-		fmt.Fprint(os.Stderr, "Password: ")
-		password, err = term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Fprintln(os.Stderr)
+		password, err = terminalinput.ReadConfirmed(os.Stdin, os.Stderr, "Password: ")
 		if err != nil {
-			return fmt.Errorf("password-hash: cannot read password")
-		}
-		defer clear(password)
-		fmt.Fprint(os.Stderr, "Confirm password: ")
-		confirmation, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Fprintln(os.Stderr)
-		if err != nil {
-			return fmt.Errorf("password-hash: cannot read confirmation")
-		}
-		match := bytes.Equal(password, confirmation)
-		clear(confirmation)
-		if !match {
-			return fmt.Errorf("password-hash: passwords do not match")
+			return fmt.Errorf("password-hash: %w", err)
 		}
 	}
 	defer clear(password)

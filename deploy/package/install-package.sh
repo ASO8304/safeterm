@@ -10,11 +10,9 @@ Usage:
   install.sh --local-signing [options]
 
 Install options:
-  --catalog-source DIR       portable catalog definitions (requires --local-signing)
   --ssh-user USER             SafeTerm SSH identity for a fresh install (default: admin)
   --ssh-password-hash-file FILE  bcrypt hash for a fresh SSH identity
   --ssh-public-key FILE       optional authorized public key
-  --single-operator           deprecated compatibility flag (single-operator is always enabled)
   --dry-run                   verify and print the base installation plan without host mutation
   --non-interactive          never prompt; supply bootstrap credentials for fresh installs
   --install-dependencies     install missing OS packages using configured APT repositories
@@ -33,7 +31,6 @@ payload="$package_dir/payload"
 prepare_output=
 signed_catalog=
 catalog_source=
-explicit_source=false
 local_signing=false
 ssh_user=admin
 ssh_user_set=false
@@ -42,7 +39,6 @@ install_dependencies=false
 bootstrap_console=false
 ssh_public_key=
 ssh_password_hash_file=
-single_operator=false
 dry_run=false
 start_services=true
 local_key_dir=/root/.config/safeterm
@@ -63,13 +59,12 @@ stop_units_if_present() {
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --prepare-catalog) [ "$#" -ge 2 ] || usage; prepare_output=$2; shift 2 ;;
-    --catalog-source) [ "$#" -ge 2 ] || usage; catalog_source=$2; explicit_source=true; shift 2 ;;
+
     --signed-catalog) [ "$#" -ge 2 ] || usage; signed_catalog=$2; shift 2 ;;
     --local-signing) local_signing=true; shift ;;
     --ssh-user) [ "$#" -ge 2 ] || usage; ssh_user=$2; ssh_user_set=true; shift 2 ;;
     --ssh-password-hash-file) [ "$#" -ge 2 ] || usage; ssh_password_hash_file=$2; shift 2 ;;
     --ssh-public-key) [ "$#" -ge 2 ] || usage; ssh_public_key=$2; shift 2 ;;
-    --single-operator) single_operator=true; shift ;;
     --dry-run) dry_run=true; shift ;;
     --non-interactive) non_interactive=true; shift ;;
     --install-dependencies) install_dependencies=true; shift ;;
@@ -88,14 +83,10 @@ target_arch=$(cat "$package_dir/TARGET_ARCH")
 [ "$host_arch" = "$target_arch" ] || { echo "package architecture $target_arch does not match host $host_arch" >&2; exit 1; }
 . "$payload/install-support.sh"
 
-if [ "$explicit_source" = true ] && [ -n "$signed_catalog" ]; then usage; fi
-if [ -z "$catalog_source" ]; then
-  if [ -f /etc/safeterm/catalog.json ]; then
-    catalog_source=/etc/safeterm
-  else
-    catalog_source="$payload/catalog-source"
-  fi
-fi
+for legacy in config-manager operations policies profiles executables roles catalog.json catalog.sig resources.json .resources-manifest.json; do
+  [ ! -e "/etc/safeterm/$legacy" ] && [ ! -L "/etc/safeterm/$legacy" ] || { echo "Legacy layout detected: /etc/safeterm/$legacy. Clean resources.d installation required; no import or deletion performed." >&2; exit 1; }
+done
+[ -n "$catalog_source" ] || catalog_source="$payload/catalog-source"
 
 if [ -n "$prepare_output" ]; then
   [ -z "$signed_catalog" ] && [ "$local_signing" = false ] || usage
@@ -114,26 +105,23 @@ EOF
 fi
 
 if [ -n "$signed_catalog" ] && [ "$local_signing" = true ]; then usage; fi
-if [ -z "$signed_catalog" ] && [ "$local_signing" = false ] && [ ! -f /etc/safeterm/catalog.json ]; then
+if [ -z "$signed_catalog" ] && [ "$local_signing" = false ] && [ ! -f /var/lib/safeterm/generated/catalog.json ]; then
   if [ "$non_interactive" = false ] && safeterm_has_terminal; then
     echo "Fresh installation: using local catalog signing; the private key stays under $local_key_dir."
     local_signing=true
   fi
 fi
-if [ "$explicit_source" = true ] && [ "$local_signing" = false ]; then usage; fi
 if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then
-  if [ "$explicit_source" = false ] && [ "$catalog_source" = /etc/safeterm ]; then signed_catalog=/etc/safeterm; else echo "Fresh unattended install requires --local-signing or --signed-catalog DIR and bootstrap credentials." >&2; exit 2; fi
+  if [ -f /usr/share/safeterm/defaults/catalog.sig ]; then signed_catalog=/usr/share/safeterm/defaults; else echo "Fresh unattended install requires --local-signing or --signed-catalog DIR and bootstrap credentials." >&2; exit 2; fi
 fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
 IFS= read -r init_name </proc/1/comm
 [ "$init_name" = systemd ] || { echo "SafeTerm installation requires systemd running as PID 1." >&2; exit 1; }
-[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
-[ ! -e /var/lib/safeterm-installer/config/pending ] || { echo "interrupted configuration transaction: run sudo termctl config rollback first" >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl apply --recover first" >&2; exit 1; }
 safeterm_dependencies
 exec 9>/run/lock/safeterm-lifecycle.lock
 flock -n 9 || { echo "another SafeTerm lifecycle operation is running" >&2; exit 1; }
-[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl catalog rollback first" >&2; exit 1; }
-[ ! -e /var/lib/safeterm-installer/config/pending ] || { echo "interrupted configuration transaction: run sudo termctl config rollback first" >&2; exit 1; }
+[ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl apply --recover first" >&2; exit 1; }
 for tool in cmp sha256sum install useradd usermod groupadd getent systemctl ssh-keygen awk grep sed tar date find realpath visudo; do
   command -v "$tool" >/dev/null 2>&1 || { echo "$tool is required" >&2; exit 1; }
 done
@@ -243,7 +231,7 @@ create_install_transaction() {
 }
 
 if [ "$local_signing" = true ]; then
-  if [ "$catalog_source" = /etc/safeterm ]; then
+  if [ "$catalog_source" = /usr/share/safeterm/defaults ]; then
     # Preserve the approved hashes; an application update cannot approve new OS binaries.
     "$payload/bin/safeterm-catalog-prepare" --source "$catalog_source" --compatible-with "$payload/catalog-source" --keep-hashes --verify-source --output "$work/catalog"
   else
@@ -280,7 +268,7 @@ if [ -f /etc/safeterm/trust/catalog-ed25519.pub ]; then
   cmp -s "$work/config/trust/catalog-ed25519.pub" /etc/safeterm/trust/catalog-ed25519.pub || { echo "package updates cannot rotate installed catalog trust" >&2; exit 1; }
 fi
 
-mkdir -p "$work/config/ssh" "$work/config/console" "$work/config/config-manager"
+mkdir -p "$work/config/ssh" "$work/config/console"
 if [ -f /etc/safeterm/ssh/ssh_host_ed25519_key ]; then
   install -m 0600 /etc/safeterm/ssh/ssh_host_ed25519_key "$work/config/ssh/ssh_host_ed25519_key"
   [ ! -f /etc/safeterm/ssh/ssh_host_ed25519_key.pub ] || install -m 0644 /etc/safeterm/ssh/ssh_host_ed25519_key.pub "$work/config/ssh/ssh_host_ed25519_key.pub"
@@ -325,11 +313,7 @@ EOF
 else
   install -m 0600 "$payload/console/users.json" "$work/config/console/users.json"
 fi
-if [ -f /etc/safeterm/config-manager/resources.json ]; then
-  install -m 0644 /etc/safeterm/config-manager/resources.json "$work/config/config-manager/resources.json"
-else
-  install -m 0644 "$payload/config-manager/resources.json" "$work/config/config-manager/resources.json"
-fi
+install -m 0644 "$payload/resources.json" "$work/config/resources.json"
 
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
@@ -338,6 +322,8 @@ for name in audit config-manager config-writer console gateway runner ssh-broker
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
 cp "$payload/catalog-source/README.md" "$payload/catalog-source/README.txt" "$work/bundle/etc/safeterm/"
+mkdir -p "$work/bundle/etc/safeterm/resources.d"
+cp "$payload/catalog-source/resources.d/TEMPLATE.json" "$payload/catalog-source/resources.d/README.md" "$payload/catalog-source/resources.d/README.txt" "$work/bundle/etc/safeterm/resources.d/"
 cp -R "$payload/managed/." "$work/bundle/managed/"
 cp "$payload/systemd/"*.service "$work/bundle/systemd/"
 chmod 0644 "$work/bundle/systemd/"*.service
@@ -356,8 +342,6 @@ fi
 create_install_transaction
 # Reference defaults are versioned separately from the active site configuration.
 install -d -o root -g root -m 0755 /usr/share/safeterm
-rm -rf -- /usr/share/safeterm/defaults
-cp -R "$payload/catalog-source" /usr/share/safeterm/defaults
 if [ "$local_signing" = true ]; then
   install -d -o root -g root -m 0700 "$local_key_dir"
   install -o root -g root -m 0600 "$private_key" "$local_key_dir/catalog-ed25519.key"
@@ -384,6 +368,11 @@ install -o root -g root -m 0555 "$payload/uninstall.sh" /usr/local/sbin/safeterm
 [ -x /usr/local/bin/termctl ] || { echo "termctl alias installation failed" >&2; exit 1; }
 /usr/local/bin/safeterm-preflight --installed
 
+if [ "$local_signing" = true ]; then
+  /usr/local/bin/termctl initialize --installer-lock-held --key-file "$local_key_dir/catalog-ed25519.key"
+else
+  /usr/local/bin/termctl initialize --installer-lock-held
+fi
 if [ "$start_services" = true ]; then
   systemctl enable safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
@@ -395,8 +384,6 @@ if [ "$start_services" = true ]; then
   systemctl restart safeterm-ssh-broker.service
   systemctl --quiet is-active safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
-/usr/local/bin/termctl catalog checkpoint --installer-lock-held
-/usr/local/bin/termctl config checkpoint --installer-lock-held
 echo "SafeTerm package installation: PASS"
 # Retain one pre-install snapshot; operators never need to track IDs and
 # repeated upgrades do not accumulate snapshots indefinitely.

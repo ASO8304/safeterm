@@ -232,7 +232,7 @@ func TestAuthorize_NilInputsAndZeroValue_Denied(t *testing.T) {
 // Requirement: REQ-005 (AC-2)
 // Exercise the complete role/operation matrix against the shipped config.
 func TestAuthorize_ShippedConfig(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

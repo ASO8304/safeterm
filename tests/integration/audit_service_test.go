@@ -26,7 +26,7 @@ func (c *auditedCore) HandleRequest(_ context.Context, request *contract.Executi
 
 // TEST-AUDIT-001..007
 func TestGatewayAndRunnerPersistCorrelatedAuditTrail(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

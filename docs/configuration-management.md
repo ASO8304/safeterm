@@ -9,28 +9,34 @@ to one isolated Config Manager profile.
 ## Restricted-terminal workflow
 
 ```text
-config list
-config describe RESOURCE
-config show RESOURCE
-config edit RESOURCE SECTION KEY
-config apply PROPOSAL_TOKEN
-config rollback RESOURCE
+config ?
+config RESOURCE
+edit SECTION
+show
+set KEY VALUE
+diff
+next
+edit ANOTHER_SECTION
+set KEY VALUE
+end
 ```
 
-Use `-` as `SECTION` for a root-level JSON field. `config edit` reads the
-current content hash, accepts one candidate value, validates it, and prints a
-redacted diff. Non-secret values are normalized before preview. Secret input is
-not echoed and secret values never appear in reads, diffs, errors, or audit.
-The proposing user confirms the preview with y/N and applies their own change.
-No second identity or approval role is required. Tokens are single-use,
-creator/resource/patch/version-bound, and kept only in memory. A different
-identity cannot consume another user's token. The propose_roles list controls
-both proposing and applying; legacy apply_roles is normalized to that list.
-Legacy require_separate_approval is accepted but ignored during upgrades.
+`set` stages values; `next` navigates without saving; `end` validates and commits
+all changes once. `cancel` discards the draft. Use `edit -` for root-level fields.
+Secret fields use `set KEY` with a hidden prompt. Reads/diffs redact secrets and
+set command lines are excluded from history. Concurrent file edits cause a
+version conflict, retaining the draft without overwriting the external change.
+
+See [the terminal guide](restricted-terminal.md) for contextual help, quoting,
+rollback, permissions and examples. Legacy one-shot config forms are removed.
+Internal single-use, creator/session-bound proposals and role checks remain;
+users do not handle tokens or require another approver. Administrator `edit`
+permissions determine proposing and applying. Unknown registry properties,
+including the removed require_separate_approval flag, are rejected.
 
 ## Registry and adapters
 
-The root-owned registry selects each exact canonical path, profile, format,
+The generated `/var/lib/safeterm/generated/resources.json` registry selects each exact canonical path, profile, format,
 access mode, field schema, roles, validator ID, typed activation operations,
 and backup policy. Unknown JSON properties are rejected when loading the
 registry. One path can belong to only one resource.

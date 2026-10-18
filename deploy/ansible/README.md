@@ -1,3 +1,7 @@
+> The only administrator source is resources.d JSON (ADR-032). Set
+> safeterm_resources_directory to the controller directory containing active JSON
+> definitions. The old registry variable and catalog-source override are removed.
+
 # SafeTerm Ansible Installer
 
 This installer turns the verified offline SafeTerm release package into a

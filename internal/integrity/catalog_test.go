@@ -123,7 +123,7 @@ func TestCatalogSigningRejectsInvalidInputs(t *testing.T) {
 
 // TEST-INTEGRITY-012
 func TestShippedCatalogHasValidDetachedSignature(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,8 +131,8 @@ func TestShippedCatalogHasValidDetachedSignature(t *testing.T) {
 	publicKey := filepath.Join(dir, "catalog.pub")
 	signature := filepath.Join(dir, "catalog.sig")
 	for source, target := range map[string]string{
-		"../../configs/trust/catalog-ed25519.pub": publicKey,
-		"../../configs/catalog.sig":               signature,
+		"../defaults/catalog/trust/catalog-ed25519.pub": publicKey,
+		"../defaults/catalog/catalog.sig":               signature,
 	} {
 		data, err := os.ReadFile(source)
 		if err != nil {

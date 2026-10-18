@@ -22,11 +22,15 @@ import (
 	"safeterm/internal/deployment"
 	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
+	"safeterm/internal/layout"
 )
+
+const writerDropIn = "/etc/systemd/system/safeterm-config-writer.service.d/50-resources.conf"
 
 const catalogStateDir = "/var/lib/safeterm-installer/catalog"
 
 type catalogRuntime struct {
+	extraFiles                map[string]string
 	live, state, key, sudoers string
 	refreshHashes             bool
 	run                       func(string, ...string) ([]byte, error)
@@ -38,181 +42,13 @@ type catalogJournal struct {
 	Active  []string `json:"active"`
 }
 
-func catalogManageCommand(dir string, args []string, out io.Writer) error {
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("catalog %s requires root; use sudo termctl catalog %s", args[0], args[0])
-	}
-	if filepath.Clean(dir) != defaultConfigDir {
-		return fmt.Errorf("catalog activation always targets /etc/safeterm; use --source DIR for candidate input")
-	}
-	var source, signed, key string
-	var dry, inherited, refresh bool
-	seenOptions := map[string]bool{}
-	for i := 1; i < len(args); i++ {
-		if seenOptions[args[i]] {
-			return fmt.Errorf("duplicate catalog option %s", args[i])
-		}
-		seenOptions[args[i]] = true
-		switch args[i] {
-		case "--refresh-hashes":
-			refresh = true
-		case "--dry-run":
-			dry = true
-		case "--installer-lock-held":
-			inherited = true
-		case "--source", "--signed-catalog", "--key-file":
-			if i+1 >= len(args) {
-				return fmt.Errorf("%s requires a value", args[i])
-			}
-			flag := args[i]
-			i++
-			switch flag {
-			case "--source":
-				source = args[i]
-			case "--signed-catalog":
-				signed = args[i]
-			case "--key-file":
-				key = args[i]
-			}
-		default:
-			return fmt.Errorf("unknown catalog option %q", args[i])
-		}
-	}
-	if args[0] != "checkpoint" && inherited {
-		return fmt.Errorf("installer lock inheritance is only supported for checkpoint")
-	}
-	if args[0] != "apply" && (source != "" || signed != "" || key != "" || dry || refresh) {
-		return fmt.Errorf("catalog %s takes no apply options", args[0])
-	}
-	if refresh && signed != "" {
-		return fmt.Errorf("cannot refresh hashes of an offline-signed catalog")
-	}
-	if source != "" && signed != "" || signed != "" && key != "" {
-		return fmt.Errorf("use --source with local signing, or --signed-catalog without a key")
-	}
-	if key == "" {
-		key = "/root/.config/safeterm/catalog-ed25519.key"
-	}
-	r := catalogRuntime{refreshHashes: refresh, live: dir, state: catalogStateDir, key: key, sudoers: "/etc/sudoers.d/safeterm-service-manager", out: out, run: catalogRun}
-	unlock, err := catalogLock(inherited)
-	if err != nil {
-		return err
-	}
-	defer unlock()
-	if _, err := os.Stat("/var/lib/safeterm-installer/config/pending"); err == nil {
-		return fmt.Errorf("recover pending configuration transaction with termctl config rollback")
-	}
-
-	for _, path := range []string{r.live, filepath.Join(r.live, "trust"), filepath.Dir(r.sudoers)} {
-		if err = catalogSecureDirectory(path); err != nil {
-			return err
-		}
-	}
-	for _, section := range catalogSections {
-		if err = catalogSecureDirectory(filepath.Join(r.live, section)); err != nil {
-			return err
-		}
-	}
-	if err = os.MkdirAll(r.state, 0700); err != nil {
-		return err
-	}
-	if err = catalogSecureDirectory(r.state); err != nil {
-		return err
-	}
-	if err = os.Chmod(r.state, 0700); err != nil {
-		return err
-	}
-	entries, err := os.ReadDir(r.state)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		for _, prefix := range []string{".apply-", ".publish-", ".checkpoint-", ".transaction-", ".rollback-"} {
-			if strings.HasPrefix(entry.Name(), prefix) {
-				if err = os.RemoveAll(filepath.Join(r.state, entry.Name())); err != nil {
-					return err
-				}
-				break
-			}
-		}
-	}
-	if _, err = os.Lstat(filepath.Join(r.state, "pending")); err == nil && args[0] != "rollback" {
-		return fmt.Errorf("an interrupted catalog transaction exists; run sudo termctl catalog rollback first")
-	}
-	switch args[0] {
-	case "checkpoint":
-		return r.checkpoint()
-	case "rollback":
-		return r.rollback()
-	case "apply":
-		if source == "" {
-			source = r.live
-		}
-		if signed != "" {
-			source = signed
-		}
-		return r.apply(source, signed != "", dry)
-	}
-	return fmt.Errorf("unknown catalog action")
-}
-
 func (r *catalogRuntime) verified(dir string) (*config.Config, error) {
 	cfg, err := config.LoadConfig(dir)
 	if err != nil {
 		return nil, err
 	}
-	if err = integrity.VerifyCatalogFiles(cfg, filepath.Join(r.live, "trust/catalog-ed25519.pub"), filepath.Join(dir, "catalog.sig")); err != nil {
+	if err = integrity.VerifyCatalogFiles(cfg, layout.PublicKey(r.live), filepath.Join(dir, "catalog.sig")); err != nil {
 		return nil, err
-	}
-	return cfg, nil
-}
-
-func (r *catalogRuntime) candidate(source, stage string, signed bool) (*config.Config, error) {
-	raw := filepath.Join(stage, "input")
-	if err := catalogCopyInput(source, raw); err != nil {
-		return nil, err
-	}
-	if r.refreshHashes {
-		refreshed := filepath.Join(stage, "refreshed")
-		if err := deployment.PrepareConfig(raw, refreshed); err != nil {
-			return nil, err
-		}
-		raw = refreshed
-	}
-	cfg, err := config.LoadConfig(raw)
-	if err != nil {
-		return nil, err
-	}
-	dir := filepath.Join(stage, "candidate")
-	if err = catalogWriteModel(dir, cfg); err != nil {
-		return nil, err
-	}
-	var signature []byte
-	if signed {
-		signature, err = catalogRead(filepath.Join(source, "catalog.sig"))
-	} else {
-		// Existing trust only: no key generation and no implicit trust rotation.
-		key, readErr := integrity.ReadPrivateKey(r.key)
-		if readErr != nil {
-			return nil, fmt.Errorf("no readable existing local signing key; use --signed-catalog DIR or --key-file FILE: %w", readErr)
-		}
-		defer clear(key)
-		stat, statErr := os.Lstat(r.key)
-		if statErr != nil || !stat.Mode().IsRegular() {
-			return nil, fmt.Errorf("unsafe signing key")
-		}
-		value, signErr := integrity.SignCatalog(cfg, key)
-		err = signErr
-		signature = integrity.EncodeBase64(value)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err = os.WriteFile(filepath.Join(dir, "catalog.sig"), signature, 0644); err != nil {
-		return nil, err
-	}
-	if _, err = r.verified(dir); err != nil {
-		return nil, fmt.Errorf("candidate does not match installed trust: %w", err)
 	}
 	return cfg, nil
 }
@@ -240,10 +76,10 @@ func (r *catalogRuntime) validate(cfg, baseline *config.Config, dir string) erro
 	if err != nil {
 		return err
 	}
-	if _, err = broker.LoadSSHAuthenticator(filepath.Join(r.live, "ssh/users.json"), catalog.KnownRoles()); err != nil {
+	if _, err = broker.LoadSSHAuthenticator(filepath.Join(layout.Authority(r.live), "ssh/users.json"), catalog.KnownRoles()); err != nil {
 		return err
 	}
-	users, err := broker.ReadConsoleUsersData(filepath.Join(r.live, "console/users.json"))
+	users, err := broker.ReadConsoleUsersData(filepath.Join(layout.Authority(r.live), "console/users.json"))
 	if err != nil {
 		return err
 	}
@@ -254,7 +90,11 @@ func (r *catalogRuntime) validate(cfg, baseline *config.Config, dir string) erro
 	if loadRegistry == nil {
 		loadRegistry = configmanager.LoadRegistry
 	}
-	registry, err := loadRegistry(filepath.Join(r.live, "config-manager/resources.json"))
+	registryPath := filepath.Join(r.live, "resources.json")
+	if _, err := os.Lstat(filepath.Join(dir, ".resources", "registry.json")); err == nil {
+		registryPath = filepath.Join(dir, ".resources", "registry.json")
+	}
+	registry, err := loadRegistry(registryPath)
 	if err != nil {
 		return err
 	}
@@ -299,6 +139,9 @@ func (r *catalogRuntime) snapshot(source, dest string) error {
 		return err
 	}
 	if err = os.WriteFile(filepath.Join(dest, "sudoers"), []byte(strings.Join(lines, "\n")+"\n"), 0440); err != nil {
+		return err
+	}
+	if err := r.snapshotExtras(source, dest); err != nil {
 		return err
 	}
 	return catalogSyncTree(dest)
@@ -360,41 +203,6 @@ func (r *catalogRuntime) baseline() (string, *config.Config, error) {
 		return "", nil, fmt.Errorf("no verified rollback baseline; restore a valid installed catalog before applying changes: %w", err)
 	}
 	return r.live, cfg, nil
-}
-
-func (r *catalogRuntime) apply(source string, signed, dry bool) error {
-	work, err := os.MkdirTemp(r.state, ".apply-")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(work)
-	cfg, err := r.candidate(source, work, signed)
-	if err != nil {
-		return err
-	}
-	base, old, err := r.baseline()
-	if err != nil {
-		return err
-	}
-	candidate := filepath.Join(work, "candidate")
-	if err = r.validate(cfg, old, candidate); err != nil {
-		return fmt.Errorf("catalog validation failed before activation: %w", err)
-	}
-	if dry {
-		fmt.Fprintln(r.out, "Catalog dry run: PASS (signature, executable hashes, identity/resource roles and sudoers validated; services unchanged)")
-		return nil
-	}
-	if live, err := r.verified(r.live); err == nil {
-		current, _ := integrity.CanonicalCatalog(live)
-		next, _ := integrity.CanonicalCatalog(cfg)
-		deployed, _ := catalogRead(r.sudoers)
-		desired, _ := catalogRead(filepath.Join(candidate, "sudoers"))
-		if bytes.Equal(current, next) && bytes.Equal(deployed, desired) {
-			fmt.Fprintln(r.out, "Catalog already current: PASS; no services restarted")
-			return nil
-		}
-	}
-	return r.activate(candidate, base)
 }
 
 func (r *catalogRuntime) activeServices() ([]string, error) {
@@ -503,7 +311,10 @@ func (r *catalogRuntime) publish(source string) error {
 	if err != nil {
 		return err
 	}
-	return catalogAtomicFile(r.sudoers, sudoers, 0440)
+	if err := catalogAtomicFile(r.sudoers, sudoers, 0440); err != nil {
+		return err
+	}
+	return r.publishExtras(source)
 }
 
 func (r *catalogRuntime) activate(candidate, base string) error {
@@ -539,7 +350,7 @@ func (r *catalogRuntime) activate(candidate, base string) error {
 	}
 	fail := func(cause error) error {
 		if recoverErr := r.recoverPending(); recoverErr != nil {
-			return fmt.Errorf("activation failed: %v; recovery failed: %w; journal retained, run sudo termctl catalog rollback", cause, recoverErr)
+			return fmt.Errorf("activation failed: %v; recovery failed: %w; journal retained, run sudo termctl apply --recover", cause, recoverErr)
 		}
 		return fmt.Errorf("activation failed; prior catalog and service state restored: %w", cause)
 	}
@@ -567,7 +378,7 @@ func (r *catalogRuntime) activate(candidate, base string) error {
 	if err = catalogSyncDirectory(r.state); err != nil {
 		return err
 	}
-	fmt.Fprintln(r.out, "Catalog applied: PASS; prior catalog retained for sudo termctl catalog rollback")
+	fmt.Fprintln(r.out, "Catalog applied: PASS; prior generation retained for sudo termctl apply --rollback")
 	return nil
 }
 

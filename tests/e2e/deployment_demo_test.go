@@ -196,8 +196,8 @@ func deployedDataPath(t *testing.T, passwordOnly bool) {
 			}
 		}
 	}
-	output := runRestrictedShell(t, listener.Addr().String(), clientConfig, "whoami\rlist\rexecute system_info\rexit\r")
-	for _, expected := range []string{"Authenticated as alice", "roles: viewer", "system_info", "result: success", "Linux"} {
+	output := runRestrictedShell(t, listener.Addr().String(), clientConfig, "whoami\rexecute ?\rexecute system\rexit\r")
+	for _, expected := range []string{"Authenticated as alice", "roles: viewer", "system", "result: success", "Linux"} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("terminal output missing %q:\n%s", expected, output)
 		}

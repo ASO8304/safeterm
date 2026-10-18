@@ -59,17 +59,11 @@ func TestBashCompletionActuallyCompletes(t *testing.T) {
 		{"termctl service re", 2, "restart"},
 		{"termctl service restart config-n", 3, "config-network"},
 		{"termctl user add s", 3, "ssh"},
-		{"termctl catalog reg", 2, "regenerate-hashes"},
-		{"termctl catalog app", 2, "apply"},
-		{"termctl config ch", 2, "check"},
-		{"termctl config app", 2, "apply"},
+		{"termctl app", 1, "apply"},
+		{"termctl ch", 1, "check"},
+		{"termctl apply --ex", 2, "--export"},
+		{"termctl apply --rec", 2, "--recover"},
 		{"termctl service restart config-w", 3, "config-writer"},
-		{"termctl catalog ex", 2, "export"},
-		{"termctl catalog export --out", 3, "--output"},
-		{"termctl catalog apply --ref", 3, "--refresh-hashes"},
-		{"termctl update /tmp --catalog", 3, "--catalog-source"},
-		{"termctl catalog roll", 2, "rollback"},
-		{"termctl catalog apply --dry", 3, "--dry-run"},
 		{"termctl user add ssh --password", 4, "--password-hash-file"},
 	} {
 		code := script.String() + fmt.Sprintf("\nCOMP_WORDS=(%s); COMP_CWORD=%d; _termctl_complete; printf '%%s\\n' \"${COMPREPLY[@]}\"", tc.words, tc.index)
@@ -111,10 +105,9 @@ func TestLifecycleRejectsInvalidInput(t *testing.T) {
 	}
 }
 
-func TestUpdatePreservesExistingCatalogUnlessReplacementIsExplicit(t *testing.T) {
+func TestUpdatePassesOnlySupportedPackageOptions(t *testing.T) {
 	for _, tc := range []struct{ args, want []string }{
 		{[]string{"--dry-run"}, []string{"--dry-run"}},
-		{[]string{"--catalog-source", "/root/site"}, []string{"--catalog-source", "/root/site", "--local-signing"}},
 		{[]string{"--signed-catalog", "/root/signed"}, []string{"--signed-catalog", "/root/signed"}},
 	} {
 		dir := t.TempDir()
@@ -162,7 +155,7 @@ func TestUserListAndSSHAuthUpdate(t *testing.T) {
 
 func TestCatalogListUsesShippedConfig(t *testing.T) {
 	var out bytes.Buffer
-	if err := run([]string{"--config-dir", "../../configs", "catalog", "list"}, &out, &out); err != nil {
+	if err := run([]string{"--config-dir", "../../internal/defaults/catalog", "catalog", "list"}, &out, &out); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out.String(), "ping") || !strings.Contains(out.String(), "trace_filtered") {

@@ -100,7 +100,7 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 				}
 				fmt.Fprint(s.output, "\r\n")
 				value := string(line)
-				if useHistory && value != "" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
+				if useHistory && value != "" && len(strings.Fields(value)) > 0 && strings.Fields(value)[0] != "set" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
 					s.history = append(s.history, value)
 					if len(s.history) > maxShellHistory {
 						s.history = s.history[len(s.history)-maxShellHistory:]
@@ -229,15 +229,50 @@ func commonPrefix(values []string) string {
 
 func matching(values []string, prefix string) []string {
 	result := []string{}
+	seen := map[string]bool{}
 	for _, value := range values {
-		if strings.HasPrefix(value, prefix) {
+		if strings.HasPrefix(value, prefix) && !seen[value] {
 			result = append(result, value)
+			seen[value] = true
 		}
 	}
+	sort.Strings(result)
 	return result
 }
 
 func (s *Shell) completionCandidates(ctx context.Context, before, prefix string) []string {
+	if s.editing != nil {
+		return s.editorCompletion(before, prefix)
+	}
+	if values, ok := s.treeCompletion(ctx, before, prefix); ok {
+		return values
+	}
+	fields := strings.Fields(before)
+	if len(fields) == 0 || (len(fields) == 1 && !strings.HasSuffix(before, " ")) {
+		return matching([]string{"clear", "config", "show", "execute", "whoami", "exit"}, prefix)
+	}
+	if fields[0] == "config" && (len(fields) == 1 || (len(fields) == 2 && !strings.HasSuffix(before, " "))) {
+		if s.configs == nil {
+			return nil
+		}
+		items, err := s.configs.List(ctx, s.principal)
+		if err != nil {
+			return nil
+		}
+		values := []string{}
+		for _, item := range items {
+			values = append(values, item.ID)
+		}
+		return matching(values, prefix)
+	}
+	if fields[0] == "show" {
+		values, _ := s.treeCompletion(ctx, "execute"+strings.TrimPrefix(before, "show"), prefix)
+		return values
+	}
+	return s.legacyCompletionCandidates(ctx, before, prefix)
+}
+
+func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix string) []string {
 	fields := strings.Fields(before)
 	trailing := strings.HasSuffix(before, " ")
 	index := len(fields) - 1
@@ -245,7 +280,7 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 		index++
 	}
 	if index <= 0 {
-		return matching([]string{"clear", "config", "describe", "exit", "help", "list", "execute", "whoami"}, prefix)
+		return matching([]string{"clear", "config", "exit", "help", "show", "execute", "whoami"}, prefix)
 	}
 	command := fields[0]
 	if (command == "execute" || command == "describe") && index == 1 {
@@ -297,53 +332,6 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 			}
 		}
 		sort.Strings(values)
-		return matching(values, prefix)
-	}
-	if command != "config" || s.configs == nil {
-		return nil
-	}
-	if index == 1 {
-		return matching([]string{"apply", "describe", "edit", "list", "rollback", "show"}, prefix)
-	}
-	if index == 2 && len(fields) >= 2 && fields[1] != "apply" && fields[1] != "list" {
-		items, err := s.configs.List(ctx, s.principal)
-		if err != nil {
-			return nil
-		}
-		values := []string{}
-		for _, item := range items {
-			values = append(values, item.ID)
-		}
-		return matching(values, prefix)
-	}
-	if len(fields) >= 3 && fields[1] == "edit" && (index == 3 || index == 4) {
-		description, err := s.configs.Describe(ctx, s.principal, fields[2])
-		if err != nil {
-			return nil
-		}
-		values, seen := []string{}, map[string]bool{}
-		if index == 3 {
-			for _, field := range description.Fields {
-				section := field.Section
-				if section == "" {
-					section = "-"
-				}
-				if !seen[section] {
-					values = append(values, section)
-					seen[section] = true
-				}
-			}
-		} else if len(fields) >= 4 {
-			section := fields[3]
-			if section == "-" {
-				section = ""
-			}
-			for _, field := range description.Fields {
-				if field.Section == section && !field.ReadOnly {
-					values = append(values, field.Key)
-				}
-			}
-		}
 		return matching(values, prefix)
 	}
 	return nil

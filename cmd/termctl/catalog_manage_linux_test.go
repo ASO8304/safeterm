@@ -153,7 +153,7 @@ func catalogFixture(t *testing.T) (*catalogRuntime, *catalogFakeHost, ed25519.Pr
 	write("ssh/users.json", map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "authorized_keys": []string{string(ssh.MarshalAuthorizedKey(sshKey))}}}}, 0600)
 	write("console/users.json", map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "disabled": true}}}, 0600)
 	registry := configmanager.Registry{Version: "test", Resources: []configmanager.Resource{{ID: "demo-options", Description: "Test", Profile: "application", Path: "/etc/safeterm-managed/application/options.json", Format: configmanager.FormatJSON, Access: configmanager.AccessReadOnly, Fields: []configmanager.FieldSchema{{Key: "enabled", Type: configmanager.FieldBoolean, Required: true}}, Permissions: configmanager.Permissions{ReadRoles: []string{"viewer"}}}}}
-	write("config-manager/resources.json", registry, 0644)
+	write("resources.json", registry, 0644)
 	host := &catalogFakeHost{active: map[string]bool{serviceUnits["identity"]: true, serviceUnits["logs"]: true, serviceUnits["gateway"]: true}}
 	var out bytes.Buffer
 	r := &catalogRuntime{live: live, state: state, key: keyFile, sudoers: filepath.Join(dir, "sudoers"), out: &out, run: host.run, registry: func(path string) (*configmanager.Registry, error) {
@@ -200,7 +200,7 @@ func catalogHasAlias(t *testing.T, r *catalogRuntime) bool {
 func TestCatalogApplyRepairsEditedLiveAndRollbackPreservesOtherFiles(t *testing.T) {
 	r, host, _ := catalogFixture(t)
 	before := map[string][]byte{}
-	for _, name := range []string{"ssh/users.json", "console/users.json", "config-manager/resources.json", "trust/catalog-ed25519.pub"} {
+	for _, name := range []string{"ssh/users.json", "console/users.json", "resources.json", "trust/catalog-ed25519.pub"} {
 		before[name], _ = os.ReadFile(filepath.Join(r.live, name))
 	}
 	catalogAddAlias(t, r.live)

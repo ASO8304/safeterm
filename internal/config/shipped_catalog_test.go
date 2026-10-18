@@ -9,7 +9,7 @@ import (
 // catches a missing executable binding, policy entry, or malformed typed
 // systemd operation before a package is built.
 func TestShippedCatalogIncludesDiagnosticsAndServiceOperations(t *testing.T) {
-	cfg, err := LoadConfig(filepath.Join("..", "..", "configs"))
+	cfg, err := LoadConfig(filepath.Join("..", "defaults", "catalog"))
 	if err != nil {
 		t.Fatalf("load shipped catalog: %v", err)
 	}

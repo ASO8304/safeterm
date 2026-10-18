@@ -15,6 +15,7 @@ import (
 	"safeterm/internal/configmanager"
 	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
+	"safeterm/internal/layout"
 )
 
 var RuntimeBinaries = []string{
@@ -42,7 +43,7 @@ func SystemdSudoers(root string) ([]string, error) {
 	root = filepath.Clean(root)
 	configDir := filepath.Join(root, "etc", "safeterm")
 	if root == "/" {
-		configDir = "/etc/safeterm"
+		configDir = layout.Generated
 	}
 	cfg, err := config.LoadConfig(configDir)
 	if err != nil {
@@ -107,9 +108,14 @@ func Check(options CheckOptions) (Report, error) {
 	binDir := filepath.Join(root, "bin")
 	configDir := filepath.Join(root, "etc", "safeterm")
 	unitDir := filepath.Join(root, "systemd")
+	adminDir := configDir
 	if options.Installed {
+		if err := layout.RejectLegacy(layout.Admin); err != nil {
+			return Report{}, err
+		}
+		adminDir = layout.Admin
 		binDir = "/usr/local/bin"
-		configDir = "/etc/safeterm"
+		configDir = layout.Generated
 		unitDir = "/etc/systemd/system"
 	}
 	for _, name := range RuntimeBinaries {
@@ -134,7 +140,7 @@ func Check(options CheckOptions) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	if err := integrity.VerifyCatalogFiles(cfg, filepath.Join(configDir, "trust", "catalog-ed25519.pub"), filepath.Join(configDir, "catalog.sig")); err != nil {
+	if err := integrity.VerifyCatalogFiles(cfg, filepath.Join(adminDir, "trust", "catalog-ed25519.pub"), filepath.Join(configDir, "catalog.sig")); err != nil {
 		return Report{}, err
 	}
 	if options.Installed {
@@ -160,13 +166,13 @@ func Check(options CheckOptions) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
-	if _, err := broker.LoadSSHAuthenticator(filepath.Join(configDir, "ssh", "users.json"), catalog.KnownRoles()); err != nil {
+	if _, err := broker.LoadSSHAuthenticator(filepath.Join(adminDir, "ssh", "users.json"), catalog.KnownRoles()); err != nil {
 		return Report{}, err
 	}
-	if _, err := broker.LoadSSHHostKey(filepath.Join(configDir, "ssh", "ssh_host_ed25519_key")); err != nil {
+	if _, err := broker.LoadSSHHostKey(filepath.Join(adminDir, "ssh", "ssh_host_ed25519_key")); err != nil {
 		return Report{}, err
 	}
-	consolePath := filepath.Join(configDir, "console", "users.json")
+	consolePath := filepath.Join(adminDir, "console", "users.json")
 	if options.Installed {
 		group, err := user.LookupGroup(identity.UserName)
 		if err != nil {
@@ -187,7 +193,7 @@ func Check(options CheckOptions) (Report, error) {
 	if _, err := identity.ParseUsers(consoleData, catalog.KnownRoles()); err != nil {
 		return Report{}, err
 	}
-	registryPath := filepath.Join(configDir, "config-manager", "resources.json")
+	registryPath := filepath.Join(configDir, "resources.json")
 	var registry *configmanager.Registry
 	if options.Installed {
 		registry, err = configmanager.LoadRegistry(registryPath)
@@ -263,7 +269,7 @@ func rejectUnexpectedPrivateKeys(configDir string) error {
 // registered target for each managed resource. It is intentionally available
 // only for offline bundle roots; installed paths are checked by Check.
 func ManagedFiles(root string) ([]ManagedFile, error) {
-	registryData, err := os.ReadFile(filepath.Join(root, "etc", "safeterm", "config-manager", "resources.json"))
+	registryData, err := os.ReadFile(filepath.Join(root, "etc", "safeterm", "resources.json"))
 	if err != nil {
 		return nil, err
 	}

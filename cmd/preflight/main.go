@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/layout"
 
 	"safeterm/internal/deployment"
 )
@@ -43,14 +44,22 @@ func main() {
 		os.Exit(1)
 	}
 	if *installConfig {
-		if err := deployment.InstallConfiguration(*root+"/etc/safeterm", "/etc/safeterm"); err != nil {
+		if err := deployment.InstallAdministration(*root+"/etc/safeterm", layout.Admin); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := deployment.InstallGenerated(*root+"/etc/safeterm", layout.Generated); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := deployment.InstallGenerated(*root+"/etc/safeterm", layout.Defaults); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 		return
 	}
 	if *writerPlan {
-		data, err := os.ReadFile(filepath.Join(*root, "etc/safeterm/config-manager/resources.json"))
+		data, err := os.ReadFile(filepath.Join(*root, "etc/safeterm/resources.json"))
 		if err == nil {
 			var registry *configmanager.Registry
 			registry, err = configmanager.ParseRegistry(data)

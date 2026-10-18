@@ -12,7 +12,7 @@ SupplementaryGroups=safeterm-audit safeterm-config-writers safeterm-gateway safe
 RuntimeDirectory=safeterm-config-application
 RuntimeDirectoryMode=0750
 UMask=0007
-ExecStart=/usr/local/bin/safeterm-config-manager -profile=application -run-as-user=safeterm-config-application -registry=/etc/safeterm/config-manager/resources.json -socket=/run/safeterm-config-application/manager.sock
+ExecStart=/usr/local/bin/safeterm-config-manager -profile=application -run-as-user=safeterm-config-application -registry=/var/lib/safeterm/generated/resources.json -socket=/run/safeterm-config-application/manager.sock
 Restart=on-failure
 RestartSec=2s
 NoNewPrivileges=yes

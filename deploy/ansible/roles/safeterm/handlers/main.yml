@@ -1,6 +1,6 @@
 ---
 - name: Restart SafeTerm control plane
-  ansible.builtin.command: /usr/local/bin/termctl config apply
+  ansible.builtin.command: /usr/local/bin/termctl apply
   listen: Restart SafeTerm control plane
 
 - name: Restart SafeTerm SSH broker

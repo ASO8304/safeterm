@@ -47,7 +47,7 @@ func TestPrepareConfigRefreshesDigestsWithoutPublishingSigningMaterial(t *testin
 }
 
 func TestSystemdSudoersContainsOnlySignedExactCommands(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func buildTestBundle(t *testing.T) string {
 	if err := os.Mkdir(filepath.Join(configDir, "config-manager"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeJSON(t, filepath.Join(configDir, "config-manager", "resources.json"), registry, 0o644)
+	writeJSON(t, filepath.Join(configDir, "resources.json"), registry, 0o644)
 	if err := os.MkdirAll(filepath.Join(bundle, "managed", "application"), 0o755); err != nil {
 		t.Fatal(err)
 	}

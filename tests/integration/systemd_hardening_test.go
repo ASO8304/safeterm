@@ -11,7 +11,7 @@ import (
 
 // TEST-ISOLATION-002, TEST-ISOLATION-003, TEST-ISOLATION-005, TEST-ISOLATION-006, TEST-AUDIT-007
 func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 		unit := strings.ReplaceAll(string(data), "\r\n", "\n")
 		requiredSettings := []string{
 			"User=" + profile.RunAsUser,
-			"ExecStart=/usr/local/bin/safeterm-runner --config /etc/safeterm --profile " + string(profile.Name),
+			"ExecStart=/usr/local/bin/safeterm-runner --config /var/lib/safeterm/generated --profile " + string(profile.Name),
 			"ProtectSystem=strict", "ProtectHome=yes",
 			"MemoryMax=", "TasksMax=", "RestrictAddressFamilies=AF_UNIX",
 			"Requires=safeterm-audit.service", "SupplementaryGroups=safeterm-audit",
@@ -71,8 +71,8 @@ func TestCapabilityProfilesHaveSeparateHardenedSystemdUnits(t *testing.T) {
 	}
 	auditUnit := strings.ReplaceAll(string(auditData), "\r\n", "\n")
 	for _, required := range []string{
-		"User=safeterm-audit", "StateDirectory=safeterm", "StateDirectoryMode=0700",
-		"ExecStart=/usr/local/bin/safeterm-audit --store /var/lib/safeterm/audit.jsonl",
+		"User=safeterm-audit", "StateDirectory=safeterm/audit\n", "StateDirectoryMode=0700",
+		"ExecStart=/usr/local/bin/safeterm-audit --store /var/lib/safeterm/audit/audit.jsonl",
 		"CapabilityBoundingSet=\nAmbientCapabilities=\n", "ProtectSystem=strict", "RestrictAddressFamilies=AF_UNIX",
 	} {
 		if !strings.Contains(auditUnit, required) {

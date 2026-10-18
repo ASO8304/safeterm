@@ -19,6 +19,7 @@ import (
 	"safeterm/internal/config"
 	"safeterm/internal/identity"
 	"safeterm/internal/integrity"
+	"safeterm/internal/layout"
 )
 
 func main() {
@@ -36,7 +37,7 @@ func uid(name string) (uint32, error) {
 	return uint32(v), e
 }
 func run() error {
-	dir := flag.String("config", "/etc/safeterm", "signed catalog")
+	dir := flag.String("config", layout.Generated, "signed catalog")
 	users := flag.String("users", "/etc/safeterm/console/users.json", "root-managed internal Console users")
 	socket := flag.String("socket", identity.SocketPath, "Identity Unix socket")
 	ttl := flag.Duration("session-ttl", 30*time.Minute, "absolute Console session lifetime (1m to 12h)")
@@ -52,7 +53,7 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	if e = integrity.VerifyCatalogFiles(cfg, filepath.Join(*dir, "trust/catalog-ed25519.pub"), filepath.Join(*dir, "catalog.sig")); e != nil {
+	if e = integrity.VerifyCatalogFiles(cfg, layout.PublicKey(*dir), filepath.Join(*dir, "catalog.sig")); e != nil {
 		return e
 	}
 	catalog, e := broker.NewCatalog(cfg)

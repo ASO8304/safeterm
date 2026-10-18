@@ -63,19 +63,20 @@ type PathPolicy struct {
 }
 
 type FieldSchema struct {
-	Section   string      `json:"section"`
-	Key       string      `json:"key"`
-	Type      FieldType   `json:"type"`
-	Required  bool        `json:"required"`
-	Secret    bool        `json:"secret"`
-	ReadOnly  bool        `json:"read_only"`
-	Enum      []string    `json:"enum,omitempty"`
-	Min       *int64      `json:"min,omitempty"`
-	Max       *int64      `json:"max,omitempty"`
-	MinLength *int        `json:"min_length,omitempty"`
-	MaxLength *int        `json:"max_length,omitempty"`
-	Pattern   string      `json:"pattern,omitempty"`
-	Path      *PathPolicy `json:"path,omitempty"`
+	Description string      `json:"description,omitempty"`
+	Section     string      `json:"section"`
+	Key         string      `json:"key"`
+	Type        FieldType   `json:"type"`
+	Required    bool        `json:"required"`
+	Secret      bool        `json:"secret"`
+	ReadOnly    bool        `json:"read_only"`
+	Enum        []string    `json:"enum,omitempty"`
+	Min         *int64      `json:"min,omitempty"`
+	Max         *int64      `json:"max,omitempty"`
+	MinLength   *int        `json:"min_length,omitempty"`
+	MaxLength   *int        `json:"max_length,omitempty"`
+	Pattern     string      `json:"pattern,omitempty"`
+	Path        *PathPolicy `json:"path,omitempty"`
 }
 
 type CrossFieldRule struct {
@@ -92,22 +93,21 @@ type BackupPolicy struct {
 }
 
 type Resource struct {
-	PrivilegedWrite         bool             `json:"privileged_write,omitempty"`
-	ID                      string           `json:"id"`
-	Description             string           `json:"description"`
-	Profile                 string           `json:"profile"`
-	Path                    string           `json:"path"`
-	Format                  Format           `json:"format"`
-	Access                  AccessMode       `json:"access"`
-	Fields                  []FieldSchema    `json:"fields"`
-	CrossFieldRules         []CrossFieldRule `json:"cross_field_rules,omitempty"`
-	ValidatorID             string           `json:"validator_id,omitempty"`
-	ActivationOperation     string           `json:"activation_operation,omitempty"`
-	HealthCheckOperation    string           `json:"health_check_operation,omitempty"`
-	RollbackOnFailure       bool             `json:"rollback_on_failure"`
-	RequireSeparateApproval bool             `json:"require_separate_approval"`
-	Backup                  BackupPolicy     `json:"backup"`
-	Permissions             Permissions      `json:"permissions"`
+	PrivilegedWrite      bool             `json:"privileged_write,omitempty"`
+	ID                   string           `json:"id"`
+	Description          string           `json:"description"`
+	Profile              string           `json:"profile"`
+	Path                 string           `json:"path"`
+	Format               Format           `json:"format"`
+	Access               AccessMode       `json:"access"`
+	Fields               []FieldSchema    `json:"fields"`
+	CrossFieldRules      []CrossFieldRule `json:"cross_field_rules,omitempty"`
+	ValidatorID          string           `json:"validator_id,omitempty"`
+	ActivationOperation  string           `json:"activation_operation,omitempty"`
+	HealthCheckOperation string           `json:"health_check_operation,omitempty"`
+	RollbackOnFailure    bool             `json:"rollback_on_failure"`
+	Backup               BackupPolicy     `json:"backup"`
+	Permissions          Permissions      `json:"permissions"`
 }
 
 type Registry struct {
@@ -116,27 +116,27 @@ type Registry struct {
 }
 
 type ResourceSummary struct {
-	ID                      string     `json:"id"`
-	Description             string     `json:"description"`
-	Profile                 string     `json:"profile"`
-	Format                  Format     `json:"format"`
-	Access                  AccessMode `json:"access"`
-	RequireSeparateApproval bool       `json:"require_separate_approval"`
+	ID          string     `json:"id"`
+	Description string     `json:"description"`
+	Profile     string     `json:"profile"`
+	Format      Format     `json:"format"`
+	Access      AccessMode `json:"access"`
 }
 
 type FieldDescription struct {
-	Section   string    `json:"section"`
-	Key       string    `json:"key"`
-	Type      FieldType `json:"type"`
-	Required  bool      `json:"required"`
-	Secret    bool      `json:"secret"`
-	ReadOnly  bool      `json:"read_only"`
-	Enum      []string  `json:"enum,omitempty"`
-	Min       *int64    `json:"min,omitempty"`
-	Max       *int64    `json:"max,omitempty"`
-	MinLength *int      `json:"min_length,omitempty"`
-	MaxLength *int      `json:"max_length,omitempty"`
-	Pattern   string    `json:"pattern,omitempty"`
+	Description string    `json:"description,omitempty"`
+	Section     string    `json:"section"`
+	Key         string    `json:"key"`
+	Type        FieldType `json:"type"`
+	Required    bool      `json:"required"`
+	Secret      bool      `json:"secret"`
+	ReadOnly    bool      `json:"read_only"`
+	Enum        []string  `json:"enum,omitempty"`
+	Min         *int64    `json:"min,omitempty"`
+	Max         *int64    `json:"max,omitempty"`
+	MinLength   *int      `json:"min_length,omitempty"`
+	MaxLength   *int      `json:"max_length,omitempty"`
+	Pattern     string    `json:"pattern,omitempty"`
 }
 
 type ResourceDescription struct {
@@ -157,12 +157,20 @@ type ReadResult struct {
 	Fields     []FieldValue `json:"fields"`
 }
 
+// FieldChange is one registered field in an atomic resource update.
+type FieldChange struct {
+	Section string `json:"section"`
+	Key     string `json:"key"`
+	Value   string `json:"value"`
+}
+
 type Patch struct {
-	ResourceID  string `json:"resource_id"`
-	Section     string `json:"section"`
-	Key         string `json:"key"`
-	Value       string `json:"value"`
-	BaseVersion string `json:"base_version"`
+	Changes     []FieldChange `json:"changes,omitempty"`
+	ResourceID  string        `json:"resource_id"`
+	Section     string        `json:"section"`
+	Key         string        `json:"key"`
+	Value       string        `json:"value"`
+	BaseVersion string        `json:"base_version"`
 }
 
 type ValidationResult struct {

@@ -47,7 +47,7 @@ health operations assigned to its own profile.
 Gateway and Runner accounts also belong to the `safeterm-audit` group so they
 can reach the Audit Service socket. The Audit Service independently verifies
 each producer UID with `SO_PEERCRED`, runs without execution capabilities, and
-writes only to `/var/lib/safeterm/audit.jsonl`. Audit records contain argument
+writes only to `/var/lib/safeterm/audit/audit.jsonl`. Audit records contain argument
 names but never raw argument values. Every append is synchronized before the
 producer receives acknowledgement, and each record is linked to the previous
 record by SHA-256 to detect modification, reordering, and deletion inside the
@@ -146,7 +146,7 @@ broaden access to unrelated configuration:
 ```bash
 install -d -o root -g root -m 0755 /etc/safeterm/config-manager
 install -o root -g root -m 0644 deploy/config-manager/resources.example.json \
-  /etc/safeterm/config-manager/resources.json
+  /var/lib/safeterm/generated/resources.json
 install -d -o safeterm-config-application -g safeterm-config-application -m 0700 \
   /etc/safeterm-managed/application
 install -d -o safeterm-config-database -g safeterm-config-database -m 0700 \

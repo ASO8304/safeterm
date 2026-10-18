@@ -10,10 +10,9 @@ import (
 func TestQuestionHelpListsDescriptionsWithoutExecution(t *testing.T) {
 	catalog, _ := NewCatalog(brokerTestConfig())
 	for _, tc := range []struct{ input, contains string }{
-		{"?", "Execute an authorized operation"},
+		{"?", "Execute an authorized command"},
 		{"execute ?", "System information"},
-		{"execute system_info ?", "parameters: none"},
-		{"config ?", "Restore the latest configuration backup"},
+		{"execute system ?", "parameters: none"},
 	} {
 		var output bytes.Buffer
 		client := &fakeGateway{}

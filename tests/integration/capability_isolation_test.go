@@ -25,7 +25,7 @@ func (c *isolationCore) HandleRequest(_ context.Context, request *contract.Execu
 
 // TEST-ISOLATION-004, TEST-ISOLATION-006, TEST-ISOLATION-010, TEST-ISOLATION-011
 func TestCapabilityIsolatedGatewayRoutesAcrossAuthenticatedUnixIPC(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"safeterm/internal/audit"
 	"safeterm/internal/configmanager"
+	"safeterm/internal/layout"
 	"strconv"
 	"syscall"
 )
@@ -27,7 +28,7 @@ func run() error {
 	if err := configmanager.ValidateWriterRegistry(); err != nil {
 		return err
 	}
-	registry, err := configmanager.LoadRegistry("/etc/safeterm/config-manager/resources.json")
+	registry, err := configmanager.LoadRegistry(layout.Registry)
 	if err != nil {
 		return err
 	}

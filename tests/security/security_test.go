@@ -30,7 +30,7 @@ func (p *executionProbe) Execute(context.Context, string, []string) (string, str
 
 func securityCore(t *testing.T) (*agent.Core, *executionProbe) {
 	t.Helper()
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestSystemdBoundValidationRejectsUnsafeEffectiveValues(t *testing.T) {
 
 // TEST-SECURITY-004: REQ-014 AC-3 and AC-7.
 func TestSignedCatalogContainsNoShellOrCallerSelectedExecutable(t *testing.T) {
-	cfg, err := config.LoadConfig("../../configs")
+	cfg, err := config.LoadConfig("../../internal/defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}

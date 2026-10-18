@@ -73,9 +73,7 @@ func NewManager(profile string, registry *Registry, validators map[string]Applic
 		return nil, err
 	}
 	selected := resourcesForProfile(registry, profile)
-	if len(selected) == 0 {
-		return nil, fmt.Errorf("configmanager: profile %q has no resources", profile)
-	}
+
 	if options.ProposalTTL == 0 {
 		options.ProposalTTL = defaultProposalTTL
 	}
@@ -147,7 +145,7 @@ func (m *Manager) Describe(ctx context.Context, actor Actor, resourceID string) 
 	fields := make([]FieldDescription, 0, len(resource.Fields))
 	for _, field := range resource.Fields {
 		fields = append(fields, FieldDescription{
-			Section: field.Section, Key: field.Key, Type: field.Type, Required: field.Required,
+			Description: field.Description, Section: field.Section, Key: field.Key, Type: field.Type, Required: field.Required,
 			Secret: field.Secret, ReadOnly: field.ReadOnly, Enum: append([]string(nil), field.Enum...), Min: cloneInt64(field.Min),
 			Max: cloneInt64(field.Max), MinLength: cloneInt(field.MinLength), MaxLength: cloneInt(field.MaxLength), Pattern: field.Pattern,
 		})
@@ -201,7 +199,7 @@ func (m *Manager) ValidatePatch(ctx context.Context, actor Actor, patch Patch) (
 	prepared, _, err := m.prepare(ctx, actor, patch)
 	if err != nil {
 		if resource := m.resources[patch.ResourceID]; resource != nil {
-			if auditErr := m.record(ctx, actor, resource.definition, ActionPropose, "validation-rejected", fieldCoordinate(patch.Section, patch.Key), patch.BaseVersion, "", "", ""); auditErr != nil {
+			if auditErr := m.record(ctx, actor, resource.definition, ActionPropose, "validation-rejected", patchCoordinate(patch), patch.BaseVersion, "", "", ""); auditErr != nil {
 				return ValidationResult{}, auditErr
 			}
 		}
@@ -231,7 +229,7 @@ func (m *Manager) Preview(ctx context.Context, actor Actor, patch Patch) (Previe
 	}
 	m.proposals[token] = prepared
 	m.proposalMu.Unlock()
-	if err := m.record(ctx, actor, resource, ActionPropose, "preview-created", patch.Section+"."+patch.Key, patch.BaseVersion, "", id, ""); err != nil {
+	if err := m.record(ctx, actor, resource, ActionPropose, "preview-created", patchCoordinate(patch), patch.BaseVersion, "", id, ""); err != nil {
 		m.proposalMu.Lock()
 		delete(m.proposals, token)
 		m.proposalMu.Unlock()
@@ -282,18 +280,18 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 	}
 	currentVersion := contentVersion(current)
 	if currentVersion != prepared.patch.BaseVersion {
-		_ = m.record(ctx, actor, resource, ActionApply, "apply-rejected", prepared.patch.Section+"."+prepared.patch.Key, prepared.patch.BaseVersion, currentVersion, prepared.id, actor.UserID)
+		_ = m.record(ctx, actor, resource, ActionApply, "apply-rejected", patchCoordinate(prepared.patch), prepared.patch.BaseVersion, currentVersion, prepared.id, actor.UserID)
 		return ApplyResult{}, fmt.Errorf("configmanager: version conflict")
 	}
 	if contentVersion(prepared.rendered) == currentVersion {
 		return ApplyResult{}, fmt.Errorf("configmanager: proposal makes no change")
 	}
-	if err := m.record(ctx, actor, resource, ActionApply, "apply-authorized", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, contentVersion(prepared.rendered), prepared.id, actor.UserID); err != nil {
+	if err := m.record(ctx, actor, resource, ActionApply, "apply-authorized", patchCoordinate(prepared.patch), currentVersion, contentVersion(prepared.rendered), prepared.id, actor.UserID); err != nil {
 		return ApplyResult{}, err
 	}
 	backup, err := m.commitFile(resource, prepared.patch, prepared.rendered, current, info)
 	if err != nil {
-		_ = m.record(ctx, actor, resource, ActionApply, "apply-rejected", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), currentVersion, "", prepared.id, actor.UserID)
+		_ = m.record(ctx, actor, resource, ActionApply, "apply-rejected", patchCoordinate(prepared.patch), currentVersion, "", prepared.id, actor.UserID)
 		return ApplyResult{}, err
 	}
 	newVersion := contentVersion(prepared.rendered)
@@ -301,16 +299,16 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 	if resource.ActivationOperation != "" {
 		if err := m.activator.Run(ctx, actor, resource.ActivationOperation); err != nil {
 			result.ActivationOutcome = "failed"
-			_ = m.record(ctx, actor, resource, ActionActivate, "activation-failed", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, newVersion, prepared.id, actor.UserID)
+			_ = m.record(ctx, actor, resource, ActionActivate, "activation-failed", patchCoordinate(prepared.patch), currentVersion, newVersion, prepared.id, actor.UserID)
 			if resource.RollbackOnFailure && backup != "" {
 				if rollbackErr := m.restoreFile(resource, backup, newVersion); rollbackErr != nil {
 					result.RollbackOutcome = "failed"
-					_ = m.record(ctx, actor, resource, ActionRollback, "rollback-failed", prepared.patch.Section+"."+prepared.patch.Key, newVersion, currentVersion, prepared.id, actor.UserID)
+					_ = m.record(ctx, actor, resource, ActionRollback, "rollback-failed", patchCoordinate(prepared.patch), newVersion, currentVersion, prepared.id, actor.UserID)
 					return result, fmt.Errorf("configmanager: activation failed: %v; rollback failed: %w", err, rollbackErr)
 				}
 				result.RollbackOutcome = "succeeded"
 				result.Version = currentVersion
-				_ = m.record(ctx, actor, resource, ActionRollback, "rollback-succeeded", prepared.patch.Section+"."+prepared.patch.Key, newVersion, currentVersion, prepared.id, actor.UserID)
+				_ = m.record(ctx, actor, resource, ActionRollback, "rollback-succeeded", patchCoordinate(prepared.patch), newVersion, currentVersion, prepared.id, actor.UserID)
 			}
 			return result, fmt.Errorf("configmanager: activation failed: %w", err)
 		}
@@ -318,23 +316,23 @@ func (m *Manager) Apply(ctx context.Context, actor Actor, token string) (ApplyRe
 		if resource.HealthCheckOperation != "" {
 			if err := m.activator.Run(ctx, actor, resource.HealthCheckOperation); err != nil {
 				result.ActivationOutcome = "health-check-failed"
-				_ = m.record(ctx, actor, resource, ActionActivate, "activation-failed", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), currentVersion, newVersion, prepared.id, actor.UserID)
+				_ = m.record(ctx, actor, resource, ActionActivate, "activation-failed", patchCoordinate(prepared.patch), currentVersion, newVersion, prepared.id, actor.UserID)
 				if resource.RollbackOnFailure && backup != "" {
 					if rollbackErr := m.restoreFile(resource, backup, newVersion); rollbackErr == nil {
 						result.RollbackOutcome, result.Version = "succeeded", currentVersion
-						_ = m.record(ctx, actor, resource, ActionRollback, "rollback-succeeded", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), newVersion, currentVersion, prepared.id, actor.UserID)
+						_ = m.record(ctx, actor, resource, ActionRollback, "rollback-succeeded", patchCoordinate(prepared.patch), newVersion, currentVersion, prepared.id, actor.UserID)
 					} else {
 						result.RollbackOutcome = "failed"
-						_ = m.record(ctx, actor, resource, ActionRollback, "rollback-failed", fieldCoordinate(prepared.patch.Section, prepared.patch.Key), newVersion, currentVersion, prepared.id, actor.UserID)
+						_ = m.record(ctx, actor, resource, ActionRollback, "rollback-failed", patchCoordinate(prepared.patch), newVersion, currentVersion, prepared.id, actor.UserID)
 						return result, fmt.Errorf("configmanager: health check failed: %v; rollback failed: %w", err, rollbackErr)
 					}
 				}
 				return result, fmt.Errorf("configmanager: health check failed: %w", err)
 			}
 		}
-		_ = m.record(ctx, actor, resource, ActionActivate, "activation-succeeded", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, newVersion, prepared.id, actor.UserID)
+		_ = m.record(ctx, actor, resource, ActionActivate, "activation-succeeded", patchCoordinate(prepared.patch), currentVersion, newVersion, prepared.id, actor.UserID)
 	}
-	if err := m.record(ctx, actor, resource, ActionApply, "applied", prepared.patch.Section+"."+prepared.patch.Key, currentVersion, result.Version, prepared.id, actor.UserID); err != nil {
+	if err := m.record(ctx, actor, resource, ActionApply, "applied", patchCoordinate(prepared.patch), currentVersion, result.Version, prepared.id, actor.UserID); err != nil {
 		if backup != "" {
 			_ = m.restoreFile(resource, backup, newVersion)
 		}
@@ -386,13 +384,6 @@ func (m *Manager) prepare(ctx context.Context, actor Actor, patch Patch) (propos
 	if resource.Access != AccessReadWrite || patch.BaseVersion == "" {
 		return proposal{}, Resource{}, fmt.Errorf("configmanager: writable resource and base version are required")
 	}
-	field, ok := findField(resource, patch.Section, patch.Key)
-	if !ok {
-		return proposal{}, Resource{}, fmt.Errorf("configmanager: field is not registered")
-	}
-	if field.ReadOnly {
-		return proposal{}, Resource{}, fmt.Errorf("configmanager: field is read-only")
-	}
 	managed := m.resources[resource.ID]
 	managed.mu.Lock()
 	defer managed.mu.Unlock()
@@ -403,39 +394,8 @@ func (m *Manager) prepare(ctx context.Context, actor Actor, patch Patch) (propos
 	if contentVersion(data) != patch.BaseVersion {
 		return proposal{}, Resource{}, fmt.Errorf("configmanager: version conflict")
 	}
-	document, err := parseDocument(resource.Format, data)
+	rendered, diff, normalized, secret, err := renderPatch(resource, data, patch)
 	if err != nil {
-		return proposal{}, Resource{}, err
-	}
-	oldValue, exists := document.Get(field.Section, field.Key)
-	if !exists {
-		return proposal{}, Resource{}, fmt.Errorf("configmanager: registered field is missing from document")
-	}
-	typed, normalized, err := normalizeValue(field, patch.Value)
-	if err != nil {
-		return proposal{}, Resource{}, err
-	}
-	if resource.Format == FormatJSON {
-		typed = typedValueForJSON(typed)
-	}
-	if err := document.Set(field.Section, field.Key, typed); err != nil {
-		return proposal{}, Resource{}, err
-	}
-	if err := validateCompleteDocument(resource, document); err != nil {
-		return proposal{}, Resource{}, err
-	}
-	rendered, err := document.Render()
-	if err != nil {
-		return proposal{}, Resource{}, err
-	}
-	if len(rendered) > maxDocumentBytes {
-		return proposal{}, Resource{}, fmt.Errorf("configmanager: rendered document exceeds size limit")
-	}
-	reparsed, err := parseDocument(resource.Format, rendered)
-	if err != nil {
-		return proposal{}, Resource{}, err
-	}
-	if err := validateCompleteDocument(resource, reparsed); err != nil {
 		return proposal{}, Resource{}, err
 	}
 	if resource.ValidatorID != "" {
@@ -443,12 +403,8 @@ func (m *Manager) prepare(ctx context.Context, actor Actor, patch Patch) (propos
 			return proposal{}, Resource{}, fmt.Errorf("configmanager: application validation failed: %w", err)
 		}
 	}
-	actual, exists := reparsed.Get(field.Section, field.Key)
-	if !exists || scalarString(actual) != normalized {
-		return proposal{}, Resource{}, fmt.Errorf("configmanager: value changed during rendering")
-	}
-	diff := renderDiff(field, scalarString(oldValue), normalized)
-	return proposal{resourceID: resource.ID, patch: patch, normalizedValue: normalized, rendered: rendered, diff: diff, secret: field.Secret}, resource, nil
+	patch.Changes = append([]FieldChange(nil), patch.Changes...)
+	return proposal{resourceID: resource.ID, patch: patch, normalizedValue: normalized, rendered: rendered, diff: diff, secret: secret}, resource, nil
 }
 
 func (m *Manager) authorize(actor Actor, resourceID string, action Action) (Resource, error) {
@@ -509,7 +465,7 @@ func (m *Manager) record(ctx context.Context, actor Actor, resource Resource, ac
 }
 
 func summary(resource Resource) ResourceSummary {
-	return ResourceSummary{ID: resource.ID, Description: resource.Description, Profile: resource.Profile, Format: resource.Format, Access: resource.Access, RequireSeparateApproval: resource.RequireSeparateApproval}
+	return ResourceSummary{ID: resource.ID, Description: resource.Description, Profile: resource.Profile, Format: resource.Format, Access: resource.Access}
 }
 
 func findField(resource Resource, section, key string) (FieldSchema, bool) {

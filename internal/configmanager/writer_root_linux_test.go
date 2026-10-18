@@ -33,7 +33,7 @@ func TestWriterUnprivilegedManagerChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := Patch{ResourceID: "cats-options", Section: "cats", Key: "Cat_Port", Value: "100", BaseVersion: read.Version}
+	p := Patch{ResourceID: "cats-options", BaseVersion: read.Version, Changes: []FieldChange{{Section: "cats", Key: "Cat_Port", Value: "100"}, {Section: "cats", Key: "Password", Value: "updated-secret"}}}
 	preview, err := m.Preview(context.Background(), actor, p)
 	if err != nil {
 		t.Fatal(err)
@@ -123,6 +123,7 @@ func TestPrivilegedWriterRootIntegration(t *testing.T) {
 				t.Fatal(err)
 			}
 			want := bytes.Replace(before, []byte("\"99\""), []byte("\"100\""), 1)
+			want = bytes.Replace(want, []byte("\"hidden\""), []byte("\"updated-secret\""), 1)
 			if !bytes.Equal(after, want) {
 				t.Fatal("unrelated INI bytes changed")
 			}

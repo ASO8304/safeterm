@@ -36,11 +36,10 @@ safeterm_local_key_dir: /root/.config/safeterm
 safeterm_bootstrap_ssh_user: alice
 safeterm_bootstrap_ssh_public_key_file: ""
 safeterm_bootstrap_ssh_password_hash_file: ""
-safeterm_single_operator: false
 
 safeterm_ssh_users: []
 safeterm_console_users: []
-safeterm_config_registry_file: ""
+safeterm_resources_directory: ""
 
 safeterm_services:
   - safeterm-audit.service
