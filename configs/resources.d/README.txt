@@ -76,7 +76,7 @@ min_length/max_length, pattern and path policy. Section and key names match the
 actual file, case-sensitively. Use an empty section for root fields and edit - in
 the terminal. Unknown/unregistered keys remain untouched and are not editable.
 Set `secret: true` for sensitive fields; `set KEY` prompts with hidden input.
-INI comments/order/layout are preserved. JSON uses the existing deterministic
+INI comments/order/layout, blank lines and a leading UTF-8 BOM are preserved. JSON uses the existing deterministic
 renderer. The source definition is always JSON even when the managed file is INI.
 
 Omitting edit/rollback roles makes the resource read-only. Backup retention

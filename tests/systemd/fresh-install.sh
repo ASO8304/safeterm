@@ -39,7 +39,7 @@ wait_ready() {
 wait_ready
 python3 "$repo/tests/systemd/console-smoke.py" empty
 install -d -m 0755 /etc/safeterm-ci
-printf '; untouched comment\n[Server]\nPort = 8080 ; keep comment\n' >/etc/safeterm-ci/options.ini
+printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 8080 ; keep comment\n' >/etc/safeterm-ci/options.ini
 chmod 0644 /etc/safeterm-ci/options.ini
 cat >/etc/safeterm/resources.d/fresh-options.json <<'JSON'
 {"id":"fresh-options","description":"CI configuration","config":{"path":"/etc/safeterm-ci/options.ini","format":"ini","permissions":{"read":["config-viewer","config-operator"],"edit":["config-operator"]},"fields":[{"section":"Server","key":"Port","type":"integer","min":1,"max":65535}]}}
@@ -48,7 +48,7 @@ termctl check
 termctl apply
 wait_ready
 python3 "$repo/tests/systemd/console-smoke.py" configured
-printf '; untouched comment\n[Server]\nPort = 9090 ; keep comment\n' >"$work/expected.ini"
+printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 9090 ; keep comment\n' >"$work/expected.ini"
 cmp "$work/expected.ini" /etc/safeterm-ci/options.ini
 [[ $(stat -c '%U:%G %a' /etc/safeterm-ci/options.ini) == 'root:root 644' ]]
 termctl service status all

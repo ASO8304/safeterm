@@ -40,6 +40,7 @@ type iniValue struct {
 }
 
 type iniDocument struct {
+	bom    string
 	lines  []string
 	values map[string]*iniValue
 }
@@ -49,8 +50,14 @@ func parseINI(data []byte) (*iniDocument, error) {
 		return nil, fmt.Errorf("configmanager: INI contains NUL")
 	}
 	text := string(data)
+	// A UTF-8 signature is file metadata, not part of the first section/key.
+	// Keep it separately so round trips and edits preserve the original bytes.
+	bom := ""
+	if strings.HasPrefix(text, "\xef\xbb\xbf") {
+		bom, text = text[:3], text[3:]
+	}
 	lines := splitLinesPreservingEndings(text)
-	document := &iniDocument{lines: lines, values: map[string]*iniValue{}}
+	document := &iniDocument{bom: bom, lines: lines, values: map[string]*iniValue{}}
 	section := ""
 	sections := map[string]bool{}
 	for index, line := range lines {
@@ -209,7 +216,7 @@ func (d *iniDocument) Set(section, key string, value any) error {
 }
 
 func (d *iniDocument) Render() ([]byte, error) {
-	return []byte(strings.Join(d.lines, "")), nil
+	return []byte(d.bom + strings.Join(d.lines, "")), nil
 }
 
 type jsonDocument struct {

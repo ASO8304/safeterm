@@ -57,7 +57,9 @@ letters, digits, slash, dot, underscore or hyphen. Symlinks, hard links, special
 files, set-ID bits, executable capabilities and content-integrity signatures are
 refused. Normal ACL/xattr preservation failure aborts before replacement.
 
-INI edits preserve every unrelated byte: comments (including section-header and
+INI edits accept and preserve a leading UTF-8 BOM. UTF-16/UTF-32 files are not
+supported. Blank lines and consecutive # or ; comments may appear between
+sections and fields. INI edits preserve every unrelated byte: comments (including section-header and
 inline comments), section/key order, indentation, assignment spacing, quotation
 style, LF/CRLF and final-newline state. Only the selected value token is replaced.
 Multiline/NUL values, duplicate sections/keys and values that cannot be expressed

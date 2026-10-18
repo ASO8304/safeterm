@@ -251,3 +251,9 @@ a real end/save must preserve root ownership, mode and unrelated INI comments.
 Managers have no ReadWritePaths: all file mutations are delegated to the writer.
 The destructive smoke test refuses existing installations and requires explicit
 SAFETERM_DISPOSABLE_HOST=1. It is never run on the developer/user workstation.
+
+UTF-8 BOM regression: adapter tests round-trip and edit the Cat section fixture
+with LF/CRLF, blank lines, consecutive comments and optional final newline. The
+initial BOM is retained, including before a root-level key. Malformed and duplicate
+syntax remains rejected. The real systemd installation/Console test now uses a
+BOM-prefixed INI and compares every output byte after saving through the writer.
