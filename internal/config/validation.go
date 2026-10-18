@@ -185,7 +185,7 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 			if op.LongRunning {
 				return nil, fmt.Errorf("config: systemd operation %q cannot be long-running", op.Name)
 			}
-			if op.ExecutableRef != "" || len(op.ArgsTemplate) != 0 || op.Systemd == nil {
+			if op.ExecutableRef != "" || len(op.ArgsTemplate) != 0 || len(op.ArgumentGroups) != 0 || len(op.RequiredAny) != 0 || len(op.ArgumentGroupSeparator) != 0 || op.Systemd == nil {
 				return nil, fmt.Errorf("config: systemd operation %q requires only a typed systemd definition", op.Name)
 			}
 			if len(op.Parameters) != 0 || !unitPattern.MatchString(op.Systemd.Unit) || strings.Contains(op.Systemd.Unit, "..") || !validSystemdAction(op.Systemd.Action) {
@@ -199,6 +199,31 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 				return nil, err
 			}
 		}
+		defined := map[string]bool{}
+		for _, p := range op.Parameters {
+			defined[p.Name] = true
+		}
+		seenRequired := map[string]bool{}
+		for _, name := range op.RequiredAny {
+			if !defined[name] || seenRequired[name] {
+				return nil, fmt.Errorf("config: operation %q: invalid required_any parameter %q", op.Name, name)
+			}
+			seenRequired[name] = true
+		}
+		for _, group := range op.ArgumentGroups {
+			if !defined[group.When] || len(group.ArgsTemplate) == 0 {
+				return nil, fmt.Errorf("config: operation %q: invalid argument group %q", op.Name, group.When)
+			}
+		}
+		for _, token := range op.ArgumentGroupSeparator {
+			if token == "" || strings.ContainsAny(token, "{}\x00") {
+				return nil, fmt.Errorf("config: operation %q: invalid argument group separator", op.Name)
+			}
+		}
+		if len(op.ArgumentGroups) == 0 && len(op.ArgumentGroupSeparator) != 0 {
+			return nil, fmt.Errorf("config: operation %q: separator requires argument groups", op.Name)
+		}
+
 	}
 	return names, nil
 }

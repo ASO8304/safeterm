@@ -63,6 +63,39 @@ func TestParseOperationArgumentsAllowsAliasOverride(t *testing.T) {
 	}
 }
 
+func TestTraceCompletionHasOnlyDynamicArguments(t *testing.T) {
+	cfg, err := config.LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := NewCatalog(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shell, err := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"netops"}}, bytes.NewReader(nil), &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ before, prefix, want string }{
+		{"execute trace ", "", "host=,port=,protocol="},
+		{"execute trace po", "po", "port="},
+		{"execute trace host=192.0.2.1 ", "", "port=,protocol="},
+		{"execute trace port=999 ", "", "host=,protocol="},
+		{"execute trace protocol=", "protocol=", "protocol=arp,protocol=icmp,protocol=ip,protocol=tcp,protocol=udp"},
+		{"execute trace port=999 protocol=t", "protocol=t", "protocol=tcp"},
+		{"show trace ", "", "host=,port=,protocol="},
+	} {
+		if got := strings.Join(shell.completionCandidates(context.Background(), tc.before, tc.prefix), ","); got != tc.want {
+			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)
+		}
+	}
+	for _, name := range []string{"trace_host", "trace_port", "trace_filtered"} {
+		if _, ok := catalog.AuthorizedOperation(name, []string{"netops"}); ok {
+			t.Errorf("obsolete operation %s remains", name)
+		}
+	}
+}
+
 func TestPositionalMappedArgumentAndHelpExample(t *testing.T) {
 	operation := config.OperationDefinition{
 		Name: "log", Parameters: []config.ParameterDefinition{{Name: "source", Type: config.ParamTypeString, Required: true, ValueMap: map[string]string{"service_A": "/var/log/service-a.log"}}},
@@ -87,5 +120,60 @@ func TestConsoleRequestsCarryAuthenticatedSession(t *testing.T) {
 	request, err := shell.request("system_info", map[string]string{})
 	if err != nil || request.Metadata.BrokerType != "console" || request.Metadata.UserID != "console-operator" || request.Metadata.ConsoleSession != "opaque-token" {
 		t.Fatalf("request=%+v err=%v", request, err)
+	}
+}
+
+func TestPingCompletionOffersCanonicalParameters(t *testing.T) {
+	cfg, err := config.LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := NewCatalog(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shell, err := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"netops"}}, bytes.NewReader(nil), &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ before, prefix, want string }{
+		{"execute ping ", "", "count=,host="},
+		{"execute ping host=192.168.222.10 ", "", "count="},
+		{"execute ping host=192.168.222.10 co", "co", "count="},
+		{"execute ping host=192.168.222.10 count=5 ", "", ""},
+		{"execute ping count=5 ", "", "host="},
+		{"execute ping count=", "count=", "count="},
+		{"execute ping -", "-", "-c"},
+	} {
+		if got := strings.Join(shell.completionCandidates(context.Background(), tc.before, tc.prefix), ","); got != tc.want {
+			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)
+		}
+	}
+}
+
+func TestLogCompletionOffersOnlyMappedSources(t *testing.T) {
+	cfg, err := config.LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := NewCatalog(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	shell, err := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"log-viewer"}}, bytes.NewReader(nil), &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ before, prefix, want string }{
+		{"execute logs ", "", "authentication,service_A,system"},
+		{"show logs ", "", "authentication,service_A,system"},
+		{"execute logs s", "s", "service_A,system"},
+		{"execute logs system ", "", ""},
+		{"execute logs source=system ", "", ""},
+		{"execute logs source=", "source=", "source=authentication,source=service_A,source=system"},
+	} {
+		if got := strings.Join(shell.completionCandidates(context.Background(), tc.before, tc.prefix), ","); got != tc.want {
+			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)
+		}
 	}
 }

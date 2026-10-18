@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"safeterm/internal/config"
 	"safeterm/internal/contract"
@@ -61,6 +62,23 @@ func (v *Validator) Validate(req *contract.ExecutionRequest) error {
 	for name := range req.Arguments {
 		if _, ok := defined[name]; !ok {
 			return fmt.Errorf("validation: operation %q does not accept argument %q", op.Name, name)
+		}
+	}
+
+	if len(op.RequiredAny) > 0 {
+		present := false
+		for _, name := range op.RequiredAny {
+			if req.Arguments[name] != "" {
+				present = true
+			}
+			for _, p := range op.Parameters {
+				if p.Name == name && p.Default != "" {
+					present = true
+				}
+			}
+		}
+		if !present {
+			return fmt.Errorf("validation: operation %q: %s must be specified", op.Name, strings.Join(op.RequiredAny, " or "))
 		}
 	}
 

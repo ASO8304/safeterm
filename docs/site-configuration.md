@@ -80,6 +80,13 @@ Role assignment never creates a role implicitly. Existing identity roles must
 continue to exist; activation does not change credentials or user role lists.
 Remove a role from identities before rolling back to a generation without it.
 
+Operations may also define `required_any` (at least one named parameter must
+have a nonempty effective value), `argument_groups` (each with `when` and
+whole-token `args_template`), and a literal `argument_group_separator` array.
+See [catalog authoring](catalog-authoring.md) for the shipped dynamic `trace`
+example. Groups and constraints are signed configuration and remain subject
+to normal typed validation, authorization and executable approval.
+
 ## Policies
 
 policies.d/site-reader.json can explicitly replace a role's entire operation list:

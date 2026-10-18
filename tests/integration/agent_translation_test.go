@@ -100,6 +100,7 @@ func TestCore_WithRealTranslator_EarlierStagesStopTranslation(t *testing.T) {
 				req.Command = "tcpdump"
 			case "missing argument":
 				delete(req.Arguments, "host")
+				delete(req.Arguments, "port")
 			case "port injection":
 				req.Arguments["port"] = "; rm -rf /"
 			case "host injection":

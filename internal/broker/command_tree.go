@@ -29,12 +29,7 @@ func operationWords(name string) []string {
 		return []string{"disk"}
 	case "system_info":
 		return []string{"system"}
-	case "trace_host":
-		return []string{"trace", "host"}
-	case "trace_port":
-		return []string{"trace", "port"}
-	case "trace_filtered":
-		return []string{"trace", "filtered"}
+
 	}
 	return []string{name}
 }
@@ -134,8 +129,7 @@ func (s *Shell) treeCompletion(ctx context.Context, before, prefix string) ([]st
 			}
 		}
 	}
-	// A complete path also offers operation arguments, including the generic
-	// trace operation alongside its host/port/filtered subcommands.
+	// A complete operation path also offers its arguments.
 	if op, args, ok := s.resolveOperation(parents); ok {
 		normalized := "execute " + op.Name + " "
 		if len(args) > 0 {

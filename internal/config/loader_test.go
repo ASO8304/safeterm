@@ -22,8 +22,8 @@ func TestShippedTcpdumpOperationsFlushOutputWithoutNameResolution(t *testing.T) 
 			t.Errorf("%s: tcpdump must stream line-buffered numeric output", op.Name)
 		}
 	}
-	if count != 4 {
-		t.Fatalf("expected four capture operations, found %d", count)
+	if count != 1 {
+		t.Fatalf("expected one capture operation, found %d", count)
 	}
 }
 

@@ -50,6 +50,12 @@ func (s *Snapshot) Operation(name string) (config.OperationDefinition, bool) {
 	}
 	operation, ok := s.definitions[name]
 	operation.ArgsTemplate = append([]string(nil), operation.ArgsTemplate...)
+	operation.RequiredAny = append([]string(nil), operation.RequiredAny...)
+	operation.ArgumentGroupSeparator = append([]string(nil), operation.ArgumentGroupSeparator...)
+	operation.ArgumentGroups = append([]config.ArgumentGroup(nil), operation.ArgumentGroups...)
+	for i := range operation.ArgumentGroups {
+		operation.ArgumentGroups[i].ArgsTemplate = append([]string(nil), operation.ArgumentGroups[i].ArgsTemplate...)
+	}
 	operation.Parameters = append([]config.ParameterDefinition(nil), operation.Parameters...)
 	for index := range operation.Parameters {
 		if operation.Parameters[index].ValueMap == nil {

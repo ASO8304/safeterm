@@ -308,13 +308,28 @@ func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix s
 				used[parts[0]] = true
 			}
 		}
+		completed := fields[2:]
+		if !trailing && len(completed) > 0 {
+			completed = completed[:len(completed)-1]
+		}
+		if parsed, err := parseOperationArguments(operation, completed); err == nil {
+			for name := range parsed {
+				used[name] = true
+			}
+		}
 		values := []string{}
 		position := index - 2
 		for parameterIndex, parameter := range operation.Parameters {
-			if !used[parameter.Name] || strings.HasPrefix(prefix, parameter.Name+"=") {
+			explicit := strings.HasPrefix(prefix, parameter.Name+"=")
+			mappedPosition := parameterIndex == position && len(parameter.ValueMap) > 0 && !strings.Contains(prefix, "=")
+			offerName := !used[parameter.Name] || explicit
+			if len(parameter.ValueMap) > 0 {
+				offerName = !used[parameter.Name] && !mappedPosition && !explicit
+			}
+			if offerName {
 				values = append(values, parameter.Name+"=")
 			}
-			if parameterIndex == position && !strings.Contains(prefix, "=") {
+			if mappedPosition && !used[parameter.Name] {
 				for alias := range parameter.ValueMap {
 					values = append(values, alias)
 				}
@@ -324,10 +339,9 @@ func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix s
 					values = append(values, parameter.Name+"="+alias)
 				}
 			}
-			if parameter.Default != "" && !strings.Contains(prefix, "=") {
-				values = append(values, parameter.Name+"="+parameter.Default)
-			}
-			if !strings.Contains(prefix, "=") {
+			// Keep the normal menu to canonical names; aliases are offered
+			// only when the user explicitly starts typing a flag.
+			if strings.HasPrefix(prefix, "-") && !used[parameter.Name] {
 				values = append(values, parameter.Aliases...)
 			}
 		}

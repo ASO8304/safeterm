@@ -58,22 +58,38 @@ execute only the signed `tail` operation. A narrower deployment may replace
 ## Add bounded network diagnostics
 
 The shipped `ping` operation sends bounded IPv4 echo requests with a
-two-second per-packet timeout. It defaults to 100 requests; operators can use
-the `-c` alias or `count=VALUE` to override that default. Only the validated
-host value is accepted:
+two-second per-packet timeout. Only host is required. Count defaults to 1000
+(the maximum); `count=VALUE` accepts 1–1000. Tab offers only `host=` and `count=`
+and stops offering parameters already supplied. The `-c` alias remains accepted
+when explicitly typed. Only the validated host value is accepted:
 
 ```text
-execute ping host=192.168.45.140 -c 5
+execute ping host=192.168.45.140 count=5
 ```
 
 Grant `ping` through the `netops` policy. Keep the executable in the
 `network-observer` profile so its `CAP_NET_RAW` boundary is separate from
 diagnostic and service-manager processes.
 
-The catalog uses separate typed operations for tcpdump filter combinations:
-`trace_host`, `trace_port`, and `trace_filtered` (host, port, and one of the
-approved `tcp`, `udp`, `icmp`, `arp`, or `ip` protocols). This keeps omitted
-filters explicit and prevents an empty or caller-built tcpdump expression.
+The catalog exposes one `trace` operation with optional typed `host`, `port`
+and `protocol` parameters. `required_any: ["host", "port"]` rejects empty
+requests and protocol-only requests with `host or port must be specified`.
+`any` is not accepted for host, port or protocol. Protocol choices are `tcp`,
+`udp`, `icmp`, `arp` and `ip`. Tab completes names and protocol values.
+
+```text
+execute trace host=192.0.2.1
+execute trace port=999
+execute trace host=192.0.2.1 port=999 protocol=tcp
+```
+
+The signed `argument_groups` each have a `when` parameter and an `args_template`.
+A group is included only when its parameter has a nonempty effective value
+(including a configured default). Included groups are joined with the literal
+`argument_group_separator: ["and"]`; there is no leading/trailing separator.
+All placeholders remain whole argv tokens and are validated before execution.
+No caller-built filter expressions or shell are accepted. Protocol predicates
+are standalone BPF tokens, so `arp` is emitted as `arp`, rather than `proto arp`.
 
 The shipped `traceroute` operation requires `/usr/bin/traceroute` on the
 target. Refresh its executable digest during catalog preparation before
@@ -128,15 +144,14 @@ copy with `--source DIR`. Package/unit changes still use the installer workflow.
 
 ## Streaming tcpdump output
 
-All shipped capture operations (`trace`, `trace_host`, `trace_port`, and
-`trace_filtered`) use `-l -nn`. SafeTerm captures stdout through a pipe;
+The shipped `trace` operation uses `-l -nn`. SafeTerm captures stdout through a pipe;
 `-l` makes tcpdump flush each text line instead of retaining a block until
 termination. `-nn` disables hostname and port-name resolution so lookup latency
 cannot delay packet rendering. The fixed capture/filter arguments remain
 catalog-owned. Runtime streaming cannot flush bytes still buffered inside the
 child process.
 
-On a test host, start `execute trace_port port=999`, generate TCP traffic to
+On a test host, start `execute trace port=999`, generate TCP traffic to
 port 999 from another terminal, and verify packet lines appear before Ctrl+C.
 Termination should still return a final result and record durable completion
 without reusing the canceled execution context. Runner completion auditing has

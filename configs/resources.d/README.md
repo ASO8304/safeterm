@@ -126,7 +126,11 @@ Service only:
     "unit": "myapp.service",
     "actions": {
       "status": { "roles": ["service-viewer", "service-operator"] },
-      "restart": { "roles": ["service-operator"] }
+      "restart": { "roles": ["service-operator"] },
+      "start": { "roles": ["service-operator"] },
+      "stop": { "roles": ["service-operator"] },
+      "enable": { "roles": ["service-operator"] },
+      "disable": { "roles": ["service-operator"] }
     }
   }
 }
@@ -134,6 +138,19 @@ Service only:
 
     execute service status myapp
     execute service restart myapp
+    execute service start myapp
+    execute service stop myapp
+    execute service enable myapp
+    execute service disable myapp
+
+Create the definition as /etc/safeterm/resources.d/myapp.json (service-only is
+valid), then run sudo termctl check and sudo termctl apply from a normal Linux
+admin shell. Reconnect SSH/Console after activation. Roles must exist and the
+SafeTerm identity must hold each action's declared role. A service-viewer sees
+status only in this example; service-operator sees all six actions. Use whoami
+inside SafeTerm to inspect the current session roles. The identity name admin
+does not imply unrestricted access. This works for external services such as
+nginx.service as well as SafeTerm units; substitute an exact installed unit.
 
 The unit must already be loaded. Supported actions: status/start/stop/restart/
 reload/enable/disable. No action or role is implicit. No wildcards, shell commands

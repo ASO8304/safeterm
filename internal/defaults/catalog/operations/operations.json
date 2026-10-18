@@ -11,20 +11,28 @@
   },
   {
     "name": "trace",
-    "description": "Capture network traffic for a specific host and port. Long-running; streamed to the caller.",
+    "description": "Capture live traffic; host or port must be specified. Protocol is optional.",
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "tcpdump",
-    "args_template": ["-l", "-nn", "-i", "any", "port", "{port}", "and", "host", "{host}"],
+    "args_template": ["-l", "-nn", "-i", "any"],
+    "required_any": ["host", "port"],
+    "argument_group_separator": ["and"],
+    "argument_groups": [
+      { "when": "port", "args_template": ["port", "{port}"] },
+      { "when": "host", "args_template": ["host", "{host}"] },
+      { "when": "protocol", "args_template": ["{protocol}"] }
+    ],
     "parameters": [
-      { "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 },
-      { "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }
+      { "name": "host", "type": "string", "required": false, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" },
+      { "name": "port", "type": "int", "required": false, "min": 1, "max": 65535 },
+      { "name": "protocol", "type": "string", "required": false, "value_map": { "tcp": "tcp", "udp": "udp", "icmp": "icmp", "arp": "arp", "ip": "ip" } }
     ],
     "long_running": true
   },
   {
     "name": "ping",
-    "description": "Send bounded ICMP echo requests with live output; default count 100.",
+    "description": "Send bounded ICMP echo requests with live output; default and maximum count 1000.",
     "runner_profile": "network-observer",
     "executor_kind": "process",
     "executable_ref": "ping",
@@ -40,7 +48,7 @@
         "name": "count",
         "type": "int",
         "required": false,
-        "default": "100",
+        "default": "1000",
         "aliases": ["-c"],
         "min": 1,
         "max": 1000
@@ -66,40 +74,6 @@
           "authentication": "/var/log/auth.log"
         }
       }
-    ],
-    "long_running": true
-  },
-  {
-    "name": "trace_host",
-    "description": "Capture network traffic for one approved host.",
-    "runner_profile": "network-observer",
-    "executor_kind": "process",
-    "executable_ref": "tcpdump",
-    "args_template": ["-l", "-nn", "-i", "any", "host", "{host}"],
-    "parameters": [{ "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" }],
-    "long_running": true
-  },
-  {
-    "name": "trace_port",
-    "description": "Capture network traffic for one approved port.",
-    "runner_profile": "network-observer",
-    "executor_kind": "process",
-    "executable_ref": "tcpdump",
-    "args_template": ["-l", "-nn", "-i", "any", "port", "{port}"],
-    "parameters": [{ "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 }],
-    "long_running": true
-  },
-  {
-    "name": "trace_filtered",
-    "description": "Capture traffic for a host, port, and approved protocol.",
-    "runner_profile": "network-observer",
-    "executor_kind": "process",
-    "executable_ref": "tcpdump",
-    "args_template": ["-l", "-nn", "-i", "any", "proto", "{protocol}", "and", "port", "{port}", "and", "host", "{host}"],
-    "parameters": [
-      { "name": "host", "type": "string", "required": true, "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}$" },
-      { "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 },
-      { "name": "protocol", "type": "string", "required": true, "value_map": { "tcp": "tcp", "udp": "udp", "icmp": "icmp", "arp": "arp", "ip": "ip" } }
     ],
     "long_running": true
   },

@@ -79,7 +79,24 @@ func TestTranslate_ShippedPingUsesBoundedFixedArguments(t *testing.T) {
 	if err := validation.New(cfg).Validate(req); err != nil {
 		t.Fatal(err)
 	}
-	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "100", "-W", "2", "--", "192.168.10.20"})
+	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "1000", "-W", "2", "--", "192.168.10.20"})
+	for _, count := range []string{"0", "1001", "1100", "any"} {
+		invalid := &contract.ExecutionRequest{Command: "ping", Arguments: map[string]string{"host": "192.168.10.20", "count": count}}
+		if err := validation.New(cfg).Validate(invalid); err == nil {
+			t.Fatalf("accepted ping count=%s", count)
+		}
+	}
+	if err := validation.New(cfg).Validate(&contract.ExecutionRequest{Command: "ping", Arguments: map[string]string{"count": "5"}}); err == nil {
+		t.Fatal("accepted ping without host")
+	}
+	tooMany := &contract.ExecutionRequest{Command: "ping", Arguments: map[string]string{"host": "192.168.10.20", "count": "1100"}}
+	if err := validation.New(cfg).Validate(tooMany); err == nil || !strings.Contains(err.Error(), "exceeds maximum 1000") {
+		t.Fatalf("expected explicit maximum error, got %v", err)
+	}
+	typo := &contract.ExecutionRequest{Command: "ping", Arguments: map[string]string{"host": "192.168.10.20", "count-": "1100"}}
+	if err := validation.New(cfg).Validate(typo); err == nil || !strings.Contains(err.Error(), `does not accept argument "count-"`) {
+		t.Fatalf("accepted misspelled parameter: %v", err)
+	}
 	req.Arguments["count"] = "5"
 	assertTranslation(t, mustTranslator(t, cfg), req, "/usr/bin/ping", []string{"-n", "-4", "-c", "5", "-W", "2", "--", "192.168.10.20"})
 }

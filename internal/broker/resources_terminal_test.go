@@ -26,7 +26,7 @@ func TestGeneratedResourceCommandsUseSignedIDsAndPerActionRoles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	item, err := resources.Parse("product.json", []byte(`{"id":"product","description":"Product","service":{"unit":"product.service","actions":{"status":{"roles":["service-viewer"]},"restart":{"roles":["service-operator"]}}},"logs":[{"id":"main","path":"/var/log/product/main.log","roles":["log-viewer"]}]}`))
+	item, err := resources.Parse("product.json", []byte(`{"id":"product","description":"Product","service":{"unit":"product.service","actions":{"status":{"roles":["service-viewer"]},"restart":{"roles":["service-operator"]},"start":{"roles":["service-operator"]},"stop":{"roles":["service-operator"]},"enable":{"roles":["service-operator"]},"disable":{"roles":["service-operator"]}}},"logs":[{"id":"main","path":"/var/log/product/main.log","roles":["log-viewer"]}]}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,6 +56,36 @@ func TestGeneratedResourceCommandsUseSignedIDsAndPerActionRoles(t *testing.T) {
 	}
 	if len(client.requests) != 1 {
 		t.Fatal("unauthorized command dispatched")
+	}
+
+	// All six actions for an external system service retain exact signed IDs
+	// and per-action authorization, including terminal completion.
+	viewerChoices := s.completionCandidates(context.Background(), "execute service ", "")
+	if strings.Join(viewerChoices, ",") != "status" {
+		t.Fatalf("viewer actions=%v", viewerChoices)
+	}
+	operatorClient := &fakeGateway{}
+	operator, err := NewShell(operatorClient, catalog, Principal{UserID: "operator", Roles: []string{"service-viewer", "service-operator"}}, strings.NewReader(""), &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(operator.completionCandidates(context.Background(), "execute service ", ""), ","); got != "disable,enable,restart,start,status,stop" {
+		t.Fatalf("operator actions=%s", got)
+	}
+	for _, action := range []string{"status", "restart", "start", "stop", "enable", "disable"} {
+		if got := operator.completionCandidates(context.Background(), "execute service "+action+" pro", "pro"); strings.Join(got, ",") != "product" {
+			t.Fatalf("%s completion=%v", action, got)
+		}
+		if _, err := operator.executeLine(context.Background(), "execute service "+action+" product", nil); err != nil {
+			t.Fatal(err)
+		}
+		last := operatorClient.requests[len(operatorClient.requests)-1]
+		if last.Command != resources.OperationID("product", "service", action) || len(last.Arguments) != 0 {
+			t.Fatalf("wrong service request: %+v", last)
+		}
+	}
+	if _, err := operator.executeLine(context.Background(), "execute service restart unregistered", nil); err == nil {
+		t.Fatal("unregistered service dispatched")
 	}
 	s.principal.Roles = []string{"log-viewer"}
 	if got := s.completionCandidates(context.Background(), "execute logs product m", "m"); strings.Join(got, ",") != "main" {

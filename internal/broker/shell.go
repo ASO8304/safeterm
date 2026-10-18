@@ -290,6 +290,9 @@ func (s *Shell) describe(operation config.OperationDefinition) {
 		fmt.Fprintf(s.output, "parameters: none\r\nexample: %s\r\n", operationExample(operation))
 		return
 	}
+	if len(operation.RequiredAny) > 0 {
+		fmt.Fprintf(s.output, "required: %s must be specified\r\n", strings.Join(operation.RequiredAny, " or "))
+	}
 	parameters := append([]config.ParameterDefinition(nil), operation.Parameters...)
 	sort.Slice(parameters, func(i, j int) bool { return parameters[i].Name < parameters[j].Name })
 	for _, parameter := range parameters {

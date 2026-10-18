@@ -54,16 +54,24 @@ type ParameterDefinition struct {
 // users, and how internal/translation maps it to a real system command
 // (M6). ArgsTemplate remains inert data in this package; translation.New
 // validates and compiles its whole-token placeholders (ADR-007).
+type ArgumentGroup struct {
+	When         string   `json:"when"`
+	ArgsTemplate []string `json:"args_template"`
+}
+
 type OperationDefinition struct {
-	Name          string                      `json:"name"`
-	Description   string                      `json:"description"`
-	RunnerProfile RunnerProfile               `json:"runner_profile"`
-	ExecutorKind  ExecutorKind                `json:"executor_kind"`
-	ExecutableRef string                      `json:"executable_ref,omitempty"`
-	ArgsTemplate  []string                    `json:"args_template,omitempty"`
-	Systemd       *SystemdOperationDefinition `json:"systemd,omitempty"`
-	Parameters    []ParameterDefinition       `json:"parameters"`
-	LongRunning   bool                        `json:"long_running"`
+	RequiredAny            []string                    `json:"required_any,omitempty"`
+	ArgumentGroups         []ArgumentGroup             `json:"argument_groups,omitempty"`
+	ArgumentGroupSeparator []string                    `json:"argument_group_separator,omitempty"`
+	Name                   string                      `json:"name"`
+	Description            string                      `json:"description"`
+	RunnerProfile          RunnerProfile               `json:"runner_profile"`
+	ExecutorKind           ExecutorKind                `json:"executor_kind"`
+	ExecutableRef          string                      `json:"executable_ref,omitempty"`
+	ArgsTemplate           []string                    `json:"args_template,omitempty"`
+	Systemd                *SystemdOperationDefinition `json:"systemd,omitempty"`
+	Parameters             []ParameterDefinition       `json:"parameters"`
+	LongRunning            bool                        `json:"long_running"`
 }
 
 type SystemdOperationDefinition struct {

@@ -103,9 +103,9 @@ Common presentation names are:
 | `execute logs service_A` | `log source=service_A` |
 | `execute service status ssh` | `status_safeterm_ssh` |
 | `execute service restart gateway` | `restart_safeterm_gateway` |
-| `execute trace host host=192.0.2.1` | `trace_host` |
-| `execute trace port port=999` | `trace_port` |
-| `execute trace filtered host=192.0.2.1 port=999 protocol=tcp` | `trace_filtered` |
+| `execute trace host=192.0.2.1` | `trace host=192.0.2.1` |
+| `execute trace port=999` | `trace port=999` |
+| `execute trace host=192.0.2.1 port=999 protocol=tcp` | `trace` with all three filters |
 
 `execute ping host=127.0.0.1 count=5`, `execute nslookup host=example.com`
 and `execute traceroute host=192.0.2.1` retain their familiar names.
@@ -126,3 +126,28 @@ sudo termctl apply --recover
 These operate on resources.d definitions and generated permissions. The editor's
 `rollback` restores application file values. Package `termctl rollback` restores
 an installation snapshot. Ordinary users never handle signing keys.
+
+## Log completion and service permissions
+
+`execute logs ` and `show logs ` offer approved log names directly, such as
+`authentication`, `service_A` and `system`. The built-in operation stores the
+selection in its `source` parameter internally; users can type
+`execute logs system`. Explicit `source=system` remains accepted, and typing
+`source=` completes only concrete approved values. A selected log is not
+repeatedly offered as an unused parameter. Resource-defined logs keep their
+existing `execute logs RESOURCE LOG` paths and per-log authorization.
+
+Service menus list only actions and units authorized for the session's roles.
+`admin` is an identity name, not an implicit superuser. `whoami` shows the roles;
+`service-viewer` grants the packaged status operations while `service-operator`
+grants the packaged control operations. Adding a new service does not grant
+access to all system units.
+
+To expose an external unit, create a root-controlled JSON definition in
+`/etc/safeterm/resources.d`, using the service-only example in its README.
+Specify the exact unit (for example `nginx.service`) and status, restart, start,
+stop, enable and disable actions with the intended role lists. Run
+`sudo termctl check` followed by `sudo termctl apply` from a normal Linux shell,
+then reconnect. The generated menu offers `execute service ACTION RESOURCE_ID`.
+The service runner receives only those exact unit/action grants. `termctl service`
+continues to administer SafeTerm's own runtime services.

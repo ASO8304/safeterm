@@ -30,6 +30,12 @@ func NewCatalog(cfg *config.Config) (*Catalog, error) {
 	for _, operation := range cfg.Operations {
 		clone := operation
 		clone.ArgsTemplate = append([]string(nil), operation.ArgsTemplate...)
+		clone.RequiredAny = append([]string(nil), operation.RequiredAny...)
+		clone.ArgumentGroupSeparator = append([]string(nil), operation.ArgumentGroupSeparator...)
+		clone.ArgumentGroups = append([]config.ArgumentGroup(nil), operation.ArgumentGroups...)
+		for i := range clone.ArgumentGroups {
+			clone.ArgumentGroups[i].ArgsTemplate = append([]string(nil), operation.ArgumentGroups[i].ArgsTemplate...)
+		}
 		clone.Parameters = append([]config.ParameterDefinition(nil), operation.Parameters...)
 		catalog.operations[operation.Name] = clone
 	}

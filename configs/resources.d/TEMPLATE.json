@@ -5,7 +5,11 @@
     "unit": "example.service",
     "actions": {
       "status": { "roles": ["service-viewer", "service-operator"] },
-      "restart": { "roles": ["service-operator"] }
+      "restart": { "roles": ["service-operator"] },
+      "start": { "roles": ["service-operator"] },
+      "stop": { "roles": ["service-operator"] },
+      "enable": { "roles": ["service-operator"] },
+      "disable": { "roles": ["service-operator"] }
     }
   },
   "config": {
