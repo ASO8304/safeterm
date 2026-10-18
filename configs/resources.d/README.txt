@@ -16,7 +16,9 @@ Use `sudo termctl check` first if you want validation without activation. Apply
 always performs the same checks. Give the definition a unique id, edit paths,
 fields and roles, and remove the service/config/logs sections you do not need.
 Existing roles are listed by `termctl role list`. A role mentioned here must
-already exist; definitions do not create users or grant roles to users.
+exist in packaged defaults or roles.d; definitions do not create users or grant
+roles to users. roles.d, profiles.d, executables.d, operations.d and policies.d
+are compiled by the same check/apply workflow (ADR-033).
 
 TEMPLATE.json is ALWAYS ignored before opening/decoding its contents. Its exact,
 case-sensitive filename is reserved. All other *.json files in this directory

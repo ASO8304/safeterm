@@ -142,3 +142,18 @@ key login for that user. Password-bearing template tasks suppress logs and diffs
 Existing identity files are preserved during package upgrades, so bootstrap
 options alone do not change an existing user's authentication methods.
 See [SSH authentication](../../docs/ssh-authentication.md).
+
+Site overlays (ADR-033) can be deployed with safeterm_definition_directories,
+a dictionary mapping supported directory names to controller paths, for example:
+
+```yaml
+safeterm_definition_directories:
+  roles.d: /srv/safeterm/roles.d
+  operations.d: /srv/safeterm/operations.d
+  profiles.d: /srv/safeterm/profiles.d
+  executables.d: /srv/safeterm/executables.d
+  policies.d: /srv/safeterm/policies.d
+```
+
+Only supported JSON definition directory names are accepted; changed files trigger
+the existing termctl apply handler. This requires an authorized signing method.

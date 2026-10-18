@@ -128,47 +128,22 @@ forced kill only when necessary. Disconnection, timeout, output exhaustion, and
 backpressure all fail closed. Tune these values deliberately per deployment;
 never remove the bounds.
 
-The Broker accepts only one session channel per connection and rejects SSH
-exec, subsystems, forwarding, agent forwarding, and environment changes. Its
-fixed shell grammar is `help`, `list`, `describe`, `execute`, `whoami`, `clear`,
-and `exit`, plus the structured `config` subcommands. Long-running output uses M11 streaming; Ctrl+C sends the semantic
-termination request to Gateway. Tab completion is derived from authorized
-catalog/config views, and history remains in memory only for the session.
-Catalog proposal/approval and additional
-client adapters remain separate control-plane work.
+The Broker accepts one interactive session channel per connection and rejects
+exec/subsystems/forwarding/environment injection. SSH and Console share the
+contextual terminal: ?, execute, config, show, whoami, clear and exit. Tab and
+question-mark help use authenticated authorization views. Ctrl+C stops streams;
+Ctrl+] exits. See [the terminal guide](../../docs/restricted-terminal.md).
 
-Provision the M13 registry and three dedicated writable directories before
-starting the Config Managers. The registry must be owned by root and must not
-be group- or world-writable. Each managed directory belongs to exactly one
-Config Manager identity so atomic temporary files and bounded backups do not
-broaden access to unrelated configuration:
+All Config Managers read the root-owned generated registry at
+/var/lib/safeterm/generated/resources.json. They have no writable application
+mounts and need no legacy /etc/safeterm-managed directories. Empty profiles are
+valid. File updates go exclusively through the restricted root writer, whose
+sandbox is generated from administrator definitions and preserves application
+ownership, ACLs, UTF-8 BOM and INI comments. Do not create/chown dummy directories.
 
-```bash
-install -d -o root -g root -m 0755 /etc/safeterm/config-manager
-install -o root -g root -m 0644 deploy/config-manager/resources.example.json \
-  /var/lib/safeterm/generated/resources.json
-install -d -o safeterm-config-application -g safeterm-config-application -m 0700 \
-  /etc/safeterm-managed/application
-install -d -o safeterm-config-database -g safeterm-config-database -m 0700 \
-  /etc/safeterm-managed/database
-install -d -o safeterm-config-network -g safeterm-config-network -m 0700 \
-  /etc/safeterm-managed/network
-```
-
-Replace the example resource paths, schemas, and roles for the target host and
-create each initial file before service startup. A Config Manager refuses an
-invalid document, a symlinked managed file, an unavailable validator or typed
-activation operation, and any resource outside its selected profile. The SSH
-Broker reaches each manager through its own authenticated Unix socket. Use
-`config list`, `config describe ID`, `config show ID`, and
-`config edit ID SECTION KEY` inside the restricted terminal. Use `-` for a
-root-level JSON field. The proposing user previews and confirms changes;
-proposal tokens are bound to that identity and Console session. Retained
-backups can be restored with `config rollback ID`.
-
-Gateway must load the same root-owned registry as the Config Managers. Its
-manager mapping uses `PROFILE=USER` entries, for example
-`application=safeterm-config-application`. Profiles and UIDs must be unique.
-Every activation operation must also exist in the signed catalog as an
-argument-free `systemd` operation; Gateway refuses startup if the registry and
-catalog cannot produce a safe allowlist for a configured manager.
+Use resources.d for configuration files and site JSON directories for roles,
+operations, executable approvals, policies and Runner profiles. Apply provisions
+custom locked Runner identities and generated units, updates Gateway dependencies,
+restarts consumers in dependency order and scopes Audit and sudo by profile.
+Never edit generated catalog/unit files directly. See [site configuration](../../docs/site-configuration.md)
+for schemas, ceilings, recovery and lifecycle behavior.

@@ -21,7 +21,9 @@ Use termctl check for optional validation without activation. Apply repeats
 validation, compiles exact capabilities and signs/activates them as a recoverable
 transaction. No separate config apply/catalog apply is needed for resources.d.
 Legacy definition paths and mutation commands are removed. Only verified package
-built-ins and current resources.d JSON are compiled. See [ADR-032](decisions/ADR-032-single-source-configuration.md).
+built-ins and current JSON .d inputs are compiled. Roles, operations, executables,
+policies and Runner profiles use the additional [site definition directories](site-configuration.md)
+introduced by ADR-033.
 For application value editing see [the terminal guide](restricted-terminal.md).
 
 Changed definition activation may disconnect SSH/Console sessions; invoke it from
