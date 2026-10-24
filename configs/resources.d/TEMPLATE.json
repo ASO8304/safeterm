@@ -26,10 +26,15 @@
         "section": "Server",
         "key": "Port",
         "description": "Listening port",
-        "type": "integer",
-        "required": true,
-        "min": 1,
-        "max": 65535
+        "type": "port",
+        "required": true
+      },
+      {
+        "section": "Server",
+        "key": "ListenAddress",
+        "description": "IPv4 address (adapt field names to the real file)",
+        "type": "ipv4",
+        "required": true
       }
     ]
   },

@@ -166,12 +166,15 @@ func validateFields(resource Resource) error {
 		}
 		seen[coordinate] = true
 		switch field.Type {
-		case FieldString:
+		case FieldString, FieldIPv4, FieldIPv6, FieldIP, FieldCIDR:
 			if len(field.Enum) != 0 || field.Min != nil || field.Max != nil || field.Path != nil {
 				return invalidField(resource, *field)
 			}
-		case FieldInteger:
+		case FieldInteger, FieldPort:
 			if len(field.Enum) != 0 || field.MinLength != nil || field.MaxLength != nil || field.Pattern != "" || field.Path != nil || (field.Min != nil && field.Max != nil && *field.Min > *field.Max) {
+				return invalidField(resource, *field)
+			}
+			if field.Type == FieldPort && (field.Min != nil && (*field.Min < 1 || *field.Min > 65535) || field.Max != nil && (*field.Max < 1 || *field.Max > 65535)) {
 				return invalidField(resource, *field)
 			}
 		case FieldBoolean:

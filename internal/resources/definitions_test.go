@@ -151,3 +151,24 @@ func FuzzDefinitionsNeverPanic(f *testing.F) {
 		_, _ = Parse("fuzz.json", []byte(s))
 	})
 }
+
+func TestCompileNetworkFieldTypes(t *testing.T) {
+	base, _ := compilerFixture(t)
+	item := parseTest(t, `{"id":"jungle","description":"Jungle network settings","config":{"path":"/etc/jungle/settings.ini","format":"ini","permissions":{"read":["config-viewer"],"edit":["config-operator"]},"fields":[{"section":"Dog","key":"Address","type":"ipv4"},{"section":"Cat","key":"Address","type":"ipv6"},{"section":"Mouse","key":"Address","type":"ip"},{"section":"Network","key":"Subnet","type":"cidr"}]}}`)
+	_, registry, _, err := Compile(base, []Named{item})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(registry.Resources) != 1 {
+		t.Fatalf("resources=%v", registry.Resources)
+	}
+	fields := registry.Resources[0].Fields
+	if len(fields) != 4 {
+		t.Fatalf("fields=%v", fields)
+	}
+	for i, typ := range []configmanager.FieldType{configmanager.FieldIPv4, configmanager.FieldIPv6, configmanager.FieldIP, configmanager.FieldCIDR} {
+		if fields[i].Type != typ {
+			t.Fatalf("field %d type=%s", i, fields[i].Type)
+		}
+	}
+}

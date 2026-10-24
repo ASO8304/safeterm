@@ -23,9 +23,14 @@ type FieldType string
 const (
 	FieldString  FieldType = "string"
 	FieldInteger FieldType = "integer"
+	FieldPort    FieldType = "port"
 	FieldBoolean FieldType = "boolean"
 	FieldEnum    FieldType = "enum"
 	FieldPath    FieldType = "path"
+	FieldIPv4    FieldType = "ipv4"
+	FieldIPv6    FieldType = "ipv6"
+	FieldIP      FieldType = "ip"
+	FieldCIDR    FieldType = "cidr"
 )
 
 type Action string

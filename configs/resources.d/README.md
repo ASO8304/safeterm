@@ -57,7 +57,7 @@ Configuration only (no systemd service is created or restarted):
       "rollback": ["config-operator"]
     },
     "fields": [
-      { "section": "Server", "key": "Port", "description": "Listening port", "type": "integer", "min": 1, "max": 65535 }
+      { "section": "Server", "key": "Port", "description": "Listening port", "type": "port" }
     ]
   }
 }
@@ -72,7 +72,8 @@ Inside SSH or Console:
     diff
     end
 
-Field types: string, integer, boolean, enum, path. Existing typed field schema
+Field types: string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr.
+Existing typed field schema
 options remain supported: required, secret, read_only, enum, min/max,
 min_length/max_length, pattern and path policy. Section and key names match the
 actual file, case-sensitively. Use an empty section for root fields and edit - in
@@ -80,6 +81,43 @@ the terminal. Unknown/unregistered keys remain untouched and are not editable.
 Set `secret: true` for sensitive fields; `set KEY` prompts with hidden input.
 INI comments/order/layout, blank lines and a leading UTF-8 BOM are preserved. JSON uses the existing deterministic
 renderer. The source definition is always JSON even when the managed file is INI.
+
+Port example (inside config.fields):
+
+```json
+{ "section": "Server", "key": "Port", "type": "port", "required": true }
+```
+
+The port type is an integer with a built-in inclusive range of 1..65535; min/max
+are unnecessary. Optional min/max may narrow this range but cannot widen it.
+Zero, negatives, fractions, service names and values above 65535 are rejected.
+INI uses the integer renderer; JSON stores a number. Draft, manager and writer
+validation apply the same bounds. Numeric cross-field rules also support port.
+
+Network field examples (inside config.fields):
+
+```json
+[
+  { "section": "Server", "key": "ListenIPv4", "type": "ipv4", "required": true },
+  { "section": "Server", "key": "ListenIPv6", "type": "ipv6", "required": true },
+  { "section": "Server", "key": "PeerAddress", "type": "ip", "required": true },
+  { "section": "Server", "key": "Network", "type": "cidr", "required": true }
+]
+```
+
+Use lowercase type names. ipv4 accepts only IPv4; ipv6 accepts only IPv6; ip
+accepts either family; cidr accepts an IPv4 or IPv6 address with prefix length.
+Validation uses Go net/netip and performs no DNS lookup or network operation.
+Names, ports, brackets, surrounding whitespace, zone identifiers, IPv4-mapped
+IPv6, invalid prefix lengths and the literal any are rejected. Empty values are
+invalid even when required is false: omit an optional field from the document
+instead of assigning an invalid address. Unspecified addresses (0.0.0.0 and ::)
+and /0 prefixes are valid; add pattern constraints if your policy forbids them.
+Text length/pattern constraints can narrow these types; enum, numeric min/max
+and path policies cannot be combined with them. Values retain their original
+spelling; CIDR host bits are preserved rather than silently masking the address.
+INI formatting/comments remain unchanged and JSON stores these values as strings.
+The types are resource config field types, not execution-operation parameter types.
 
 Omitting edit/rollback roles makes the resource read-only. Backup retention
 (default 5) is 1..32. Optional profile selects application (default), database or

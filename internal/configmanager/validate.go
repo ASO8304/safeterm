@@ -3,6 +3,7 @@ package configmanager
 import (
 	"encoding/json"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,10 +17,13 @@ func normalizeValue(field FieldSchema, candidate string) (any, string, error) {
 		return nil, "", fmt.Errorf("configmanager: field %q.%q is required", field.Section, field.Key)
 	}
 	switch field.Type {
-	case FieldInteger:
+	case FieldInteger, FieldPort:
 		value, err := strconv.ParseInt(strings.TrimSpace(candidate), 10, 64)
 		if err != nil {
 			return nil, "", fmt.Errorf("configmanager: field %q.%q must be an integer", field.Section, field.Key)
+		}
+		if field.Type == FieldPort && (value < 1 || value > 65535) {
+			return nil, "", fmt.Errorf("configmanager: field %q.%q must be a port between 1 and 65535", field.Section, field.Key)
 		}
 		if field.Min != nil && value < *field.Min || field.Max != nil && value > *field.Max {
 			return nil, "", fmt.Errorf("configmanager: field %q.%q is outside its allowed range", field.Section, field.Key)
@@ -48,6 +52,30 @@ func normalizeValue(field FieldSchema, candidate string) (any, string, error) {
 			return nil, "", fmt.Errorf("configmanager: field %q.%q: %w", field.Section, field.Key, err)
 		}
 		return canonical, canonical, nil
+	case FieldIPv4, FieldIPv6, FieldIP, FieldCIDR:
+		if err := validateTextConstraints(field, candidate); err != nil {
+			return nil, "", err
+		}
+		valid := false
+		if field.Type == FieldCIDR {
+			prefix, err := netip.ParsePrefix(candidate)
+			valid = err == nil && !prefix.Addr().Is4In6() && prefix.Addr().Zone() == ""
+		} else {
+			addr, err := netip.ParseAddr(candidate)
+			valid = err == nil && addr.Zone() == "" && !addr.Is4In6()
+			if field.Type == FieldIPv4 {
+				valid = valid && addr.Is4()
+			}
+			if field.Type == FieldIPv6 {
+				valid = valid && addr.Is6()
+			}
+		}
+		if !valid {
+			return nil, "", fmt.Errorf("configmanager: field %q.%q must be a valid %s value", field.Section, field.Key, field.Type)
+		}
+		// Preserve the administrator's spelling and CIDR host bits. Validation
+		// must not silently rewrite unrelated application semantics.
+		return candidate, candidate, nil
 	case FieldString:
 		if err := validateTextConstraints(field, candidate); err != nil {
 			return nil, "", err
