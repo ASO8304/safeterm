@@ -172,3 +172,23 @@ func TestCompileNetworkFieldTypes(t *testing.T) {
 		}
 	}
 }
+
+func TestDefinitionJSONErrorsHaveFileLineAndColumnWithoutValues(t *testing.T) {
+	for _, tc := range []struct{ data, want string }{
+		{"{\n  ]\n}", "line 2, column 3"},
+		{"{\r\n  ]\r\n}", "line 2, column 3"},
+		{"{\n  \"id\":", "line 2, column 8"},
+		{"{\n  \"id\": 42\n}", "line 2, column 10"},
+		{"{\"id\":\"مثال\", ]}", "line 1, column 15"},
+	} {
+		_, err := Parse("resources.d/ks-nsp.json", []byte(tc.data))
+		if err == nil || !strings.Contains(err.Error(), "resources.d/ks-nsp.json") || !strings.Contains(err.Error(), tc.want) {
+			t.Errorf("%q: %v; want %s", tc.data, err, tc.want)
+		}
+	}
+	const secret = "do-not-print-this-value"
+	_, err := Parse("resource.json", []byte(`{"id":"`+secret+`", ]}`))
+	if err == nil || strings.Contains(err.Error(), secret) {
+		t.Fatalf("error leaks document: %v", err)
+	}
+}

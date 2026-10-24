@@ -6,12 +6,14 @@ package resources
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
@@ -85,7 +87,18 @@ func Decode(data []byte, target any) error {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(target); err != nil {
-		return err
+		var syntax *json.SyntaxError
+		var mismatch *json.UnmarshalTypeError
+		switch {
+		case errors.As(err, &syntax):
+			return jsonPosition(data, syntax.Offset, err)
+		case errors.As(err, &mismatch):
+			return jsonPosition(data, mismatch.Offset, err)
+		case errors.Is(err, io.ErrUnexpectedEOF), errors.Is(err, io.EOF):
+			return jsonPosition(data, int64(len(data))+1, err)
+		default:
+			return err
+		}
 	}
 	if err := dec.Decode(new(any)); err != io.EOF {
 		return fmt.Errorf("trailing JSON data")
@@ -113,7 +126,7 @@ func Decode(data []byte, target any) error {
 				}
 				key, ok := token.(string)
 				if !ok || seen[key] {
-					return fmt.Errorf("duplicate JSON property")
+					return jsonPosition(data, dec.InputOffset(), fmt.Errorf("duplicate JSON property %q", key))
 				}
 				seen[key] = true
 				if err = value(depth + 1); err != nil {
@@ -133,6 +146,23 @@ func Decode(data []byte, target any) error {
 		return err
 	}
 	return value(0)
+}
+
+// Report a 1-based line/character column without printing application values.
+// Offset follows encoding/json's 1-based byte position convention.
+func jsonPosition(data []byte, offset int64, err error) error {
+	index := int(offset - 1)
+	if index < 0 {
+		index = 0
+	}
+	if index > len(data) {
+		index = len(data)
+	}
+	prefix := data[:index]
+	line := bytes.Count(prefix, []byte("\n")) + 1
+	start := bytes.LastIndexByte(prefix, '\n') + 1
+	column := utf8.RuneCount(prefix[start:]) + 1
+	return fmt.Errorf("line %d, column %d (byte %d): %w", line, column, index+1, err)
 }
 
 func Parse(file string, data []byte) (Named, error) {

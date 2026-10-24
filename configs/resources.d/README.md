@@ -208,6 +208,14 @@ action and its roles. Saving then requires both edit and action permissions;
 backup/recovery uses the existing whole-file rollback-on-activation-failure policy.
 A configuration-only definition cannot specify on_change.
 
+## JSON syntax diagnostics
+
+termctl check reports definition syntax/type errors with the filename, line,
+character column and byte offset. Inspect that location in your JSON editor;
+objects use braces and arrays use brackets. JSON does not accept trailing commas.
+Diagnostics do not echo configuration values. Existing files are not rewritten
+when validation fails.
+
 ## Activation, compatibility and recovery
 
 One apply compiles registry fields, exact operations and role policies; checks
