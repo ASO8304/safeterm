@@ -74,6 +74,7 @@ type FieldSchema struct {
 	Key         string      `json:"key"`
 	Type        FieldType   `json:"type"`
 	Required    bool        `json:"required"`
+	AllowEmpty  bool        `json:"allow_empty,omitempty"`
 	Secret      bool        `json:"secret"`
 	ReadOnly    bool        `json:"read_only"`
 	Enum        []string    `json:"enum,omitempty"`
@@ -135,6 +136,7 @@ type FieldDescription struct {
 	Key         string    `json:"key"`
 	Type        FieldType `json:"type"`
 	Required    bool      `json:"required"`
+	AllowEmpty  bool      `json:"allow_empty,omitempty"`
 	Secret      bool      `json:"secret"`
 	ReadOnly    bool      `json:"read_only"`
 	Enum        []string  `json:"enum,omitempty"`

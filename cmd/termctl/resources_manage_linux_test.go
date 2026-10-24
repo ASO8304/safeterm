@@ -356,3 +356,28 @@ func TestIncompleteResourceSnapshotCannotFallBackToLive(t *testing.T) {
 		t.Fatal("failed restore mutated live registry")
 	}
 }
+
+func TestCatalogLogProbeAllowsOnlyFixedUnprivilegedReadCheck(t *testing.T) {
+	valid := []string{"-n", "-u", "safeterm-log-reader", "-g", "safeterm-gateway", "--", "/usr/bin/test", "-r", "/var/log/product/service.log"}
+	if err := validateCatalogCommand("/usr/bin/sudo", valid); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		index int
+		value string
+	}{{2, "root"}, {4, "root"}, {6, "/bin/sh"}, {7, "-w"}, {8, "/root/private.log"}, {8, "relative.log"}} {
+		args := append([]string(nil), valid...)
+		args[tc.index] = tc.value
+		if err := validateCatalogCommand("/usr/bin/sudo", args); err == nil {
+			t.Errorf("accepted unsafe probe %v", args)
+		}
+	}
+	for _, args := range [][]string{nil, valid[:8], append(append([]string(nil), valid...), "extra")} {
+		if err := validateCatalogCommand("/usr/bin/sudo", args); err == nil {
+			t.Fatal("accepted malformed probe")
+		}
+	}
+	if _, err := catalogRun("/usr/bin/sudo", "/bin/sh"); err == nil || !strings.Contains(err.Error(), "unsupported catalog administration arguments") {
+		t.Fatalf("unsafe invocation was not rejected: %v", err)
+	}
+}

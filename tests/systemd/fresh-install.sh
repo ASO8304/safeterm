@@ -51,6 +51,22 @@ python3 "$repo/tests/systemd/console-smoke.py" configured
 printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 9090 ; keep comment\n' >"$work/expected.ini"
 cmp "$work/expected.ini" /etc/safeterm-ci/options.ini
 [[ $(stat -c '%U:%G %a' /etc/safeterm-ci/options.ini) == 'root:root 644' ]]
+# Exercise the real production access probe before and after a permissions failure.
+printf 'CI log fixture\n' >/var/log/safeterm-ci.log
+chmod 0644 /var/log/safeterm-ci.log
+cat >/etc/safeterm/resources.d/fresh-log.json <<'JSON'
+{"id":"fresh-log","description":"CI registered log","logs":[{"id":"main","path":"/var/log/safeterm-ci.log","roles":["log-viewer"]}]}
+JSON
+termctl check
+chmod 0600 /var/log/safeterm-ci.log
+if termctl check >"$work/unreadable-log.log" 2>&1; then
+  echo 'check accepted a log the reader cannot read' >&2; exit 1
+fi
+grep -F 'read-access check for log "main"' "$work/unreadable-log.log"
+if grep -F 'unsupported catalog administration' "$work/unreadable-log.log"; then exit 1; fi
+chmod 0644 /var/log/safeterm-ci.log
+termctl apply
+wait_ready
 termctl service status all
 printf 'Systemd fresh installation, Console discovery, completion and INI save: PASS\n'
 

@@ -74,13 +74,40 @@ Inside SSH or Console:
 
 Field types: string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr, ip_port.
 Existing typed field schema
-options remain supported: required, secret, read_only, enum, min/max,
+options remain supported: required, allow_empty, secret, read_only, enum, min/max,
 min_length/max_length, pattern and path policy. Section and key names match the
 actual file, case-sensitively. Use an empty section for root fields and edit - in
 the terminal. Unknown/unregistered keys remain untouched and are not editable.
 Set `secret: true` for sensitive fields; `set KEY` prompts with hidden input.
 INI comments/order/layout, blank lines and a leading UTF-8 BOM are preserved. JSON uses the existing deterministic
 renderer. The source definition is always JSON even when the managed file is INI.
+
+Required and empty values are separate controls:
+
+| required | allow_empty | Missing key | Existing blank value |
+|---|---|---|---|
+| false | false (default) | Allowed | Must satisfy the field type/constraints |
+| true | false (default) | Rejected | Rejected |
+| false | true | Allowed | Allowed |
+| true | true | Rejected | Allowed |
+
+For an optional IPv4 such as PATIP in a shared application INI:
+
+```json
+{ "section": "Sultan", "key": "PATIP", "type": "ipv4", "required": false, "allow_empty": true }
+```
+
+allow_empty permits exactly an empty string, not whitespace or invalid nonempty
+values. It bypasses scalar type/length/pattern/path validation only for that empty
+string; nonempty values remain fully validated and cross-field rules still apply.
+JSON stores permitted empty values as "", including for port/integer/boolean;
+it does not insert zero, false or null. Missing registered keys are not created
+by the editor. Older definitions without allow_empty keep their existing behavior.
+Draft validation, manager previews and the privileged writer enforce the same flag.
+
+termctl check identifies the resource ID, managed file path, section, key, type,
+required/allow_empty flags and numeric bounds for field errors. It distinguishes
+missing keys, blank values and invalid typed values. Secret values are redacted.
 
 Port example (inside config.fields):
 
@@ -113,9 +140,8 @@ or [::1]:2420; brackets are mandatory for IPv6 endpoints. Endpoint hostnames,
 zero ports, missing ports and IPv6 zones/mapped addresses are rejected.
 Validation uses Go net/netip and performs no DNS lookup or network operation.
 For address-only types, names, ports, brackets, surrounding whitespace, zone identifiers, IPv4-mapped
-IPv6, invalid prefix lengths and the literal any are rejected. Empty values are
-invalid even when required is false: omit an optional field from the document
-instead of assigning an invalid address. Unspecified addresses (0.0.0.0 and ::)
+IPv6, invalid prefix lengths and the literal any are rejected. Empty values are invalid by default even when required is false. Set
+allow_empty=true explicitly when the application permits a blank value. Unspecified addresses (0.0.0.0 and ::)
 and /0 prefixes are valid; add pattern constraints if your policy forbids them.
 Text length/pattern constraints can narrow these types; enum, numeric min/max
 and path policies cannot be combined with them. Values retain their original

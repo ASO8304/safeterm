@@ -34,7 +34,8 @@
         "key": "ListenAddress",
         "description": "IPv4 address (adapt field names to the real file)",
         "type": "ipv4",
-        "required": true
+        "required": true,
+        "allow_empty": false
       }
     ]
   },

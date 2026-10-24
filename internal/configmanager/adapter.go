@@ -128,7 +128,7 @@ func iniValueEnd(value string, start int) int {
 			quote = character
 			continue
 		}
-		if (character == ';' || character == '#') && index > start && (value[index-1] == ' ' || value[index-1] == '\t') {
+		if (character == ';' || character == '#') && index > 0 && (value[index-1] == ' ' || value[index-1] == '\t') {
 			return index
 		}
 	}

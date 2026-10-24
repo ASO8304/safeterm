@@ -284,6 +284,9 @@ func (s *Shell) editorHelp(fields []string) error {
 				continue
 			}
 			detail := string(f.Type)
+			if f.AllowEmpty {
+				detail += ", empty allowed"
+			}
 			if f.Description != "" {
 				detail += " — " + f.Description
 			}

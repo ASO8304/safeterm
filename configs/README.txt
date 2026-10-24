@@ -266,3 +266,37 @@ reused only when it exactly matches the newly compiled candidate; changed
 candidates still require signing. Application files and ownership are not overwritten. Portable deployment
 copies only custom source JSON, provisions actual binaries/files/services and
 permissions, and uses the target host's approved hashes/signing method.
+
+## Where the default definitions live
+
+/etc/safeterm/*.d contains administrator inputs, inactive TEMPLATE.json files and
+guides. It intentionally does not contain active copies of every built-in default.
+Packaged reference definitions live under /usr/share/safeterm/defaults:
+operations/, roles/, profiles/, executables/ and policies/. Do not edit that
+versioned reference directory or /var/lib/safeterm/generated runtime output.
+
+Inspect defaults in administrator-editable source format:
+
+    sudo termctl defaults operation
+    sudo termctl defaults operation ping
+    sudo termctl defaults role
+    sudo termctl defaults profile
+    sudo termctl defaults executable
+    sudo termctl defaults policy
+
+To override a packaged operation, export one definition, edit it and activate:
+
+    sudo termctl defaults operation ping | sudo tee /etc/safeterm/operations.d/ping.json >/dev/null
+    sudo nano /etc/safeterm/operations.d/ping.json
+    sudo termctl check
+    sudo termctl apply
+
+An exact TEMPLATE.json is always inactive; other *.json files are active inputs.
+Removing an override restores the packaged default on the next successful apply.
+Package updates preserve administrator inputs while supplying new built-in defaults.
+
+If a log check reports an internal unsupported-executable error, it is not proof
+of a file permission failure. Current termctl permits only the exact fixed
+safeterm-log-reader read probe through its catalog command helper. Real probe
+failures identify the log ID, path, identity and underlying command result.
+Do not change log ownership in response to an internal helper failure.

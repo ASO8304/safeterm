@@ -30,11 +30,11 @@ func WriterUnitDropIn(registry *Registry, checkFiles bool) ([]byte, error) {
 			if checkFiles {
 				data, _, err := readManagedFile(r.Path)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("configwriter: resource %q, file %q: %w", r.ID, r.Path, err)
 				}
 				doc, err := parseDocument(r.Format, data)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("configwriter: resource %q, file %q: %w", r.ID, r.Path, err)
 				}
 				if err := validateCompleteDocument(r, doc); err != nil {
 					return nil, err

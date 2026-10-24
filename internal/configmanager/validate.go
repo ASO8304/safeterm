@@ -13,6 +13,9 @@ import (
 )
 
 func normalizeValue(field FieldSchema, candidate string) (any, string, error) {
+	if candidate == "" && field.AllowEmpty {
+		return "", "", nil
+	}
 	if field.Required && candidate == "" {
 		return nil, "", fmt.Errorf("configmanager: field %q.%q is required", field.Section, field.Key)
 	}
@@ -180,13 +183,17 @@ func validateCompleteDocument(resource Resource, document document) error {
 		value, exists := document.Get(field.Section, field.Key)
 		if !exists {
 			if field.Required {
-				return fmt.Errorf("configmanager: required field %q.%q is missing", field.Section, field.Key)
+				return fieldValidationError(resource, field, "key is missing from the document", fmt.Errorf("required field %q.%q is missing; required=true requires the key to exist even when allow_empty=true", field.Section, field.Key))
 			}
 			continue
 		}
 		normalized, _, err := normalizeValue(field, scalarString(value))
 		if err != nil {
-			return err
+			state := "invalid value"
+			if scalarString(value) == "" {
+				state = "key exists but its value is empty; allow_empty=false (set allow_empty=true only if the application accepts an empty value)"
+			}
+			return fieldValidationError(resource, field, state, err)
 		}
 		values[field.Section+"\x00"+field.Key] = normalized
 	}
@@ -210,6 +217,23 @@ func validateCompleteDocument(resource Resource, document document) error {
 		}
 	}
 	return nil
+}
+
+func fieldValidationError(resource Resource, field FieldSchema, state string, cause error) error {
+	bounds := ""
+	if field.Type == FieldPort {
+		bounds = ", range=1..65535"
+	}
+	if field.Min != nil {
+		bounds += fmt.Sprintf(", min=%d", *field.Min)
+	}
+	if field.Max != nil {
+		bounds += fmt.Sprintf(", max=%d", *field.Max)
+	}
+	if field.Secret {
+		cause = fmt.Errorf("value does not satisfy its declared type or constraints (secret value redacted)")
+	}
+	return fmt.Errorf("configmanager: resource %q, file %q, section %q, key %q (type=%s, required=%t, allow_empty=%t%s): %s: %w", resource.ID, resource.Path, field.Section, field.Key, field.Type, field.Required, field.AllowEmpty, bounds, state, cause)
 }
 
 func typedValueForJSON(value any) any {

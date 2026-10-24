@@ -43,7 +43,7 @@ func CheckDraftValue(f FieldDescription, value string) error {
 	if typ == FieldPath {
 		typ = FieldString
 	}
-	_, _, err := normalizeValue(FieldSchema{Section: f.Section, Key: f.Key, Type: typ, Required: f.Required, Enum: f.Enum, Min: f.Min, Max: f.Max, MinLength: f.MinLength, MaxLength: f.MaxLength, Pattern: f.Pattern}, value)
+	_, _, err := normalizeValue(FieldSchema{Section: f.Section, Key: f.Key, Type: typ, Required: f.Required, AllowEmpty: f.AllowEmpty, Enum: f.Enum, Min: f.Min, Max: f.Max, MinLength: f.MinLength, MaxLength: f.MaxLength, Pattern: f.Pattern}, value)
 	return err
 }
 
@@ -72,7 +72,7 @@ func renderPatch(r Resource, data []byte, p Patch) ([]byte, string, string, bool
 		}
 		value, norm, e := normalizeValue(f, c.Value)
 		if e != nil {
-			return nil, "", "", false, e
+			return nil, "", "", false, fieldValidationError(r, f, "invalid value", e)
 		}
 		normalized[i] = norm
 		if r.Format == FormatJSON {

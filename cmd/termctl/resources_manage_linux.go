@@ -182,7 +182,7 @@ func checkResourceLog(log resources.Log) error {
 		}
 	}
 	if _, err := catalogRun("/usr/bin/sudo", "-n", "-u", "safeterm-log-reader", "-g", "safeterm-gateway", "--", "/usr/bin/test", "-r", log.Path); err != nil {
-		return fmt.Errorf("log reader cannot read this file; grant only required read/traverse access (no ownership changes): %w", err)
+		return fmt.Errorf("read-access check for log %q at %q as safeterm-log-reader failed: %w", log.ID, log.Path, err)
 	}
 	return nil
 }

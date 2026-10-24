@@ -21,6 +21,7 @@ import (
 	"safeterm/internal/configmanager"
 	"safeterm/internal/identity"
 	"safeterm/internal/layout"
+	"safeterm/internal/resources"
 )
 
 const defaultConfigDir = "/etc/safeterm"
@@ -964,12 +965,36 @@ compdef _termctl termctl
 	return nil
 }
 
-func catalogRun(name string, args ...string) ([]byte, error) {
+func validateCatalogCommand(name string, args []string) error {
 	switch name {
+	case "/usr/bin/sudo":
+		// This is only a read-access probe under a fixed unprivileged identity.
+		// Never permit arbitrary sudo commands through the catalog helper.
+		prefix := []string{"-n", "-u", "safeterm-log-reader", "-g", "safeterm-gateway", "--", "/usr/bin/test", "-r"}
+		if len(args) != len(prefix)+1 {
+			return fmt.Errorf("unsupported catalog administration arguments for sudo")
+		}
+		for i := range prefix {
+			if args[i] != prefix[i] {
+				return fmt.Errorf("unsupported catalog administration arguments for sudo")
+			}
+		}
+		if err := resources.ValidateLogPath(args[len(prefix)]); err != nil {
+			return fmt.Errorf("invalid log access probe path: %w", err)
+		}
+		return nil
 	case "/usr/bin/systemctl", "/usr/sbin/visudo", "/usr/local/bin/safeterm-preflight", "/usr/sbin/useradd", "/usr/bin/getent", "/usr/bin/id":
+		return nil
 	default:
-		return nil, fmt.Errorf("unsupported catalog administration executable")
+		return fmt.Errorf("unsupported catalog administration executable %q", name)
 	}
+}
+
+func catalogRun(name string, args ...string) ([]byte, error) {
+	if err := validateCatalogCommand(name, args); err != nil {
+		return nil, err
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	data, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
