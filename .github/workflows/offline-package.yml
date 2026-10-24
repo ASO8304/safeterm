@@ -24,10 +24,16 @@ jobs:
           cache: true
 
       - name: Run full verification
-        run: make verify
+        run: make verify 2>&1 | tee "$RUNNER_TEMP/verify.log"
+      - name: Report test failure diagnostics
+        if: failure()
+        run: python3 tests/ci/report-failure.py "$RUNNER_TEMP/verify.log"
 
       - name: Run deployment and SSH end-to-end tests
-        run: make e2e
+        run: make e2e 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+      - name: Report test failure diagnostics
+        if: failure()
+        run: python3 tests/ci/report-failure.py "$RUNNER_TEMP/e2e.log"
 
       - name: Test privileged configuration writer with an unprivileged client
         run: |

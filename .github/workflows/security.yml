@@ -22,7 +22,10 @@ jobs:
         with:
           go-version: "1.26.x"
           cache: true
-      - run: make security
+      - run: make security 2>&1 | tee "$RUNNER_TEMP/security.log"
+      - name: Report test failure diagnostics
+        if: failure()
+        run: python3 tests/ci/report-failure.py "$RUNNER_TEMP/security.log"
       - name: Test privileged configuration writer with an unprivileged client
         run: |
           go test -c -o "$RUNNER_TEMP/configmanager-root.test" ./internal/configmanager

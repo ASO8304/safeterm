@@ -20,7 +20,10 @@ jobs:
           go-version: '1.26.x'
 
       - name: Run full verification (fmt, vet, build, test)
-        run: make verify
+        run: make verify 2>&1 | tee "$RUNNER_TEMP/verify.log"
+      - name: Report test failure diagnostics
+        if: failure()
+        run: python3 tests/ci/report-failure.py "$RUNNER_TEMP/verify.log"
 
   end-to-end:
     name: Deployment and SSH End-to-End
@@ -35,7 +38,10 @@ jobs:
           go-version: '1.26.x'
 
       - name: Run deployment and public-boundary tests
-        run: make e2e
+        run: make e2e 2>&1 | tee "$RUNNER_TEMP/e2e.log"
+      - name: Report test failure diagnostics
+        if: failure()
+        run: python3 tests/ci/report-failure.py "$RUNNER_TEMP/e2e.log"
 
   systemd-smoke:
     name: Fresh systemd installation and Console completion
