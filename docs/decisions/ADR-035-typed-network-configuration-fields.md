@@ -45,3 +45,10 @@ bounds 1..65535. Zero is excluded because managed service ports must identify an
 explicit listening/remote port rather than request ephemeral allocation. Optional
 min/max may narrow this range; schemas attempting to widen it are rejected.
 Network-address types remain strings, while JSON port values are numbers.
+
+## IP endpoints
+
+ip_port parses literal endpoints with netip.ParseAddrPort and requires a nonzero
+port (1..65535). IPv4 uses ADDRESS:PORT; IPv6 requires [ADDRESS]:PORT. No hostname
+resolution, zones or IPv4-mapped IPv6 are accepted. Values remain strings and
+preserve spelling, including the existing INI layout.

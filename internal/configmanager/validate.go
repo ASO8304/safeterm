@@ -52,12 +52,15 @@ func normalizeValue(field FieldSchema, candidate string) (any, string, error) {
 			return nil, "", fmt.Errorf("configmanager: field %q.%q: %w", field.Section, field.Key, err)
 		}
 		return canonical, canonical, nil
-	case FieldIPv4, FieldIPv6, FieldIP, FieldCIDR:
+	case FieldIPv4, FieldIPv6, FieldIP, FieldCIDR, FieldIPPort:
 		if err := validateTextConstraints(field, candidate); err != nil {
 			return nil, "", err
 		}
 		valid := false
-		if field.Type == FieldCIDR {
+		if field.Type == FieldIPPort {
+			endpoint, err := netip.ParseAddrPort(candidate)
+			valid = err == nil && endpoint.Port() != 0 && endpoint.Addr().Zone() == "" && !endpoint.Addr().Is4In6()
+		} else if field.Type == FieldCIDR {
 			prefix, err := netip.ParsePrefix(candidate)
 			valid = err == nil && !prefix.Addr().Is4In6() && prefix.Addr().Zone() == ""
 		} else {

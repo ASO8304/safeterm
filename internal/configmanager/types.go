@@ -30,6 +30,7 @@ const (
 	FieldIPv4    FieldType = "ipv4"
 	FieldIPv6    FieldType = "ipv6"
 	FieldIP      FieldType = "ip"
+	FieldIPPort  FieldType = "ip_port"
 	FieldCIDR    FieldType = "cidr"
 )
 

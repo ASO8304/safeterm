@@ -72,7 +72,7 @@ Inside SSH or Console:
     diff
     end
 
-Field types: string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr.
+Field types: string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr, ip_port.
 Existing typed field schema
 options remain supported: required, secret, read_only, enum, min/max,
 min_length/max_length, pattern and path policy. Section and key names match the
@@ -101,14 +101,18 @@ Network field examples (inside config.fields):
   { "section": "Server", "key": "ListenIPv4", "type": "ipv4", "required": true },
   { "section": "Server", "key": "ListenIPv6", "type": "ipv6", "required": true },
   { "section": "Server", "key": "PeerAddress", "type": "ip", "required": true },
+  { "section": "Server", "key": "Endpoint", "type": "ip_port", "required": true },
   { "section": "Server", "key": "Network", "type": "cidr", "required": true }
 ]
 ```
 
 Use lowercase type names. ipv4 accepts only IPv4; ipv6 accepts only IPv6; ip
 accepts either family; cidr accepts an IPv4 or IPv6 address with prefix length.
+ip_port accepts an IP literal plus a port in 1..65535, such as 127.0.0.1:2420
+or [::1]:2420; brackets are mandatory for IPv6 endpoints. Endpoint hostnames,
+zero ports, missing ports and IPv6 zones/mapped addresses are rejected.
 Validation uses Go net/netip and performs no DNS lookup or network operation.
-Names, ports, brackets, surrounding whitespace, zone identifiers, IPv4-mapped
+For address-only types, names, ports, brackets, surrounding whitespace, zone identifiers, IPv4-mapped
 IPv6, invalid prefix lengths and the literal any are rejected. Empty values are
 invalid even when required is false: omit an optional field from the document
 instead of assigning an invalid address. Unspecified addresses (0.0.0.0 and ::)

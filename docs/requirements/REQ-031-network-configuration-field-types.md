@@ -11,7 +11,9 @@
    enum, numeric and path options. Do not broaden operation parameter types.
 6. Support port as an integer in 1..65535 without explicit min/max. Optional
    limits may narrow the range but cannot widen it. JSON port values are numbers.
-7. Ship updated inactive templates and Markdown/plain-text administrator guides.
+7. Support ip_port for IPv4:port or [IPv6]:port with ports 1..65535. Reject
+   names, missing/zero/out-of-range ports, zones and mapped IPv6.
+8. Ship updated inactive templates and Markdown/plain-text administrator guides.
 
 Tests: internal/configmanager/network_types_test.go and existing integration,
 resource compilation, terminal and security suites.

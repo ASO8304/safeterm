@@ -166,7 +166,7 @@ func validateFields(resource Resource) error {
 		}
 		seen[coordinate] = true
 		switch field.Type {
-		case FieldString, FieldIPv4, FieldIPv6, FieldIP, FieldCIDR:
+		case FieldString, FieldIPv4, FieldIPv6, FieldIP, FieldCIDR, FieldIPPort:
 			if len(field.Enum) != 0 || field.Min != nil || field.Max != nil || field.Path != nil {
 				return invalidField(resource, *field)
 			}

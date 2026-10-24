@@ -12,6 +12,7 @@ func TestNetworkFieldTypes(t *testing.T) {
 	}{
 		{FieldIPv4, []string{"192.0.2.1", "0.0.0.0", "255.255.255.255"}, []string{"256.1.1.1", "192.168.001.1", "::1", "192.0.2.1/24", "localhost", "any", "", " 192.0.2.1", "192.0.2.1 ", "192.0.2.1:80"}},
 		{FieldIPv6, []string{"::1", "::", "2001:db8::1", "2001:0DB8:0000:0000:0000:0000:0000:0001"}, []string{"192.0.2.1", "::ffff:192.0.2.1", "fe80::1%eth0", "[::1]", "2001:db8::/64", "any", "", "gggg::1"}},
+		{FieldIPPort, []string{"127.0.0.1:2420", "192.0.2.1:1", "192.0.2.1:65535", "[::1]:2420", "[2001:0DB8::1]:443"}, []string{"127.0.0.1", "127.0.0.1:0", "127.0.0.1:65536", "127.0.0.1:-1", "localhost:2420", "any:2420", "127.0.0.1:http", "::1:2420", "[fe80::1%eth0]:2420", "[::ffff:127.0.0.1]:2420", " 127.0.0.1:2420", "127.0.0.1:2420\n", ""}},
 		{FieldIP, []string{"192.0.2.1", "2001:db8::1"}, []string{"any", "localhost", "999.1.1.1", "::ffff:192.0.2.1", "fe80::1%eth0", "127.0.0.1\n", "127.0.0.1;id"}},
 		{FieldCIDR, []string{"192.0.2.0/24", "192.0.2.7/24", "0.0.0.0/0", "2001:db8::1/64", "::/0", "::1/128"}, []string{"192.0.2.1", "192.0.2.1/33", "2001:db8::/129", "::ffff:192.0.2.1/120", "fe80::%eth0/64", "any", "", "192.0.2.1/-1", "192.0.2.1/255.255.255.0"}},
 	} {
@@ -42,7 +43,7 @@ func TestNetworkFieldTypes(t *testing.T) {
 }
 
 func TestNetworkFieldsRespectConstraintsAndRejectIncompatibleSchema(t *testing.T) {
-	for _, typ := range []FieldType{FieldIPv4, FieldIPv6, FieldIP, FieldCIDR} {
+	for _, typ := range []FieldType{FieldIPv4, FieldIPv6, FieldIP, FieldCIDR, FieldIPPort} {
 		for _, field := range []FieldSchema{
 			{Type: typ, Min: int64Pointer(1)}, {Type: typ, Max: int64Pointer(1)}, {Type: typ, Enum: []string{"192.0.2.1"}}, {Type: typ, Path: &PathPolicy{AllowedPrefixes: []string{"/etc"}}},
 		} {
@@ -67,7 +68,7 @@ func TestNetworkFieldPatchPreservesINIAndJSONStrings(t *testing.T) {
 			typ      FieldType
 			old, new string
 		}{
-			{FieldIPv4, "192.0.2.1", "192.0.2.2"}, {FieldIPv6, "::1", "2001:0DB8::1"}, {FieldIP, "192.0.2.1", "2001:db8::1"}, {FieldCIDR, "192.0.2.1/24", "192.0.2.7/24"},
+			{FieldIPv4, "192.0.2.1", "192.0.2.2"}, {FieldIPv6, "::1", "2001:0DB8::1"}, {FieldIPPort, "127.0.0.1:2420", "[2001:0DB8::1]:443"}, {FieldIP, "192.0.2.1", "2001:db8::1"}, {FieldCIDR, "192.0.2.1/24", "192.0.2.7/24"},
 		} {
 			var data string
 			if format == FormatINI {
