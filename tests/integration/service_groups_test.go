@@ -111,13 +111,17 @@ func TestGroupedServiceAcrossAuthenticatedRunnerIPCAndAudit(t *testing.T) {
 	}
 	started, completed := 0, 0
 	for _, event := range sink.events {
-		if event.Outcome == "service-step-started" {
+		step, ok := audit.ParseServiceStep(event.Operation)
+		if !ok {
+			continue
+		}
+		if event.Outcome == "accepted" {
 			started++
 		}
-		if event.Outcome == "service-step-completed" {
+		if event.Outcome == "completed" {
 			completed++
 		}
-		if event.ServiceStep > 0 && (event.RequestID != request.RequestID || event.UserID != "operator" || event.ServiceUnit == "") {
+		if event.RequestID != request.RequestID || event.UserID != "operator" || step.ParentOperation != operation || step.Unit == "" {
 			t.Fatalf("unattributed step %+v", event)
 		}
 	}

@@ -473,3 +473,7 @@ The protected Audit log records each step before execution and after its result,
 with real unit/action, step number, request id and initiating identity. The
 restricted user only sees the public alias. Renaming a resource changes its
 public commands. Existing single-unit definitions need no schema change.
+
+Audit step identity uses operation=service-step:PARENT_OPERATION:INDEX:ACTION:UNIT
+with existing accepted/completed outcomes and the initiating request id. This
+keeps the V1 audit envelope readable by older package binaries during rollback.

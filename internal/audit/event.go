@@ -4,16 +4,12 @@ package audit
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
 
 	"safeterm/internal/contract"
 )
-
-var serviceUnitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]*\.service$`)
-var serviceActionPattern = regexp.MustCompile(`^(status|start|stop|restart|reload|enable|disable)$`)
 
 const SchemaVersion = 1
 
@@ -28,9 +24,6 @@ const (
 // records argument names rather than values so credentials and other caller
 // data do not become part of the audit trail.
 type Event struct {
-	ServiceUnit    string                   `json:"service_unit,omitempty"`
-	ServiceAction  string                   `json:"service_action,omitempty"`
-	ServiceStep    int                      `json:"service_step,omitempty"`
 	SchemaVersion  int                      `json:"schema_version"`
 	RequestID      string                   `json:"request_id"`
 	SessionID      string                   `json:"session_id,omitempty"`
@@ -136,11 +129,10 @@ func (e Event) Validate() error {
 		ComponentIdentity: {"authenticated": true, "authentication-failed": true, "logged-out": true},
 		ComponentGateway: {
 			"unknown-operation": true, "profile-unavailable": true, "routed": true,
-			"runner-error": true, "returned": true, "service-rejected": true, "service-conflict": true,
+			"runner-error": true, "returned": true,
 		},
 		ComponentRunner: {
 			"profile-rejected": true, "accepted": true, "completed": true,
-			"service-step-started": true, "service-step-completed": true, "service-step-failed": true,
 			"session-started": true, "stream-opened": true,
 			"terminate-requested": true, "interrupt-delivered": true,
 			"grace-expired": true, "forced-kill": true,
@@ -157,13 +149,10 @@ func (e Event) Validate() error {
 	if !allowedOutcomes[e.Component][e.Outcome] {
 		return fmt.Errorf("audit: unsupported %s outcome %q", e.Component, e.Outcome)
 	}
-	serviceOutcome := e.Outcome == "service-step-started" || e.Outcome == "service-step-completed" || e.Outcome == "service-step-failed"
-	if serviceOutcome {
-		if e.Component != ComponentRunner || e.ServiceStep < 1 || e.ServiceStep > 64 || !serviceUnitPattern.MatchString(e.ServiceUnit) || strings.Contains(e.ServiceUnit, "..") || !serviceActionPattern.MatchString(e.ServiceAction) {
+	if strings.HasPrefix(e.Operation, "service-step:") {
+		if _, ok := ParseServiceStep(e.Operation); !ok || e.Component != ComponentRunner || (e.Outcome != "accepted" && e.Outcome != "completed") {
 			return fmt.Errorf("audit: invalid service step event")
 		}
-	} else if e.ServiceUnit != "" || e.ServiceAction != "" || e.ServiceStep != 0 {
-		return fmt.Errorf("audit: service metadata requires a service step outcome")
 	}
 	if e.Component == ComponentConfigManager {
 		if e.ResourceID == "" || e.UserID == "" || e.Profile == "" {

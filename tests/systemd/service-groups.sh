@@ -41,9 +41,12 @@ actual = Path('/etc/safeterm-ci/service-events').read_text().splitlines()
 assert actual == expected, actual
 events = [json.loads(line)['event'] for line in
           Path('/var/lib/safeterm/audit/audit.jsonl').read_text().splitlines()]
-steps = [e for e in events if e.get('service_unit', '').startswith('ci-chain-')]
+steps = [(e, e['operation'].split(':')) for e in events
+         if e.get('operation', '').startswith('service-step:')]
+steps = [(e, p) for e, p in steps if len(p) == 5 and p[4].startswith('ci-chain-')]
 assert len(steps) == 30, len(steps)  # 15 steps, before and after durable events
-assert all(e.get('user_id') == 'ci-admin' and e.get('request_id') for e in steps)
-assert all(e['outcome'] in ('service-step-started', 'service-step-completed') for e in steps)
+assert all(e.get('user_id') == 'ci-admin' and e.get('request_id') for e, _ in steps)
+assert all(e['outcome'] in ('accepted', 'completed') for e, _ in steps)
+
 PY
 printf 'Ordered service groups, alias output, completion and durable per-step audit: PASS\n'

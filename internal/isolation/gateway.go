@@ -177,13 +177,13 @@ func (g *Gateway) Dispatch(ctx context.Context, req *contract.ExecutionRequest) 
 		// Reserve in the single Gateway across all Runner profiles. Runner also
 		// independently rejects overlap and rechecks its exact signed plan.
 		if err := validation.New(snapshot.config).Validate(req); err != nil {
-			if auditErr := g.record(ctx, req, profile, "service-rejected", snapshot.Version(), nil); auditErr != nil {
+			if auditErr := g.record(ctx, req, profile, "runner-error", snapshot.Version(), nil); auditErr != nil {
 				return nil, auditErr
 			}
 			return nil, fmt.Errorf("isolation: invalid service request")
 		}
 		if err := policy.New(snapshot.config).Authorize(req); err != nil {
-			if auditErr := g.record(ctx, req, profile, "service-rejected", snapshot.Version(), nil); auditErr != nil {
+			if auditErr := g.record(ctx, req, profile, "runner-error", snapshot.Version(), nil); auditErr != nil {
 				return nil, auditErr
 			}
 			return nil, fmt.Errorf("isolation: unauthorized service request")
@@ -191,7 +191,7 @@ func (g *Gateway) Dispatch(ctx context.Context, req *contract.ExecutionRequest) 
 		var acquired bool
 		release, acquired = g.serviceLocks.Acquire(operation.Systemd.OrderedUnits())
 		if !acquired {
-			if auditErr := g.record(ctx, req, profile, "service-conflict", snapshot.Version(), nil); auditErr != nil {
+			if auditErr := g.record(ctx, req, profile, "runner-error", snapshot.Version(), nil); auditErr != nil {
 				return nil, auditErr
 			}
 			return nil, fmt.Errorf("isolation: service operation conflicts with another active operation")
@@ -290,13 +290,30 @@ func (h *ProfileHandler) Handle(ctx context.Context, req *contract.ExecutionRequ
 		ctx, expire = context.WithDeadline(ctx, req.Metadata.SessionExpiresAt)
 		defer expire()
 	}
+	serviceStarts := map[int]time.Time{}
 	ctx = execution.WithServiceReporter(ctx, func(reportCtx context.Context, step execution.ServiceStepEvent) error {
 		if h.sink == nil {
 			return nil
 		}
-		event := audit.NewEvent(req, snapshot.Version(), audit.ComponentRunner, string(h.profile), step.Outcome, nil)
-		event.ServiceUnit, event.ServiceAction, event.ServiceStep = step.Unit, step.Action, step.Index
-		return h.sink.Record(reportCtx, event)
+		stepRequest := *req
+		operation, err := audit.ServiceStepOperation(req.Command, step.Index, step.Action, step.Unit)
+		if err != nil {
+			return err
+		}
+		stepRequest.Command = operation
+		outcome := "accepted"
+		var response *contract.ExecutionResponse
+		if step.Outcome == "service-step-started" {
+			serviceStarts[step.Index] = time.Now().UTC()
+		} else {
+			outcome = "completed"
+			result, code := contract.ResultSuccess, step.ExitCode
+			if step.Outcome == "service-step-failed" {
+				result = contract.ResultExecutionError
+			}
+			response = &contract.ExecutionResponse{RequestID: req.RequestID, Result: result, ExitCode: code, StartedAt: serviceStarts[step.Index], EndedAt: time.Now().UTC()}
+		}
+		return h.sink.Record(reportCtx, audit.NewEvent(&stepRequest, snapshot.Version(), audit.ComponentRunner, string(h.profile), outcome, response))
 	})
 	response := h.core.HandleRequest(ctx, req)
 	// Execution cancellation must not cancel the durable completion record.

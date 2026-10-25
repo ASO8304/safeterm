@@ -68,3 +68,12 @@ authenticated Runner IPC test checks durable step attribution. The disposable
 systemd/Console smoke test checks real fixture service start/restart/stop order,
 alias completion/output and protected audit entries. It must not run on a
 developer's normal host.
+
+Service step records deliberately retain the existing V1 event envelope and
+accepted/completed outcomes so older binaries can read the chain after package
+rollback. Their operation field is a reserved typed child identity:
+service-step:PARENT_OPERATION:INDEX:ACTION:UNIT. Input tokens cannot contain the
+separator; ParseServiceStep validates/canonicalizes it. Child records share the
+initiating request id and identity. Completed child records include ordinary
+execution result, exit code and timing fields. No new on-disk event fields or
+outcomes are introduced.

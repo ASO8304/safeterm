@@ -52,10 +52,11 @@ func (l *ServiceLocks) Acquire(units []string) (func(), bool) {
 }
 
 type ServiceStepEvent struct {
-	Unit    string
-	Action  string
-	Index   int
-	Outcome string
+	Unit     string
+	Action   string
+	Index    int
+	Outcome  string
+	ExitCode int
 }
 type serviceReporterKey struct{}
 type ServiceReporter func(context.Context, ServiceStepEvent) error
@@ -110,6 +111,7 @@ func (e *SystemdExecutor) Execute(ctx context.Context, operation string, args []
 	defer cancel()
 	reporter, _ := ctx.Value(serviceReporterKey{}).(ServiceReporter)
 	var output strings.Builder
+	exitCode := ExitCodeUnavailable
 	report := func(step config.ServiceStep, index int, outcome string) error {
 		if reporter == nil {
 			return nil
@@ -120,9 +122,10 @@ func (e *SystemdExecutor) Execute(ctx context.Context, operation string, args []
 			reportCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		}
 		defer cancel()
-		return reporter(reportCtx, ServiceStepEvent{Unit: step.Unit, Action: step.Action, Index: index, Outcome: outcome})
+		return reporter(reportCtx, ServiceStepEvent{Unit: step.Unit, Action: step.Action, Index: index, Outcome: outcome, ExitCode: exitCode})
 	}
 	for i, step := range plan.Steps() {
+		exitCode = ExitCodeUnavailable
 		fail := func(reason string) (string, string, int, error) {
 			return output.String(), "", ExitCodeUnavailable, fmt.Errorf("execution: %s: step %d (%s) %s; sequence stopped; no automatic recovery", plan.Alias, i+1, step.Action, reason)
 		}
@@ -139,6 +142,7 @@ func (e *SystemdExecutor) Execute(ctx context.Context, operation string, args []
 			return fail("canceled before execution")
 		}
 		_, _, code, err := e.controller.Control(ctx, step.Action, step.Unit)
+		exitCode = code
 		// systemctl status uses 3 for an inactive/failed unit; render that state
 		// without forwarding raw systemd/journal output. Status is a read operation;
 		// reporting an inactive state is a successful query, not a successful start.
