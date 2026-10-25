@@ -168,7 +168,7 @@ func TestOperationTreeKeepsSignedIDsAndFiltersRoles(t *testing.T) {
 	client := &fakeGateway{}
 	out := &bytes.Buffer{}
 	s, _ := NewShell(client, catalog, Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader(""), out)
-	editorCommands(t, s, "execute service ?", "execute service status ?", "show service status ssh", "execute service status ssh")
+	editorCommands(t, s, "execute service ?", "execute service status ?", "execute service status ssh ?", "execute service status ssh")
 	if len(client.requests) != 1 || client.requests[0].Command != "status_safeterm_ssh" {
 		t.Fatalf("requests=%+v", client.requests)
 	}
@@ -177,7 +177,7 @@ func TestOperationTreeKeepsSignedIDsAndFiltersRoles(t *testing.T) {
 			t.Fatalf("%s: %v", tc.before, got)
 		}
 	}
-	if got := s.completionCandidates(context.Background(), "execute tr", "tr"); len(got) != 0 {
+	if got := s.completionCandidates(context.Background(), "execute cap", "cap"); len(got) != 0 {
 		t.Fatal("unauthorized completion")
 	}
 }
@@ -186,7 +186,7 @@ func TestRootDiscoveryUsesMinimalMenuAndConfigListsFiles(t *testing.T) {
 	s, _, out := editorFixture(t)
 	editorCommands(t, s, "?", "config ?")
 	text := out.String()
-	for _, name := range []string{"execute", "config", "show", "whoami", "clear", "exit", "options"} {
+	for _, name := range []string{"execute", "config", "whoami", "clear", "exit", "options"} {
 		if !strings.Contains(text, name) {
 			t.Fatalf("missing %s", name)
 		}

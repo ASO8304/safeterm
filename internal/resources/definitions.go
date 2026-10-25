@@ -38,7 +38,19 @@ type Permissions struct {
 	Edit     []string `json:"edit,omitempty"`
 	Rollback []string `json:"rollback,omitempty"`
 }
+type ContextField struct {
+	Name string `json:"name"`
+	configmanager.FieldSchema
+}
+
+type ContextDefinition struct {
+	Path        []string       `json:"path"`
+	Description string         `json:"description,omitempty"`
+	Fields      []ContextField `json:"fields"`
+}
+
 type Configuration struct {
+	Contexts        []ContextDefinition            `json:"contexts,omitempty"`
 	Path            string                         `json:"path"`
 	Format          configmanager.Format           `json:"format"`
 	Profile         string                         `json:"profile,omitempty"`
@@ -335,17 +347,30 @@ func Compile(base *config.Config, items []Named) (*config.Config, *configmanager
 				access = configmanager.AccessReadWrite
 			}
 			r := configmanager.Resource{ID: d.ID, Description: d.Description, Profile: profile, Path: c.Path, Format: c.Format, Access: access, PrivilegedWrite: true, Fields: c.Fields, CrossFieldRules: c.CrossFieldRules, Backup: configmanager.BackupPolicy{Enabled: true, Keep: keep}, Permissions: configmanager.Permissions{ReadRoles: c.Permissions.Read, ProposeRoles: c.Permissions.Edit, ApplyRoles: c.Permissions.Edit, RollbackRoles: c.Permissions.Rollback}}
+
 			if c.OnChange != "" {
-				if c.OnChange != "restart" && c.OnChange != "reload" {
-					return fail(fmt.Errorf("config.on_change must be restart or reload"))
-				}
-				if d.Service == nil || len(d.Service.Actions[c.OnChange].Roles) == 0 {
-					return fail(fmt.Errorf("config.on_change requires an explicitly authorized service action"))
-				}
-				r.ActivationOperation = OperationID(d.ID, "service", c.OnChange)
-				r.Permissions.ActivateRoles = d.Service.Actions[c.OnChange].Roles
-				r.RollbackOnFailure = true
+				return fail(fmt.Errorf("config.on_change is no longer supported; save the file and use execute service separately"))
 			}
+			if len(c.Contexts) > 0 {
+				if len(c.Contexts) > 128 {
+					return fail(fmt.Errorf("too many configuration contexts"))
+				}
+				if len(c.Fields) > 0 {
+					return fail(fmt.Errorf("use config.contexts or config.fields, not both"))
+				}
+				for _, context := range c.Contexts {
+					if len(context.Fields) == 0 || len(context.Fields) > configmanager.MaxPatchChanges {
+						return fail(fmt.Errorf("context fields must contain 1..512 entries"))
+					}
+					compiled := configmanager.ConfigContext{Path: append([]string(nil), context.Path...), Description: context.Description}
+					for _, field := range context.Fields {
+						r.Fields = append(r.Fields, field.FieldSchema)
+						compiled.Fields = append(compiled.Fields, configmanager.FieldAlias{Name: field.Name, Section: field.Section, Key: field.Key})
+					}
+					r.Contexts = append(r.Contexts, compiled)
+				}
+			}
+
 			one := configmanager.Registry{Version: reg.Version, Resources: []configmanager.Resource{r}}
 			if err := configmanager.ValidateRegistry(&one); err != nil {
 				return fail(err)

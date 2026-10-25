@@ -300,3 +300,15 @@ of a file permission failure. Current termctl permits only the exact fixed
 safeterm-log-reader read probe through its catalog command helper. Real probe
 failures identify the log ID, path, identity and underlying command result.
 Do not change log ownership in response to an internal helper failure.
+
+## Logical configuration paths
+
+See resources.d/README.txt for config.contexts. Register a physical file once,
+then define logical paths and case-sensitive field names such as config tunnel /
+set Value_1 1400 mapped to [Tunnel].TCPMSS. Contexts and field validation are
+compiled together; no Go change is needed for supported types/formats.
+Config saves never activate services; remove config.on_change and use execute
+service separately. The root show command is removed; show inside configuration
+contexts remains available. Capture replaces trace; packaged nslookup/traceroute
+operations and their installation dependencies have been removed. Administrator
+policies/overrides referencing removed operation IDs must be revised explicitly.

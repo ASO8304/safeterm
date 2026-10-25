@@ -171,7 +171,7 @@ func newTestSessionManagerWithTimeout(t *testing.T, action string, options Strea
 
 func streamRequest(t *testing.T, user string) *contract.ExecutionRequest {
 	t.Helper()
-	request, err := contract.NewExecutionRequest("trace", map[string]string{"port": "53", "host": "127.0.0.1"}, contract.Metadata{BrokerType: "web", UserID: user})
+	request, err := contract.NewExecutionRequest("capture", map[string]string{"port": "53", "host": "127.0.0.1"}, contract.Metadata{BrokerType: "web", UserID: user})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +352,7 @@ func TestSessionManagerBoundsConcurrentSessions(t *testing.T) {
 // TEST-STREAM-023
 func TestSessionManagerRequiresOwnerClaims(t *testing.T) {
 	manager, _ := newTestSessionManager(t, "interrupt", DefaultStreamOptions())
-	request, err := contract.NewExecutionRequest("trace", nil, contract.Metadata{})
+	request, err := contract.NewExecutionRequest("capture", nil, contract.Metadata{})
 	if err != nil {
 		t.Fatal(err)
 	}

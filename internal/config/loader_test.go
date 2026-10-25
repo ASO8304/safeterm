@@ -27,23 +27,28 @@ func TestShippedTcpdumpOperationsFlushOutputWithoutNameResolution(t *testing.T) 
 	}
 }
 
-func TestShippedTracerouteUsesStreaming(t *testing.T) {
+func TestShippedCatalogOmitsRemovedNetworkCommands(t *testing.T) {
 	cfg, err := LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
 	}
+	foundCapture := false
 	for _, op := range cfg.Operations {
-		if op.Name == "traceroute" {
-			if !op.LongRunning || op.RunnerProfile != ProfileNetworkObserver {
-				t.Fatal("traceroute must use the network observer streaming path")
-			}
-			if !slices.Contains(op.ArgsTemplate, "-n") {
-				t.Fatal("traceroute must avoid reverse DNS delays")
-			}
-			return
+		if op.Name == "capture" {
+			foundCapture = true
+		}
+		if op.Name == "trace" || op.Name == "traceroute" || op.Name == "nslookup" {
+			t.Errorf("removed operation %s remains", op.Name)
 		}
 	}
-	t.Fatal("traceroute operation missing")
+	if !foundCapture {
+		t.Fatal("capture operation missing")
+	}
+	for _, executable := range cfg.Executables {
+		if executable.ID == "nslookup" || executable.ID == "traceroute" {
+			t.Errorf("removed executable %s remains", executable.ID)
+		}
+	}
 }
 
 func TestShippedPingUsesStreaming(t *testing.T) {
@@ -174,7 +179,7 @@ func TestLoadConfig_MultipleFilesInSameFolder_AreMerged(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(opsDir, "core.json"), []byte(`[{"name":"system_info","runner_profile":"diagnostics","executor_kind":"process","executable_ref":"uname"}]`), 0o644); err != nil {
 		t.Fatalf("failed to write core.json: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(opsDir, "network.json"), []byte(`[{"name":"trace","runner_profile":"network-observer","executor_kind":"process","executable_ref":"tcpdump"}]`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(opsDir, "network.json"), []byte(`[{"name":"capture","runner_profile":"network-observer","executor_kind":"process","executable_ref":"tcpdump"}]`), 0o644); err != nil {
 		t.Fatalf("failed to write network.json: %v", err)
 	}
 	for _, sub := range []string{"roles", "policies"} {

@@ -41,6 +41,96 @@ symlinks, hardlinks, nonregular files, duplicate properties/ids, unknown fields,
 trailing JSON, deep inputs and oversized inputs are rejected. Limits: 256 active
 files, 1 MiB per file, 8 MiB total; generated metadata files are each <=1 MiB.
 
+## Logical config contexts and field names
+
+Register a physical file once. Its config.contexts can expose multiple logical
+paths and field names without duplicating that file or writing Go code. The
+inactive TEMPLATE.json uses this recommended structure. Do not mix config.fields
+and config.contexts in one resource. Existing config.fields definitions still
+use resource/section navigation; a resource with contexts exposes only its
+logical paths, not an additional physical resource-ID entry point.
+
+Example config-only definition:
+
+```json
+{
+  "id": "network-options",
+  "description": "Shared application settings",
+  "config": {
+    "path": "/etc/product/options.ini",
+    "format": "ini",
+    "permissions": {
+      "read": ["config-viewer", "config-operator"],
+      "edit": ["config-operator"],
+      "rollback": ["config-operator"]
+    },
+    "contexts": [
+      {
+        "path": ["tunnel"],
+        "fields": [
+          { "name": "Value_1", "section": "Tunnel", "key": "TCPMSS", "type": "integer", "min": 1, "max": 65535 },
+          { "name": "Value_2", "section": "Cat", "key": "Port_2", "type": "port" }
+        ]
+      },
+      {
+        "path": ["application", "cat"],
+        "fields": [
+          { "name": "enabled", "section": "Cat", "key": "Enabled", "type": "boolean" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The bounds above are illustrative administrator policy. Field types/constraints
+are the existing schema, declared once alongside the mapping. name is the exact
+case-sensitive CLI field name; section/key are the exact real file coordinates.
+For example set Value_1 1400 writes TCPMSS = 1400 in [Tunnel]. Values are not
+translated; this maps names and coordinates only. Paths use 1..8 lowercase tokens
+matching [a-z][a-z0-9-]{0,47}. Field names use letters, digits, dots, underscores
+and hyphens, starting with a letter, up to 128 characters. A resource supports
+up to 128 contexts and each context 1..512 fields. At most 4096 total routes are
+accepted. Duplicate names in one context, repeated physical fields and ambiguous
+or prefix-conflicting paths fail check/apply. Separate contexts may reuse a field
+name when they refer to different physical keys.
+
+After sudo termctl check and sudo termctl apply, reconnect and use:
+
+    config tunnel
+    show
+    set Value_1 1400
+    set Value_2 443
+    diff
+    end
+
+    config application cat
+    set enabled false
+    end
+
+? and Tab discover paths, names and typed choices according to resource roles.
+Tab keeps its existing common-prefix/list behavior. A singleton context has direct
+fields, so no edit/next is needed; use end to save and abort/cancel to discard.
+There is no automatic entry creation or deletion. Legacy resource/section editing
+continues to use edit/next and saves at end.
+
+Each end validates the final physical document and saves once; it never restarts
+or reloads a service. config.on_change is rejected; remove it and use execute
+service ACTION ID separately with the appropriate role. A multi-context file has
+one version/lock authority. External changes reject a stale save and retain the
+draft; abort and reopen before reapplying. No force overwrite exists. Other views'
+fields/comments are preserved. Cross-field checks still apply to the full file.
+
+Resource read/edit/rollback roles cover every context of that file; contexts do
+not create independent grants or field-level RBAC. Raw section/key names outside
+the current view are not settable through that logical CLI. The manager/writer
+still independently authorize the real resource and validate real coordinates.
+Secret input remains hidden; show/diff redact it and set lines are not stored in
+history. rollback restores a whole-file backup, including other contexts; its
+confirmation explicitly says so. It is not a context-only undo.
+
+## Existing resource/section definitions
+
 Configuration only (no systemd service is created or restarted):
 
 ```json
@@ -227,12 +317,9 @@ existing restricted systemctl grants. Only the dedicated service runner uses
 those grants; users and Config Managers do not receive general sudo access.
 `termctl service ...` still manages SafeTerm's own runtime daemons.
 
-Combine sections in one definition when convenient. Automatic application
-reload is OFF by default, even if service and config occur together. To opt in,
-set config.on_change to restart or reload and explicitly define that service
-action and its roles. Saving then requires both edit and action permissions;
-backup/recovery uses the existing whole-file rollback-on-activation-failure policy.
-A configuration-only definition cannot specify on_change.
+Combine service/config/log sections when convenient. Saving a configuration only
+writes the file. Automatic service activation through config.on_change is no
+longer supported; remove that property and use execute service separately.
 
 ## JSON syntax diagnostics
 

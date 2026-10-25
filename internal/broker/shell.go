@@ -201,16 +201,8 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 			return false, err
 		}
 		return false, s.runOperation(ctx, operation, arguments, input)
-	case "show":
-		return false, s.operationTreeHelp(fields[1:])
 	case "config":
-		if len(fields) == 1 {
-			return false, s.listConfig(ctx)
-		}
-		if len(fields) != 2 {
-			return false, fmt.Errorf("usage: config RESOURCE")
-		}
-		return false, s.enterConfig(ctx, fields[1])
+		return false, s.configPath(ctx, fields[1:], false)
 	case "whoami":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: whoami")
@@ -242,7 +234,6 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 		for _, item := range [][2]string{
 			{"execute", "Execute an authorized command; use execute ?"},
 			{"config", "Select a configuration file; use config ?"},
-			{"show", "Show available operations; show COMMAND gives details"},
 			{"whoami", "Show your identity and roles"},
 			{"clear", "Clear the screen"},
 			{"exit", "Close this session"},
@@ -254,31 +245,15 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	switch fields[0] {
 	case "execute":
 		return s.operationTreeHelp(fields[1:])
-	case "show":
-		return s.operationTreeHelp(fields[1:])
 	case "config":
-		if len(fields) == 1 {
-			return s.listConfig(ctx)
-		}
+		return s.configPath(ctx, fields[1:], true)
 	case "help":
 		return s.writeHelp("")
 	}
 	return fmt.Errorf("no contextual help here; use ?, execute ?, or config ?")
 }
 
-func (s *Shell) listConfig(ctx context.Context) error {
-	if s.configs == nil {
-		return fmt.Errorf("configuration management is unavailable")
-	}
-	items, err := s.configs.List(ctx, s.principal)
-	if err != nil {
-		return err
-	}
-	for _, item := range items {
-		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", item.ID, item.Description)))
-	}
-	return nil
-}
+func (s *Shell) listConfig(ctx context.Context) error { return s.configPath(ctx, nil, true) }
 
 func (s *Shell) readConfigValue(ctx context.Context, input <-chan byte, prompt string, secret bool) (string, error) {
 	return s.readLine(ctx, input, prompt, secret, false)
@@ -382,7 +357,7 @@ func parseOperationArguments(operation config.OperationDefinition, fields []stri
 func (s *Shell) writeHelp(topic string) error {
 	switch topic {
 	case "":
-		fmt.Fprint(s.output, "Commands\r\n  execute ?       List authorized operations\r\n  show COMMAND    Show parameters and examples\r\n  config ?        List registered configuration files\r\n  config RESOURCE Enter the configuration editor\r\n  whoami          Show identity and roles\r\n  exit            Close session\r\n\r\nTab completes; ? then Enter explains the current choices. Ctrl+C stops an operation; Ctrl+] closes the session.\r\n")
+		fmt.Fprint(s.output, "Commands\r\n  execute ?       List authorized operations\r\n  config ?        List registered configuration files\r\n  config RESOURCE Enter the configuration editor\r\n  whoami          Show identity and roles\r\n  exit            Close session\r\n\r\nTab completes; ? then Enter explains the current choices. Ctrl+C stops an operation; Ctrl+] closes the session.\r\n")
 	case "config":
 		fmt.Fprint(s.output, "config RESOURCE -> edit SECTION -> set KEY VALUE -> diff -> end\r\nUse next to select another section, cancel to discard. Only end saves.\r\nFor secrets: set KEY prompts privately. Use - for the root section.\r\n")
 	case "execute":
@@ -489,6 +464,9 @@ func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 func (s *Shell) prompt() string {
 	context := ""
 	if e := s.editing; e != nil {
+		if e.logical {
+			return fmt.Sprintf("safeterm::%s(%s)> ", s.principal.UserID, strings.Join(e.path, "/"))
+		}
 		context = "(" + e.resource
 		if e.inSection {
 			section := e.section

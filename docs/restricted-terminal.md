@@ -11,7 +11,7 @@ safeterm::admin> ?
 safeterm::admin> execute ?
 safeterm::admin> execute service ?
 safeterm::admin> execute service status ?
-safeterm::admin> show service status ssh
+safeterm::admin> execute service status ssh ?
 safeterm::admin> execute service status ssh
 ```
 
@@ -21,8 +21,37 @@ values. Both features filter through the authenticated user's permissions.
 No help request executes an operation or writes a file. Arrow keys navigate
 history; Ctrl+C cancels input/stops a stream; Ctrl+] closes the entire session.
 
-The root menu is `execute`, `config`, `show`, `whoami`, `clear`, `exit`.
+The root menu is `execute`, `config`, `whoami`, `clear`, `exit`.
 `help` remains accepted for keyboard guidance but is not another primary menu.
+
+## Logical configuration paths
+
+A resources.d config.contexts definition can map config tunnel to named fields
+such as Value_1 and Value_2, while storing them as [Tunnel].TCPMSS and [Cat].Port_2.
+Use config ?, config application ? and Tab to discover authorized paths.
+
+```text
+safeterm::admin> config tunnel
+safeterm::admin(tunnel)> show
+safeterm::admin(tunnel)> set Value_1 1400
+safeterm::admin(tunnel)> set Value_2 443
+safeterm::admin(tunnel)> diff
+safeterm::admin(tunnel)> end
+Configuration saved.
+```
+
+Logical fields are directly settable without edit. A logical singleton has no
+next; end saves and exits; abort or cancel discards the draft. show, diff, help,
+Tab, typed validation and secret redaction use the logical names. Physical paths
+and unrelated keys do not become user-selectable arguments. Multiple contexts
+can share one registered file, with one version-checked atomic writer. Saving
+never restarts services; use execute service separately. Whole-file rollback
+can affect all views and asks for explicit confirmation.
+
+See the [installed JSON guide](../configs/resources.d/README.md) for the complete
+schema and examples. Existing config.fields resources retain section navigation
+as described below. A source cannot mix fields with contexts, and a context-based
+resource has no extra raw-ID editing path.
 
 ## Configure a file
 
@@ -103,12 +132,12 @@ Common presentation names are:
 | `execute logs service_A` | `log source=service_A` |
 | `execute service status ssh` | `status_safeterm_ssh` |
 | `execute service restart gateway` | `restart_safeterm_gateway` |
-| `execute trace host=192.0.2.1` | `trace host=192.0.2.1` |
-| `execute trace port=999` | `trace port=999` |
-| `execute trace host=192.0.2.1 port=999 protocol=tcp` | `trace` with all three filters |
+| `execute capture host=192.0.2.1` | `trace host=192.0.2.1` |
+| `execute capture port=999` | `trace port=999` |
+| `execute capture host=192.0.2.1 port=999 protocol=tcp` | `capture` with all three filters |
 
-`execute ping host=127.0.0.1 count=5`, `execute nslookup host=example.com`
-and `execute traceroute host=192.0.2.1` retain their familiar names.
+`execute ping host=127.0.0.1 count=5` retains its familiar name.
+The packaged nslookup and traceroute operations are removed; capture replaces trace.
 Service actions/targets appear only if their corresponding signed operations
 exist and the role is authorized. Presentation aliases do not grant permissions,
 change the signed catalog or run arbitrary Linux commands. Only the contextual names are accepted; raw legacy operation names, `list`,
@@ -129,7 +158,7 @@ an installation snapshot. Ordinary users never handle signing keys.
 
 ## Log completion and service permissions
 
-`execute logs ` and `show logs ` offer approved log names directly, such as
+`execute logs ` offers approved log names directly, such as
 `authentication`, `service_A` and `system`. The built-in operation stores the
 selection in its `source` parameter internally; users can type
 `execute logs system`. Explicit `source=system` remains accepted, and typing
@@ -151,3 +180,6 @@ stop, enable and disable actions with the intended role lists. Run
 then reconnect. The generated menu offers `execute service ACTION RESOURCE_ID`.
 The service runner receives only those exact unit/action grants. `termctl service`
 continues to administer SafeTerm's own runtime services.
+
+The root-level show command is removed. Use execute COMMAND ? for command
+help. The show command inside a configuration context still displays values.

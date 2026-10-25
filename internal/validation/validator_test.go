@@ -7,7 +7,7 @@ import (
 	"safeterm/internal/contract"
 )
 
-// traceTestConfig builds an in-memory Config with a "trace" operation
+// traceTestConfig builds an in-memory Config with a "capture" operation
 // matching the exact example from the project document (section 6.3):
 // a "port" parameter (int, 1..65535) and a "host" parameter (string,
 // IPv4 pattern).
@@ -25,7 +25,7 @@ func traceTestConfig() *config.Config {
 		},
 		Operations: []config.OperationDefinition{
 			{
-				Name: "trace", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump",
+				Name: "capture", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump",
 				Parameters: []config.ParameterDefinition{
 					{Name: "port", Type: config.ParamTypeInt, Required: true, Min: &minPort, Max: &maxPort},
 					{Name: "host", Type: config.ParamTypeString, Required: true, Pattern: `^[0-9]{1,3}(\.[0-9]{1,3}){3}$`},
@@ -65,7 +65,7 @@ func TestValidate_UnknownOperation_Rejected(t *testing.T) {
 // Scenario: a required argument that is missing must be rejected.
 func TestValidate_MissingRequiredArgument_Rejected(t *testing.T) {
 	v := New(traceTestConfig())
-	req := newRequest(t, "trace", map[string]string{"port": "999"}) // host missing
+	req := newRequest(t, "capture", map[string]string{"port": "999"}) // host missing
 
 	if err := v.Validate(req); err == nil {
 		t.Fatal("expected error for missing required argument 'host', got nil")
@@ -78,7 +78,7 @@ func TestValidate_MissingRequiredArgument_Rejected(t *testing.T) {
 // even if its value looks harmless — this is the whitelist enforcement.
 func TestValidate_UnknownArgument_Rejected(t *testing.T) {
 	v := New(traceTestConfig())
-	req := newRequest(t, "trace", map[string]string{
+	req := newRequest(t, "capture", map[string]string{
 		"port":  "999",
 		"host":  "192.168.10.20",
 		"extra": "unexpected",
@@ -109,7 +109,7 @@ func TestValidate_PortBoundaries(t *testing.T) {
 	v := New(traceTestConfig())
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			req := newRequest(t, "trace", map[string]string{
+			req := newRequest(t, "capture", map[string]string{
 				"port": tc.port,
 				"host": "192.168.10.20",
 			})
@@ -129,7 +129,7 @@ func TestValidate_PortBoundaries(t *testing.T) {
 // example: port = "; rm -rf /" must be rejected.
 func TestValidate_PortWithInjectionAttempt_Rejected(t *testing.T) {
 	v := New(traceTestConfig())
-	req := newRequest(t, "trace", map[string]string{
+	req := newRequest(t, "capture", map[string]string{
 		"port": "; rm -rf /",
 		"host": "192.168.10.20",
 	})
@@ -145,7 +145,7 @@ func TestValidate_PortWithInjectionAttempt_Rejected(t *testing.T) {
 // rejected.
 func TestValidate_HostNotMatchingPattern_Rejected(t *testing.T) {
 	v := New(traceTestConfig())
-	req := newRequest(t, "trace", map[string]string{
+	req := newRequest(t, "capture", map[string]string{
 		"port": "999",
 		"host": "not-an-ip",
 	})
@@ -163,7 +163,7 @@ func TestValidate_HostNotMatchingPattern_Rejected(t *testing.T) {
 // specifically to prove the dangerousChars layer runs independently.
 func TestValidate_HostWithShellMetacharacters_Rejected(t *testing.T) {
 	v := New(traceTestConfig())
-	req := newRequest(t, "trace", map[string]string{
+	req := newRequest(t, "capture", map[string]string{
 		"port": "999",
 		"host": "192.168.10.20; rm -rf /",
 	})
@@ -186,7 +186,7 @@ func TestValidate_HostPatternMustMatchFullString_NotJustPrefix(t *testing.T) {
 	cfg := &config.Config{
 		Operations: []config.OperationDefinition{
 			{
-				Name: "trace",
+				Name: "capture",
 				Parameters: []config.ParameterDefinition{
 					{Name: "port", Type: config.ParamTypeInt, Required: true, Min: &minPort, Max: &maxPort},
 					{Name: "host", Type: config.ParamTypeString, Required: true, Pattern: `[0-9]{1,3}(\.[0-9]{1,3}){3}`}, // no ^...$
@@ -199,7 +199,7 @@ func TestValidate_HostPatternMustMatchFullString_NotJustPrefix(t *testing.T) {
 	// This value contains dangerous characters too, so to isolate the
 	// full-match behavior specifically, this case is expected to fail
 	// for either reason — the important assertion is that it fails at all.
-	req := newRequest(t, "trace", map[string]string{
+	req := newRequest(t, "capture", map[string]string{
 		"port": "999",
 		"host": "192.168.10.20 extra-trailing-data",
 	})
@@ -213,7 +213,7 @@ func TestValidate_HostPatternMustMatchFullString_NotJustPrefix(t *testing.T) {
 // Scenario: a fully valid request must pass with no error.
 func TestValidate_ValidTraceRequest_Passes(t *testing.T) {
 	v := New(traceTestConfig())
-	req := newRequest(t, "trace", map[string]string{
+	req := newRequest(t, "capture", map[string]string{
 		"port": "999",
 		"host": "192.168.10.20",
 	})

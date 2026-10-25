@@ -158,7 +158,7 @@ func TestCatalogListUsesShippedConfig(t *testing.T) {
 	if err := run([]string{"--config-dir", "../../internal/defaults/catalog", "catalog", "list"}, &out, &out); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "ping") || !strings.Contains(out.String(), "trace") {
+	if !strings.Contains(out.String(), "ping") || !strings.Contains(out.String(), "capture") {
 		t.Fatalf("catalog output missing new operations: %q", out.String())
 	}
 }

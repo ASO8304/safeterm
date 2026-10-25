@@ -66,7 +66,7 @@ func assertRejected(t *testing.T, tr *Translator, req *contract.ExecutionRequest
 // Preserve the exact trace example using the actual shipped configuration.
 func TestTranslate_ExactTraceExample(t *testing.T) {
 	cfg := shippedConfig(t)
-	req := &contract.ExecutionRequest{Command: "trace", Arguments: map[string]string{"port": "999", "host": "192.168.10.20"}}
+	req := &contract.ExecutionRequest{Command: "capture", Arguments: map[string]string{"port": "999", "host": "192.168.10.20"}}
 	if err := validation.New(cfg).Validate(req); err != nil {
 		t.Fatal(err)
 	}
@@ -206,10 +206,10 @@ func TestTranslate_RejectsNilOrUnknownOperation(t *testing.T) {
 	for _, name := range []string{"", "missing", "tcpdump", "/usr/bin/uname", "system_info; uname"} {
 		assertRejected(t, tr, &contract.ExecutionRequest{Command: name}, "unknown operation")
 	}
-	assertRejected(t, &Translator{}, &contract.ExecutionRequest{Command: "trace"}, "unknown operation")
+	assertRejected(t, &Translator{}, &contract.ExecutionRequest{Command: "capture"}, "unknown operation")
 	emptyConfig := tokenConfig()
 	emptyConfig.Operations = nil
-	assertRejected(t, mustTranslator(t, emptyConfig), &contract.ExecutionRequest{Command: "trace"}, "unknown operation")
+	assertRejected(t, mustTranslator(t, emptyConfig), &contract.ExecutionRequest{Command: "capture"}, "unknown operation")
 }
 
 // TEST-TRANS-008

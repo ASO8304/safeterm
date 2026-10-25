@@ -31,3 +31,11 @@ a normal Linux administrator shell. No application values, owners or ACLs change
 Read the reference's recovery and offline-signing sections before using those
 advanced modes. Custom source files survive package update; moving definitions to
 another server requires that server's files, units, roles, read access and signer.
+
+## Logical contexts
+
+config.contexts maps logical CLI paths and field name aliases to physical
+section/key coordinates. The [resource guide](../configs/resources.d/README.md)
+contains the full JSON schema example, limits and permission behavior.
+End saves files only; config.on_change is rejected. Manage services explicitly
+through execute service. Existing config.fields definitions remain supported.

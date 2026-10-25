@@ -47,14 +47,14 @@ func TestInjectionCorpusNeverReachesExecution(t *testing.T) {
 	core, probe := securityCore(t)
 	payloads := []string{"127.0.0.1;id", "127.0.0.1 && id", "127.0.0.1|id", "`id`", "$(id)", "127.0.0.1 > /tmp/x", "' OR '1'='1", "\";id", "127.0.0.1\nwhoami", "127.0.0.1\rwhoami", "${IFS}id", "{id}", strings.Repeat("1", 8192)}
 	for _, payload := range payloads {
-		request, _ := contract.NewExecutionRequest("trace", map[string]string{"port": "53", "host": payload}, contract.Metadata{BrokerType: "ssh", UserID: "attacker", ClaimedRoles: []string{"netops"}})
+		request, _ := contract.NewExecutionRequest("capture", map[string]string{"port": "53", "host": payload}, contract.Metadata{BrokerType: "ssh", UserID: "attacker", ClaimedRoles: []string{"netops"}})
 		response := core.HandleRequest(context.Background(), request)
 		if response.Result != contract.ResultRejected || response.FailureStage != string(agent.StageValidation) {
 			t.Errorf("payload %q result=%s stage=%s", payload, response.Result, response.FailureStage)
 		}
 	}
 	for _, port := range []string{"1;id", "1|id", "$(id)", "-1", "0", "65536", "999999999999999999999"} {
-		request, _ := contract.NewExecutionRequest("trace", map[string]string{"port": port, "host": "127.0.0.1"}, contract.Metadata{BrokerType: "ssh", UserID: "attacker", ClaimedRoles: []string{"netops"}})
+		request, _ := contract.NewExecutionRequest("capture", map[string]string{"port": port, "host": "127.0.0.1"}, contract.Metadata{BrokerType: "ssh", UserID: "attacker", ClaimedRoles: []string{"netops"}})
 		response := core.HandleRequest(context.Background(), request)
 		if response.Result != contract.ResultRejected || response.FailureStage != string(agent.StageValidation) {
 			t.Errorf("port payload %q accepted", port)

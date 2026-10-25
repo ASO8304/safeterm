@@ -42,14 +42,14 @@ func TestEditorSupportsCursorDeleteHistoryAndPrompt(t *testing.T) {
 func TestEditorCompletesAuthorizedOperationsAndParameters(t *testing.T) {
 	catalog, _ := NewCatalog(brokerTestConfig())
 	shell, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "alice", Roles: []string{"netops"}}, bytes.NewReader(nil), &bytes.Buffer{})
-	if got := shell.completionCandidates(context.Background(), "execute tr", "tr"); len(got) != 1 || got[0] != "trace" {
+	if got := shell.completionCandidates(context.Background(), "execute cap", "cap"); len(got) != 1 || got[0] != "capture" {
 		t.Fatalf("operations=%v", got)
 	}
-	if got := shell.completionCandidates(context.Background(), "execute trace po", "po"); len(got) != 1 || got[0] != "port=" {
+	if got := shell.completionCandidates(context.Background(), "execute capture po", "po"); len(got) != 1 || got[0] != "port=" {
 		t.Fatalf("parameters=%v", got)
 	}
 	viewer, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, bytes.NewReader(nil), &bytes.Buffer{})
-	if got := viewer.completionCandidates(context.Background(), "execute tr", "tr"); len(got) != 0 {
+	if got := viewer.completionCandidates(context.Background(), "execute cap", "cap"); len(got) != 0 {
 		t.Fatalf("unauthorized completion=%v", got)
 	}
 }
@@ -77,13 +77,12 @@ func TestTraceCompletionHasOnlyDynamicArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ before, prefix, want string }{
-		{"execute trace ", "", "host=,port=,protocol="},
-		{"execute trace po", "po", "port="},
-		{"execute trace host=192.0.2.1 ", "", "port=,protocol="},
-		{"execute trace port=999 ", "", "host=,protocol="},
-		{"execute trace protocol=", "protocol=", "protocol=arp,protocol=icmp,protocol=ip,protocol=tcp,protocol=udp"},
-		{"execute trace port=999 protocol=t", "protocol=t", "protocol=tcp"},
-		{"show trace ", "", "host=,port=,protocol="},
+		{"execute capture ", "", "host=,port=,protocol="},
+		{"execute capture po", "po", "port="},
+		{"execute capture host=192.0.2.1 ", "", "port=,protocol="},
+		{"execute capture port=999 ", "", "host=,protocol="},
+		{"execute capture protocol=", "protocol=", "protocol=arp,protocol=icmp,protocol=ip,protocol=tcp,protocol=udp"},
+		{"execute capture port=999 protocol=t", "protocol=t", "protocol=tcp"},
 	} {
 		if got := strings.Join(shell.completionCandidates(context.Background(), tc.before, tc.prefix), ","); got != tc.want {
 			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)
@@ -166,7 +165,6 @@ func TestLogCompletionOffersOnlyMappedSources(t *testing.T) {
 	}
 	for _, tc := range []struct{ before, prefix, want string }{
 		{"execute logs ", "", "authentication,service_A,system"},
-		{"show logs ", "", "authentication,service_A,system"},
 		{"execute logs s", "s", "service_A,system"},
 		{"execute logs system ", "", ""},
 		{"execute logs source=system ", "", ""},
@@ -176,4 +174,22 @@ func TestLogCompletionOffersOnlyMappedSources(t *testing.T) {
 			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)
 		}
 	}
+}
+
+func TestRootShowIsRemovedWithoutChangingConfigShow(t *testing.T) {
+	s, _, _ := editorFixture(t)
+	client := &fakeGateway{}
+	s.client = client
+	for _, line := range []string{"show", "show capture", "show ?"} {
+		if _, err := s.executeLine(context.Background(), line, nil); err == nil {
+			t.Fatalf("root show accepted: %q", line)
+		}
+	}
+	if got := s.completionCandidates(context.Background(), "sh", "sh"); len(got) != 0 {
+		t.Fatalf("root show completed: %v", got)
+	}
+	if len(client.requests) != 0 {
+		t.Fatal("root show dispatched execution")
+	}
+	editorCommands(t, s, "config options", "edit Server", "show", "cancel")
 }

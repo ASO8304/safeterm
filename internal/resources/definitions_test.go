@@ -116,20 +116,24 @@ func TestStrictDefinitionsAndInvalidReferencesFailClosed(t *testing.T) {
 	}
 
 }
-func TestCombinedDefinitionHasExplicitActivationAndFriendlyPaths(t *testing.T) {
+func TestCombinedDefinitionKeepsServiceActionsSeparateFromSaving(t *testing.T) {
 	item := parseTest(t, configOnly)
 	service := parseTest(t, serviceOnly)
 	item.Definition.Service = service.Definition.Service
 	item.Definition.Config.OnChange = "restart"
 	base, _ := compilerFixture(t)
+	if _, _, _, err := Compile(base, []Named{item}); err == nil {
+		t.Fatal("automatic service activation accepted")
+	}
+	item.Definition.Config.OnChange = ""
 	_, registry, _, err := Compile(base, []Named{item})
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, r := range registry.Resources {
 		if r.ID == "options" {
-			if r.ActivationOperation != OperationID("options", "service", "restart") || !r.RollbackOnFailure {
-				t.Fatal("activation missing")
+			if r.ActivationOperation != "" || r.RollbackOnFailure {
+				t.Fatal("saving config must not activate a service")
 			}
 		}
 	}
@@ -190,5 +194,32 @@ func TestDefinitionJSONErrorsHaveFileLineAndColumnWithoutValues(t *testing.T) {
 	_, err := Parse("resource.json", []byte(`{"id":"`+secret+`", ]}`))
 	if err == nil || strings.Contains(err.Error(), secret) {
 		t.Fatalf("error leaks document: %v", err)
+	}
+}
+
+func TestCompileLogicalContextsAndNames(t *testing.T) {
+	base, _ := compilerFixture(t)
+	const source = `{"id":"shared-options","description":"Shared","config":{"path":"/etc/product/options.ini","format":"ini","permissions":{"read":["config-viewer"],"edit":["config-operator"]},"contexts":[{"path":["tunnel"],"fields":[{"name":"Value_1","section":"Tunnel","key":"TCPMSS","type":"integer","min":1,"max":65535},{"name":"Value_2","section":"Cat","key":"Port_2","type":"port"}]},{"path":["application","cat"],"fields":[{"name":"enabled","section":"Cat","key":"Enabled","type":"boolean"}]}]}}`
+	item := parseTest(t, source)
+	_, reg, _, err := Compile(base, []Named{item})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reg.Resources) != 1 || len(reg.Resources[0].Contexts) != 2 || len(reg.Resources[0].Fields) != 3 {
+		t.Fatalf("wrong compiled registry %+v", reg)
+	}
+	if reg.Resources[0].Fields[0].Key != "TCPMSS" || reg.Resources[0].Contexts[0].Fields[0].Name != "Value_1" {
+		t.Fatal("alias replaced physical key")
+	}
+	for _, broken := range []string{
+		strings.Replace(source, `"name":"Value_1"`, `"name":"bad name"`, 1),
+		strings.Replace(source, `"name":"Value_2"`, `"name":"Value_1"`, 1),
+		strings.Replace(source, `["application","cat"]`, `["tunnel","cat"]`, 1),
+		strings.Replace(source, `"contexts":`, `"fields":[{"section":"x","key":"Y","type":"string"}],"contexts":`, 1),
+	} {
+		item := parseTest(t, broken)
+		if _, _, _, err := Compile(base, []Named{item}); err == nil {
+			t.Fatal("accepted invalid logical definition")
+		}
 	}
 }

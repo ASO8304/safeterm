@@ -4,12 +4,37 @@
   "service": {
     "unit": "example.service",
     "actions": {
-      "status": { "roles": ["service-viewer", "service-operator"] },
-      "restart": { "roles": ["service-operator"] },
-      "start": { "roles": ["service-operator"] },
-      "stop": { "roles": ["service-operator"] },
-      "enable": { "roles": ["service-operator"] },
-      "disable": { "roles": ["service-operator"] }
+      "status": {
+        "roles": [
+          "service-viewer",
+          "service-operator"
+        ]
+      },
+      "restart": {
+        "roles": [
+          "service-operator"
+        ]
+      },
+      "start": {
+        "roles": [
+          "service-operator"
+        ]
+      },
+      "stop": {
+        "roles": [
+          "service-operator"
+        ]
+      },
+      "enable": {
+        "roles": [
+          "service-operator"
+        ]
+      },
+      "disable": {
+        "roles": [
+          "service-operator"
+        ]
+      }
     }
   },
   "config": {
@@ -17,25 +42,43 @@
     "format": "ini",
     "backup_keep": 5,
     "permissions": {
-      "read": ["config-viewer", "config-operator"],
-      "edit": ["config-operator"],
-      "rollback": ["config-operator"]
+      "read": [
+        "config-viewer",
+        "config-operator"
+      ],
+      "edit": [
+        "config-operator"
+      ],
+      "rollback": [
+        "config-operator"
+      ]
     },
-    "fields": [
+    "contexts": [
       {
-        "section": "Server",
-        "key": "Port",
-        "description": "Listening port",
-        "type": "port",
-        "required": true
-      },
-      {
-        "section": "Server",
-        "key": "ListenAddress",
-        "description": "IPv4 address (adapt field names to the real file)",
-        "type": "ipv4",
-        "required": true,
-        "allow_empty": false
+        "path": [
+          "application",
+          "example"
+        ],
+        "description": "Example application settings",
+        "fields": [
+          {
+            "name": "listen-port",
+            "section": "Server",
+            "key": "Port",
+            "description": "Listening port",
+            "type": "port",
+            "required": true
+          },
+          {
+            "name": "listen-address",
+            "section": "Server",
+            "key": "ListenAddress",
+            "description": "IPv4 address (adapt field names to the real file)",
+            "type": "ipv4",
+            "required": true,
+            "allow_empty": false
+          }
+        ]
       }
     ]
   },
@@ -44,7 +87,9 @@
       "id": "main",
       "description": "Main application log",
       "path": "/var/log/example/application.log",
-      "roles": ["log-viewer"]
+      "roles": [
+        "log-viewer"
+      ]
     }
   ]
 }

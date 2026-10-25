@@ -249,25 +249,10 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 	}
 	fields := strings.Fields(before)
 	if len(fields) == 0 || (len(fields) == 1 && !strings.HasSuffix(before, " ")) {
-		return matching([]string{"clear", "config", "show", "execute", "whoami", "exit"}, prefix)
+		return matching([]string{"clear", "config", "execute", "whoami", "exit"}, prefix)
 	}
-	if fields[0] == "config" && (len(fields) == 1 || (len(fields) == 2 && !strings.HasSuffix(before, " "))) {
-		if s.configs == nil {
-			return nil
-		}
-		items, err := s.configs.List(ctx, s.principal)
-		if err != nil {
-			return nil
-		}
-		values := []string{}
-		for _, item := range items {
-			values = append(values, item.ID)
-		}
-		return matching(values, prefix)
-	}
-	if fields[0] == "show" {
-		values, _ := s.treeCompletion(ctx, "execute"+strings.TrimPrefix(before, "show"), prefix)
-		return values
+	if fields[0] == "config" {
+		return s.configCompletion(ctx, before, prefix)
 	}
 	return s.legacyCompletionCandidates(ctx, before, prefix)
 }
@@ -280,7 +265,7 @@ func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix s
 		index++
 	}
 	if index <= 0 {
-		return matching([]string{"clear", "config", "exit", "help", "show", "execute", "whoami"}, prefix)
+		return matching([]string{"clear", "config", "exit", "help", "execute", "whoami"}, prefix)
 	}
 	command := fields[0]
 	if (command == "execute" || command == "describe") && index == 1 {

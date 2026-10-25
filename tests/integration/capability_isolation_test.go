@@ -73,7 +73,7 @@ func TestCapabilityIsolatedGatewayRoutesAcrossAuthenticatedUnixIPC(t *testing.T)
 		operation string
 		profile   config.RunnerProfile
 	}{
-		{"system_info", config.ProfileDiagnostics}, {"trace", config.ProfileNetworkObserver},
+		{"system_info", config.ProfileDiagnostics}, {"capture", config.ProfileNetworkObserver},
 	} {
 		request, err := contract.NewExecutionRequest(tc.operation, nil, contract.Metadata{})
 		if err != nil {
@@ -88,7 +88,7 @@ func TestCapabilityIsolatedGatewayRoutesAcrossAuthenticatedUnixIPC(t *testing.T)
 		t.Fatalf("unexpected core calls: %+v", running)
 	}
 
-	crossProfile, _ := contract.NewExecutionRequest("trace", nil, contract.Metadata{})
+	crossProfile, _ := contract.NewExecutionRequest("capture", nil, contract.Metadata{})
 	response, err := running[config.ProfileDiagnostics].client.Handle(context.Background(), crossProfile)
 	if err != nil || response.Result != contract.ResultRejected {
 		t.Fatalf("cross-profile response=%+v error=%v", response, err)

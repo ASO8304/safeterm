@@ -53,7 +53,7 @@ func buildCoreWithRealPolicy(t *testing.T) (*agent.Core, *observedPolicy, *polic
 func policyRequest(t *testing.T, operation string, roles []string) *contract.ExecutionRequest {
 	t.Helper()
 	var args map[string]string
-	if operation == "trace" {
+	if operation == "capture" {
 		args = map[string]string{"port": "999", "host": "192.168.10.20"}
 	}
 	req, err := contract.NewExecutionRequest(operation, args, contract.Metadata{ClaimedRoles: roles})
@@ -80,8 +80,8 @@ func TestCore_WithRealPolicy_AcceptsAuthorizedRequests(t *testing.T) {
 	}{
 		{"viewer system info", "system_info", []string{"viewer"}},
 		{"netops system info", "system_info", []string{"netops"}},
-		{"netops trace", "trace", []string{"netops"}},
-		{"multiple roles", "trace", []string{"ghost", "viewer", "netops"}},
+		{"netops trace", "capture", []string{"netops"}},
+		{"multiple roles", "capture", []string{"ghost", "viewer", "netops"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			core, p, tr, ex := buildCoreWithRealPolicy(t)
@@ -111,7 +111,7 @@ func TestCore_WithRealPolicy_DenialStopsDownstreamStages(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			core, p, tr, ex := buildCoreWithRealPolicy(t)
-			req := policyRequest(t, "trace", tc.roles)
+			req := policyRequest(t, "capture", tc.roles)
 			resp := core.HandleRequest(context.Background(), req)
 			assertPolicyResponse(t, req, resp)
 			if resp.Result != contract.ResultRejected || !strings.HasPrefix(resp.Message, "policy: ") {
@@ -131,7 +131,7 @@ func TestCore_WithRealPolicy_InvalidInputStopsBeforePolicy(t *testing.T) {
 	for _, name := range []string{"unknown operation", "raw command", "port range", "injection", "extra argument"} {
 		t.Run(name, func(t *testing.T) {
 			core, p, tr, ex := buildCoreWithRealPolicy(t)
-			req := policyRequest(t, "trace", []string{"netops"})
+			req := policyRequest(t, "capture", []string{"netops"})
 			switch name {
 			case "unknown operation":
 				req.Command = "missing"

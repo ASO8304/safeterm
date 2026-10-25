@@ -25,12 +25,12 @@ func testPolicyConfig() *config.Config {
 		},
 		Operations: []config.OperationDefinition{
 			{Name: "system_info", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname"},
-			{Name: "trace", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump"},
+			{Name: "capture", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump"},
 		},
 		Roles: []config.RoleDefinition{{Name: "viewer"}, {Name: "netops"}, {Name: "unassigned"}},
 		Policies: []config.PolicyDefinition{
 			{Role: "viewer", Operations: []string{"system_info"}},
-			{Role: "netops", Operations: []string{"system_info", "trace"}},
+			{Role: "netops", Operations: []string{"system_info", "capture"}},
 		},
 	}
 }
@@ -63,7 +63,7 @@ func TestAuthorize_NoClaimedRoles_Denied(t *testing.T) {
 // authorized.
 func TestAuthorize_RoleWithPermission_Allowed(t *testing.T) {
 	e := New(testPolicyConfig())
-	req := requestWithRoles(t, "trace", []string{"netops"})
+	req := requestWithRoles(t, "capture", []string{"netops"})
 
 	if err := e.Authorize(req); err != nil {
 		t.Fatalf("expected netops to be authorized for trace, got error: %v", err)
@@ -72,10 +72,10 @@ func TestAuthorize_RoleWithPermission_Allowed(t *testing.T) {
 
 // TEST-POLICY-003
 // Requirement: REQ-005 (AC-2), mirrors the shipped policies.json exactly:
-// "viewer" may run system_info but must NOT be allowed to run "trace".
+// "viewer" may run system_info but must NOT be allowed to run "capture".
 func TestAuthorize_ViewerCannotRunTrace(t *testing.T) {
 	e := New(testPolicyConfig())
-	req := requestWithRoles(t, "trace", []string{"viewer"})
+	req := requestWithRoles(t, "capture", []string{"viewer"})
 
 	if err := e.Authorize(req); err == nil {
 		t.Fatal("expected viewer role to be denied for trace operation, got nil")
@@ -103,7 +103,7 @@ func TestAuthorize_UnknownRole_Denied(t *testing.T) {
 // RBAC semantics).
 func TestAuthorize_MultipleRoles_OneGrantsAccess_Allowed(t *testing.T) {
 	e := New(testPolicyConfig())
-	req := requestWithRoles(t, "trace", []string{"viewer", "netops"})
+	req := requestWithRoles(t, "capture", []string{"viewer", "netops"})
 
 	if err := e.Authorize(req); err != nil {
 		t.Fatalf("expected access to be granted when at least one role permits it, got error: %v", err)
@@ -116,7 +116,7 @@ func TestAuthorize_MultipleRoles_OneGrantsAccess_Allowed(t *testing.T) {
 // request must be denied.
 func TestAuthorize_MultipleRoles_NoneGrantAccess_Denied(t *testing.T) {
 	e := New(testPolicyConfig())
-	req := requestWithRoles(t, "trace", []string{"viewer", "ghost_role"})
+	req := requestWithRoles(t, "capture", []string{"viewer", "ghost_role"})
 
 	if err := e.Authorize(req); err == nil {
 		t.Fatal("expected denial when no claimed role grants the operation, got nil")
@@ -144,7 +144,7 @@ func TestAuthorize_RoleOrderAndDuplicates(t *testing.T) {
 		{"ghost", "netops"}, {"netops", "ghost"},
 		{"netops", "netops"}, {"", "netops"},
 	} {
-		if err := e.Authorize(requestWithRoles(t, "trace", roles)); err != nil {
+		if err := e.Authorize(requestWithRoles(t, "capture", roles)); err != nil {
 			t.Errorf("roles %v: expected authorization, got %v", roles, err)
 		}
 	}
@@ -184,18 +184,18 @@ func TestAuthorize_MultiplePoliciesForRole_AreMerged(t *testing.T) {
 	cfg.Policies = []config.PolicyDefinition{
 		{Role: "viewer", Operations: []string{"system_info"}},
 		{Role: "netops", Operations: []string{"system_info"}},
-		{Role: "netops", Operations: []string{"trace", "trace"}},
+		{Role: "netops", Operations: []string{"capture", "capture"}},
 	}
 	if err := config.ValidateConfig(cfg); err != nil {
 		t.Fatal(err)
 	}
 	e := New(cfg)
-	for _, operation := range []string{"system_info", "trace"} {
+	for _, operation := range []string{"system_info", "capture"} {
 		if err := e.Authorize(requestWithRoles(t, operation, []string{"netops"})); err != nil {
 			t.Errorf("merged grant missing for %s: %v", operation, err)
 		}
 	}
-	if err := e.Authorize(requestWithRoles(t, "trace", []string{"viewer"})); err == nil {
+	if err := e.Authorize(requestWithRoles(t, "capture", []string{"viewer"})); err == nil {
 		t.Fatal("netops grant leaked into viewer")
 	}
 }
@@ -222,7 +222,7 @@ func TestAuthorize_NilInputsAndZeroValue_Denied(t *testing.T) {
 		}
 	}
 	for _, e := range []*Enforcer{New(nil), {}} {
-		if err := e.Authorize(requestWithRoles(t, "trace", []string{"netops"})); err == nil {
+		if err := e.Authorize(requestWithRoles(t, "capture", []string{"netops"})); err == nil {
 			t.Fatal("unconfigured enforcer must not grant access")
 		}
 	}
@@ -241,8 +241,8 @@ func TestAuthorize_ShippedConfig(t *testing.T) {
 		role, operation string
 		allowed         bool
 	}{
-		{"viewer", "system_info", true}, {"viewer", "trace", false},
-		{"netops", "system_info", true}, {"netops", "trace", true},
+		{"viewer", "system_info", true}, {"viewer", "capture", false},
+		{"netops", "system_info", true}, {"netops", "capture", true},
 	} {
 		if err := e.Authorize(requestWithRoles(t, tc.operation, []string{tc.role})); (err == nil) != tc.allowed {
 			t.Errorf("%s -> %s: allowed=%v, error=%v", tc.role, tc.operation, tc.allowed, err)
@@ -256,8 +256,8 @@ func TestAuthorize_ShippedConfig(t *testing.T) {
 func TestAuthorize_GrantTableIsIndependentOfSourceConfig(t *testing.T) {
 	cfg := testPolicyConfig()
 	e := New(cfg)
-	cfg.Policies[0].Operations[0] = "trace"
-	if err := e.Authorize(requestWithRoles(t, "trace", []string{"viewer"})); err == nil {
+	cfg.Policies[0].Operations[0] = "capture"
+	if err := e.Authorize(requestWithRoles(t, "capture", []string{"viewer"})); err == nil {
 		t.Fatal("source config mutation granted new access")
 	}
 	if err := e.Authorize(requestWithRoles(t, "system_info", []string{"viewer"})); err != nil {

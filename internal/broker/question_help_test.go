@@ -34,7 +34,7 @@ func TestQuestionHelpRejectsUnauthorizedOperation(t *testing.T) {
 	catalog, _ := NewCatalog(brokerTestConfig())
 	var output bytes.Buffer
 	shell, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "viewer", Roles: []string{"viewer"}}, strings.NewReader(""), &output)
-	if _, err := shell.executeLine(context.Background(), "execute trace ?", nil); err == nil {
+	if _, err := shell.executeLine(context.Background(), "execute capture ?", nil); err == nil {
 		t.Fatal("unauthorized help accepted")
 	}
 	if strings.Contains(output.String(), "Capture traffic") {

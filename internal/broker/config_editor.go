@@ -10,6 +10,9 @@ import (
 )
 
 type configEditSession struct {
+	logical     bool
+	path        []string
+	coordinates map[string]configmanager.FieldAlias
 	resource    string
 	section     string
 	inSection   bool
@@ -31,13 +34,21 @@ func (s *Shell) enterConfig(ctx context.Context, id string) error {
 		return err
 	}
 	s.editing = &configEditSession{resource: id, base: read, description: desc}
-	fmt.Fprint(s.output, "Use edit SECTION, show, ?; end saves, cancel discards.\r\n")
 	return nil
 }
 
 func (s *Shell) editPatch() configmanager.Patch {
 	e := s.editing
-	return configmanager.Patch{ResourceID: e.resource, BaseVersion: e.base.Version, Changes: append([]configmanager.FieldChange(nil), e.changes...)}
+	changes := append([]configmanager.FieldChange(nil), e.changes...)
+	if e.logical {
+		for i := range changes {
+			if alias, ok := e.coordinates[changes[i].Key]; ok {
+				changes[i].Section = alias.Section
+				changes[i].Key = alias.Key
+			}
+		}
+	}
+	return configmanager.Patch{ResourceID: e.resource, BaseVersion: e.base.Version, Changes: changes}
 }
 
 func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte) (bool, error) {
@@ -51,7 +62,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 	}
 	command := fields[0]
 	switch command {
-	case "cancel":
+	case "cancel", "abort":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: cancel")
 		}
@@ -66,6 +77,9 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 	case "help":
 		return false, s.editorHelp(nil)
 	case "edit":
+		if e.logical {
+			return false, fmt.Errorf("this context has direct fields; use set ?")
+		}
 		if len(fields) != 2 {
 			return false, fmt.Errorf("usage: edit SECTION (use - for root fields)")
 		}
@@ -82,6 +96,9 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 		}
 		return false, fmt.Errorf("section is unknown or unauthorized; use edit ?")
 	case "next":
+		if e.logical {
+			return false, fmt.Errorf("use end to save this context or abort to discard")
+		}
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: next")
 		}
@@ -190,7 +207,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 		if len(e.changes) > 0 {
 			return false, fmt.Errorf("cancel staged changes before rollback")
 		}
-		answer, err := s.readConfigValue(ctx, input, "restore newest backup? [y/N]: ", false)
+		answer, err := s.readConfigValue(ctx, input, "restore newest whole-file backup (all contexts)? [y/N]: ", false)
 		if err != nil {
 			return false, err
 		}
@@ -204,7 +221,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 		if err != nil {
 			return false, err
 		}
-		e.base = read
+		e.base = e.aliasRead(read)
 	case "diff", "end":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: %s", command)
@@ -230,7 +247,11 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 				if secret {
 					value = "[REDACTED]"
 				}
-				s.writeTerminalData([]byte(fmt.Sprintf("%s.%s: %s -> %s\n", c.Section, c.Key, old, value)))
+				name := c.Section + "." + c.Key
+				if e.logical {
+					name = c.Key
+				}
+				s.writeTerminalData([]byte(fmt.Sprintf("%s: %s -> %s\n", name, old, value)))
 			}
 			return false, nil
 		}
@@ -257,7 +278,13 @@ func (s *Shell) editorHelp(fields []string) error {
 	}
 	if len(fields) == 0 {
 		for _, r := range [][2]string{{"show", "Show values including staged changes; secrets are hidden"}, {"edit SECTION", "Select a registered section"}, {"set KEY VALUE", "Stage a value; omit VALUE for a secret"}, {"diff", "Show unsaved changes"}, {"next", "Return to the resource; keep staged changes"}, {"end", "Validate and save all changes, then leave configuration"}, {"rollback", "Restore the latest file backup; asks for confirmation"}, {"cancel", "Discard unsaved changes and leave configuration"}, {"exit", "Close session and discard unsaved changes"}} {
+			if e.logical && (r[0] == "edit SECTION" || r[0] == "next") {
+				continue
+			}
 			row(r[0], r[1])
+		}
+		if e.logical {
+			row("abort", "Discard unsaved changes and leave configuration")
 		}
 		return nil
 	}
@@ -316,7 +343,11 @@ func (s *Shell) editorCompletion(before, prefix string) []string {
 		index++
 	}
 	if index <= 0 {
-		return matching([]string{"show", "edit", "set", "diff", "next", "end", "cancel", "rollback", "exit"}, prefix)
+		commands := []string{"show", "set", "diff", "end", "cancel", "abort", "rollback", "exit"}
+		if !s.editing.logical {
+			commands = append(commands, "edit", "next")
+		}
+		return matching(commands, prefix)
 	}
 	e := s.editing
 	values := []string{}

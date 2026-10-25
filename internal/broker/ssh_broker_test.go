@@ -39,12 +39,12 @@ func brokerTestConfig() *config.Config {
 		},
 		Operations: []config.OperationDefinition{
 			{Name: "system_info", Description: "System information", RunnerProfile: config.ProfileDiagnostics, ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname", ArgsTemplate: []string{"-a"}},
-			{Name: "trace", Description: "Capture traffic", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump", ArgsTemplate: []string{"port", "{port}"}, LongRunning: true, Parameters: []config.ParameterDefinition{{Name: "port", Type: config.ParamTypeInt, Required: true, Min: &minimum, Max: &maximum}}},
+			{Name: "capture", Description: "Capture traffic", RunnerProfile: config.ProfileNetworkObserver, ExecutorKind: config.ExecutorProcess, ExecutableRef: "tcpdump", ArgsTemplate: []string{"port", "{port}"}, LongRunning: true, Parameters: []config.ParameterDefinition{{Name: "port", Type: config.ParamTypeInt, Required: true, Min: &minimum, Max: &maximum}}},
 		},
 		Roles: []config.RoleDefinition{{Name: "viewer"}, {Name: "netops"}},
 		Policies: []config.PolicyDefinition{
 			{Role: "viewer", Operations: []string{"system_info"}},
-			{Role: "netops", Operations: []string{"system_info", "trace"}},
+			{Role: "netops", Operations: []string{"system_info", "capture"}},
 		},
 	}
 }
@@ -159,7 +159,7 @@ func TestRestrictedShellFiltersCatalogInjectsIdentityAndMapsInterrupt(t *testing
 	input := make(chan byte, 1)
 	done := make(chan error, 1)
 	go func() {
-		_, err := shell.executeLine(context.Background(), "execute trace port=53", input)
+		_, err := shell.executeLine(context.Background(), "execute capture port=53", input)
 		done <- err
 	}()
 	input <- 0x03
@@ -176,7 +176,7 @@ func TestRestrictedShellFiltersCatalogInjectsIdentityAndMapsInterrupt(t *testing
 		t.Fatalf("terminal control sequence reached client output: %q", output.String())
 	}
 	viewer, _ := NewShell(client, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, strings.NewReader(""), io.Discard)
-	if _, err := viewer.executeLine(context.Background(), "execute trace port=53", input); err == nil {
+	if _, err := viewer.executeLine(context.Background(), "execute capture port=53", input); err == nil {
 		t.Fatal("unauthorized operation was accepted by the Broker catalog")
 	}
 }

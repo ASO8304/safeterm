@@ -225,7 +225,10 @@ func TestOperatorCatalogTemplatesAndPrivilegeAssets(t *testing.T) {
 		}
 	}
 	shell := readText(t, filepath.Join(repository, "internal", "broker", "shell.go"))
-	for _, marker := range []string{"execute ?", "show COMMAND", "config RESOURCE", "Ctrl+]"} {
+	if strings.Contains(shell, "show COMMAND") {
+		t.Fatal("removed root show is still advertised")
+	}
+	for _, marker := range []string{"execute ?", "config RESOURCE", "Ctrl+]"} {
 		if !strings.Contains(shell, marker) {
 			t.Errorf("guided shell help missing %q", marker)
 		}

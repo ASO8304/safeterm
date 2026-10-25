@@ -23,7 +23,7 @@ func FuzzRequestValidationNeverPanicsOrAcceptsMetacharacters(f *testing.F) {
 	}
 	validator := validation.New(cfg)
 	f.Fuzz(func(t *testing.T, value string) {
-		request := &contract.ExecutionRequest{RequestID: "fuzz", Command: "trace", Arguments: map[string]string{"port": "53", "host": value}, Metadata: contract.Metadata{BrokerType: "ssh", UserID: "fuzzer", ClaimedRoles: []string{"netops"}, ReceivedAt: time.Now().UTC()}}
+		request := &contract.ExecutionRequest{RequestID: "fuzz", Command: "capture", Arguments: map[string]string{"port": "53", "host": value}, Metadata: contract.Metadata{BrokerType: "ssh", UserID: "fuzzer", ClaimedRoles: []string{"netops"}, ReceivedAt: time.Now().UTC()}}
 		err := validator.Validate(request)
 		if strings.ContainsAny(value, ";&|`$(){}<>\n\r'\"") && err == nil {
 			t.Fatalf("dangerous value accepted: %q", value)

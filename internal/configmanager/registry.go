@@ -132,11 +132,18 @@ func ValidateRegistry(registry *Registry) error {
 		if err := validateFields(*resource); err != nil {
 			return err
 		}
+		if err := validateContexts(*resource); err != nil {
+			return err
+		}
 		if err := validateCrossRules(*resource); err != nil {
 			return err
 		}
 	}
-	return nil
+	summaries := make([]ResourceSummary, 0, len(registry.Resources))
+	for _, r := range registry.Resources {
+		summaries = append(summaries, ResourceSummary{ID: r.ID, Contexts: r.Contexts})
+	}
+	return ValidateContextRoutes(summaries)
 }
 
 func validatePermissionRoles(resourceID string, permissions Permissions) error {

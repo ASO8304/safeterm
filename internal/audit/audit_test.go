@@ -14,7 +14,7 @@ import (
 )
 
 func testEvent() Event {
-	req, _ := contract.NewExecutionRequest("trace", map[string]string{"token": "top-secret", "host": "127.0.0.1"}, contract.Metadata{
+	req, _ := contract.NewExecutionRequest("capture", map[string]string{"token": "top-secret", "host": "127.0.0.1"}, contract.Metadata{
 		BrokerType: "cli", UserID: "alice", ClaimedRoles: []string{"netops"},
 	})
 	start := time.Now().UTC()
@@ -28,7 +28,7 @@ func TestEventCapturesCorrelationAndExcludesArgumentValues(t *testing.T) {
 	if err := event.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if event.RequestID == "" || event.Operation != "trace" || event.UserID != "alice" || event.BrokerType != "cli" || event.DurationMillis == nil || *event.DurationMillis != 15 {
+	if event.RequestID == "" || event.Operation != "capture" || event.UserID != "alice" || event.BrokerType != "cli" || event.DurationMillis == nil || *event.DurationMillis != 15 {
 		t.Fatalf("incomplete event: %+v", event)
 	}
 	if strings.Join(event.ArgumentNames, ",") != "host,token" {

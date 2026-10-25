@@ -18,18 +18,6 @@
     "allowed_profiles": ["network-observer"]
   },
   {
-    "id": "nslookup",
-    "path": "/usr/bin/nslookup",
-    "sha256": "c831307d1dcb3ccf32b2c8d1b61710f379d4c757cfd733e171a829e4511b5343",
-    "allowed_profiles": ["network-observer"]
-  },
-  {
-    "id": "traceroute",
-    "path": "/usr/bin/traceroute",
-    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-    "allowed_profiles": ["network-observer"]
-  },
-  {
     "id": "free",
     "path": "/usr/bin/free",
     "sha256": "985e0ca296fa1ffd274cbbebe0c49844ee9a3ce09a389e9b8527777b395cd4a1",

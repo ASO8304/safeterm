@@ -71,16 +71,16 @@ Grant `ping` through the `netops` policy. Keep the executable in the
 `network-observer` profile so its `CAP_NET_RAW` boundary is separate from
 diagnostic and service-manager processes.
 
-The catalog exposes one `trace` operation with optional typed `host`, `port`
+The catalog exposes one `capture` operation with optional typed `host`, `port`
 and `protocol` parameters. `required_any: ["host", "port"]` rejects empty
 requests and protocol-only requests with `host or port must be specified`.
 `any` is not accepted for host, port or protocol. Protocol choices are `tcp`,
 `udp`, `icmp`, `arp` and `ip`. Tab completes names and protocol values.
 
 ```text
-execute trace host=192.0.2.1
-execute trace port=999
-execute trace host=192.0.2.1 port=999 protocol=tcp
+execute capture host=192.0.2.1
+execute capture port=999
+execute capture host=192.0.2.1 port=999 protocol=tcp
 ```
 
 The signed `argument_groups` each have a `when` parameter and an `args_template`.
@@ -91,9 +91,6 @@ All placeholders remain whole argv tokens and are validated before execution.
 No caller-built filter expressions or shell are accepted. Protocol predicates
 are standalone BPF tokens, so `arp` is emitted as `arp`, rather than `proto arp`.
 
-The shipped `traceroute` operation requires `/usr/bin/traceroute` on the
-target. Refresh its executable digest during catalog preparation before
-signing a production catalog.
 
 ## Add typed systemd control
 
@@ -144,14 +141,14 @@ copy with `--source DIR`. Package/unit changes still use the installer workflow.
 
 ## Streaming tcpdump output
 
-The shipped `trace` operation uses `-l -nn`. SafeTerm captures stdout through a pipe;
+The shipped `capture` operation uses `-l -nn`. SafeTerm captures stdout through a pipe;
 `-l` makes tcpdump flush each text line instead of retaining a block until
 termination. `-nn` disables hostname and port-name resolution so lookup latency
 cannot delay packet rendering. The fixed capture/filter arguments remain
 catalog-owned. Runtime streaming cannot flush bytes still buffered inside the
 child process.
 
-On a test host, start `execute trace port=999`, generate TCP traffic to
+On a test host, start `execute capture port=999`, generate TCP traffic to
 port 999 from another terminal, and verify packet lines appear before Ctrl+C.
 Termination should still return a final result and record durable completion
 without reusing the canceled execution context. Runner completion auditing has
@@ -160,18 +157,9 @@ an independent five-second deadline and still fails closed if audit fails.
 Changing these arguments changes the signed catalog. Use the normal package
 upgrade/signing procedure; editing the active JSON without signing is not valid.
 
-## Traceroute sessions
+## Ping sessions
 
-The shipped traceroute operation sets `long_running: true` so the Broker routes
-it through bounded streaming instead of collecting all output until exit.
-`execute traceroute host=192.168.1.1` starts a session and supports Ctrl+C.
-The fixed `-n -m 12 -w 2` arguments disable reverse DNS and bound hops and
-probe waiting. A hop may still take time to produce output while probes wait
-for responses; streaming forwards bytes when traceroute writes them, rather
-than manufacturing progress during a probe wait.
-
-Ping also uses bounded streaming. Its count remains finite (100 by default),
-with the existing override and validation limits. Both ping and traceroute
-support Ctrl+C to stop the operation and Ctrl+] to close the entire terminal
-session. IPC waits are closed on context cancellation, including during stream
-startup, so a stalled response need not hold the terminal until its deadline.
+Ping uses bounded streaming with a default and maximum count of 1000.
+Capture and ping support Ctrl+C to stop the operation and Ctrl+] to close the
+session. IPC waits are closed on context cancellation, including stream startup.
+The packaged nslookup and traceroute operations are no longer provided.

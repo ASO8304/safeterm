@@ -61,6 +61,9 @@ func (b *ConfigBroker) List(ctx context.Context, principal Principal) ([]configm
 			all = append(all, item)
 		}
 	}
+	if err := configmanager.ValidateContextRoutes(all); err != nil {
+		return nil, err
+	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	return all, nil
 }

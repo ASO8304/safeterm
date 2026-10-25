@@ -35,7 +35,7 @@ type Metadata struct {
 // must produce and that Agent Core consumes.
 type ExecutionRequest struct {
 	RequestID string            `json:"request_id"`
-	Command   string            `json:"command"` // logical operation name, e.g. "trace" — never a raw shell command
+	Command   string            `json:"command"` // logical operation name, e.g. "capture" — never a raw shell command
 	Arguments map[string]string `json:"arguments"`
 	Metadata  Metadata          `json:"metadata"`
 }

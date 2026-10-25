@@ -27,7 +27,7 @@ func TestTraceDynamicFilters(t *testing.T) {
 		{"all", map[string]string{"host": "192.0.2.1", "port": "999", "protocol": "tcp"}, []string{"port", "999", "and", "host", "192.0.2.1", "and", "tcp"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			req := &contract.ExecutionRequest{Command: "trace", Arguments: tc.values}
+			req := &contract.ExecutionRequest{Command: "capture", Arguments: tc.values}
 			if err := validator.Validate(req); err != nil {
 				t.Fatal(err)
 			}
@@ -35,7 +35,7 @@ func TestTraceDynamicFilters(t *testing.T) {
 		})
 	}
 	for _, values := range []map[string]string{nil, {"protocol": "tcp"}, {"host": ""}} {
-		req := &contract.ExecutionRequest{Command: "trace", Arguments: values}
+		req := &contract.ExecutionRequest{Command: "capture", Arguments: values}
 		if err := validator.Validate(req); err == nil || !strings.Contains(err.Error(), "host or port must be specified") {
 			t.Fatalf("%v: %v", values, err)
 		}
@@ -45,7 +45,7 @@ func TestTraceDynamicFilters(t *testing.T) {
 		{"host": "any"}, {"port": "any"}, {"host": "any", "port": "999"}, {"host": "192.0.2.1", "protocol": "any"},
 		{"port": "999", "protocol": "tcp or udp"}, {"port": "0"}, {"port": "65536"}, {"host": "192.0.2.1;id"}, {"port": "999", "unknown": "x"},
 	} {
-		if err := validator.Validate(&contract.ExecutionRequest{Command: "trace", Arguments: values}); err == nil {
+		if err := validator.Validate(&contract.ExecutionRequest{Command: "capture", Arguments: values}); err == nil {
 			t.Fatalf("accepted %v", values)
 		}
 	}

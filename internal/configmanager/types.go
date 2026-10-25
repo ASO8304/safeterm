@@ -100,6 +100,7 @@ type BackupPolicy struct {
 }
 
 type Resource struct {
+	Contexts             []ConfigContext  `json:"contexts,omitempty"`
 	PrivilegedWrite      bool             `json:"privileged_write,omitempty"`
 	ID                   string           `json:"id"`
 	Description          string           `json:"description"`
@@ -123,11 +124,26 @@ type Registry struct {
 }
 
 type ResourceSummary struct {
-	ID          string     `json:"id"`
-	Description string     `json:"description"`
-	Profile     string     `json:"profile"`
-	Format      Format     `json:"format"`
-	Access      AccessMode `json:"access"`
+	Contexts    []ConfigContext `json:"contexts,omitempty"`
+	ID          string          `json:"id"`
+	Description string          `json:"description"`
+	Profile     string          `json:"profile"`
+	Format      Format          `json:"format"`
+	Access      AccessMode      `json:"access"`
+}
+
+// ConfigContext maps a logical CLI path to registered physical coordinates.
+// It never grants permissions independently of its owning Resource.
+type ConfigContext struct {
+	Path        []string     `json:"path"`
+	Description string       `json:"description,omitempty"`
+	Fields      []FieldAlias `json:"fields"`
+}
+
+type FieldAlias struct {
+	Name    string `json:"name"`
+	Section string `json:"section"`
+	Key     string `json:"key"`
 }
 
 type FieldDescription struct {

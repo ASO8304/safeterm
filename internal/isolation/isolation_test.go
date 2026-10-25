@@ -27,7 +27,7 @@ func TestSnapshotRoutesAndFiltersProfiles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if profile, ok := snapshot.Route("trace"); !ok || profile != config.ProfileNetworkObserver {
+	if profile, ok := snapshot.Route("capture"); !ok || profile != config.ProfileNetworkObserver {
 		t.Fatalf("trace route = %q, %v", profile, ok)
 	}
 	if profile, ok := snapshot.Route("system_info"); !ok || profile != config.ProfileDiagnostics {
@@ -177,7 +177,7 @@ func TestGatewayRoutesWithoutExecuting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, _ := contract.NewExecutionRequest("trace", map[string]string{"port": "53", "host": "127.0.0.1"}, contract.Metadata{ClaimedRoles: []string{"netops"}})
+	request, _ := contract.NewExecutionRequest("capture", map[string]string{"port": "53", "host": "127.0.0.1"}, contract.Metadata{ClaimedRoles: []string{"netops"}})
 	if _, err := gateway.Dispatch(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestProfileHandlerRejectsCrossProfileBeforeCore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request, _ := contract.NewExecutionRequest("trace", nil, contract.Metadata{})
+	request, _ := contract.NewExecutionRequest("capture", nil, contract.Metadata{})
 	response, err := handler.Handle(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)

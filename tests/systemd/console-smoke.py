@@ -12,8 +12,8 @@ if os.geteuid() != 0 or os.environ.get('SAFETERM_DISPOSABLE_HOST') != '1':
     raise SystemExit('requires disposable root CI VM')
 
 mode = sys.argv[1]
-if mode not in ('empty', 'configured', 'site'):
-    raise SystemExit('expected empty, configured or site')
+if mode not in ('empty', 'configured', 'site', 'logical'):
+    raise SystemExit('expected empty, configured, site or logical')
 pid, fd = pty.fork()
 if pid == 0:
     os.execv('/usr/bin/sudo', ['sudo', '-iu', 'safeterm'])
@@ -88,6 +88,23 @@ try:
         result = command('end')
         if b'Configuration saved.' not in result:
             raise RuntimeError('INI change did not commit')
+    if mode == 'logical':
+        result = command('config ?')
+        if b'tunnel' not in result or b'network-settings' in result:
+            raise RuntimeError('logical config paths not exposed correctly')
+        command('config tu\t', b'\nsafeterm::ci-admin(tunnel)> ')
+        result = command('show', b'\nsafeterm::ci-admin(tunnel)> ')
+        if b'Value_1' not in result or b'TCPMSS' in result:
+            raise RuntimeError('physical field name exposed instead of alias')
+        command('set Value_1\t1400', b'\nsafeterm::ci-admin(tunnel)> ')
+        command('set Value_2 443', b'\nsafeterm::ci-admin(tunnel)> ')
+        result = command('diff', b'\nsafeterm::ci-admin(tunnel)> ')
+        if b'Value_1: 1360 -> 1400' not in result:
+            raise RuntimeError('alias diff missing')
+        command('end')
+        command('config application c\t', b'\nsafeterm::ci-admin(application/cat)> ')
+        command('set enabled false', b'\nsafeterm::ci-admin(application/cat)> ')
+        command('end')
     os.write(fd, b'exit\r')
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:

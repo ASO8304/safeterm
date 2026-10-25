@@ -465,7 +465,7 @@ func (m *Manager) record(ctx context.Context, actor Actor, resource Resource, ac
 }
 
 func summary(resource Resource) ResourceSummary {
-	return ResourceSummary{ID: resource.ID, Description: resource.Description, Profile: resource.Profile, Format: resource.Format, Access: resource.Access}
+	return ResourceSummary{Contexts: cloneContexts(resource.Contexts), ID: resource.ID, Description: resource.Description, Profile: resource.Profile, Format: resource.Format, Access: resource.Access}
 }
 
 func findField(resource Resource, section, key string) (FieldSchema, bool) {

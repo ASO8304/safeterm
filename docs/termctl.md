@@ -93,7 +93,7 @@ Package rollback restores the latest installer snapshot, including accounts and
 state, so use it before unrelated account changes. Uninstall retains data and
 snapshots. See [installation](offline-installation.md) for signing and recovery.
 The restricted editor has independent authorization-aware Tab and `?` Enter help.
-`execute trace ` completes `host=`, `port=` and `protocol=` without subcommands.
+`execute capture ` completes `host=`, `port=` and `protocol=` without subcommands.
 At least one of host or port must be specified; protocol is optional. Protocol
 values complete after `protocol=`. The value `any` is rejected for all three inputs.
 `execute ping ` completes `host=` and `count=`; only host is required, and

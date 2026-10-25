@@ -10,7 +10,7 @@
     "long_running": false
   },
   {
-    "name": "trace",
+    "name": "capture",
     "description": "Capture live traffic; host or port must be specified. Protocol is optional.",
     "runner_profile": "network-observer",
     "executor_kind": "process",
@@ -75,26 +75,6 @@
         }
       }
     ],
-    "long_running": true
-  },
-  {
-    "name": "nslookup",
-    "description": "Resolve an approved hostname or IPv4 address.",
-    "runner_profile": "network-observer",
-    "executor_kind": "process",
-    "executable_ref": "nslookup",
-    "args_template": ["{host}"],
-    "parameters": [{ "name": "host", "type": "string", "required": true, "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$" }],
-    "long_running": false
-  },
-  {
-    "name": "traceroute",
-    "description": "Trace the route to an approved hostname or IPv4 address.",
-    "runner_profile": "network-observer",
-    "executor_kind": "process",
-    "executable_ref": "traceroute",
-    "args_template": ["-n", "-m", "12", "-w", "2", "{host}"],
-    "parameters": [{ "name": "host", "type": "string", "required": true, "pattern": "^[A-Za-z0-9][A-Za-z0-9.-]{0,252}$" }],
     "long_running": true
   },
   {

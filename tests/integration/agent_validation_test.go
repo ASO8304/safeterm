@@ -53,7 +53,7 @@ func buildCoreWithRealValidator(t *testing.T) *agent.Core {
 func TestCore_WithRealValidator_AcceptsValidTraceRequest(t *testing.T) {
 	core := buildCoreWithRealValidator(t)
 
-	req, err := contract.NewExecutionRequest("trace", map[string]string{
+	req, err := contract.NewExecutionRequest("capture", map[string]string{
 		"port": "999",
 		"host": "192.168.10.20",
 	}, contract.Metadata{})
@@ -75,7 +75,7 @@ func TestCore_WithRealValidator_AcceptsValidTraceRequest(t *testing.T) {
 func TestCore_WithRealValidator_RejectsOutOfRangePort(t *testing.T) {
 	core := buildCoreWithRealValidator(t)
 
-	req, err := contract.NewExecutionRequest("trace", map[string]string{
+	req, err := contract.NewExecutionRequest("capture", map[string]string{
 		"port": "99999",
 		"host": "192.168.10.20",
 	}, contract.Metadata{})
@@ -97,7 +97,7 @@ func TestCore_WithRealValidator_RejectsOutOfRangePort(t *testing.T) {
 func TestCore_WithRealValidator_RejectsInjectionAttempt(t *testing.T) {
 	core := buildCoreWithRealValidator(t)
 
-	req, err := contract.NewExecutionRequest("trace", map[string]string{
+	req, err := contract.NewExecutionRequest("capture", map[string]string{
 		"port": "; rm -rf /",
 		"host": "192.168.10.20",
 	}, contract.Metadata{})

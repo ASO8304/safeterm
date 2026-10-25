@@ -66,7 +66,7 @@ func TestCore_WithRealTranslator_CapturesConfiguredCommands(t *testing.T) {
 		operation, role, command string
 		args                     []string
 	}{
-		{"trace", "netops", "/usr/bin/tcpdump", []string{"-l", "-nn", "-i", "any", "port", "999", "and", "host", "192.168.10.20"}},
+		{"capture", "netops", "/usr/bin/tcpdump", []string{"-l", "-nn", "-i", "any", "port", "999", "and", "host", "192.168.10.20"}},
 		{"system_info", "viewer", "/usr/bin/uname", []string{"-a"}},
 	} {
 		t.Run(tc.operation, func(t *testing.T) {
@@ -91,7 +91,7 @@ func TestCore_WithRealTranslator_EarlierStagesStopTranslation(t *testing.T) {
 	for _, name := range []string{"unknown operation", "raw command", "missing argument", "port injection", "host injection", "extra argument", "viewer", "missing roles", "unknown role"} {
 		t.Run(name, func(t *testing.T) {
 			core, tr, ex := buildCoreWithRealTranslator(t, translationConfig(t))
-			req := policyRequest(t, "trace", []string{"netops"})
+			req := policyRequest(t, "capture", []string{"netops"})
 			stage := "validation: "
 			switch name {
 			case "unknown operation":
@@ -133,13 +133,13 @@ func TestCore_WithRealTranslator_EarlierStagesStopTranslation(t *testing.T) {
 func TestCore_WithRealTranslator_MissingSubstitutionStopsExecution(t *testing.T) {
 	cfg := translationConfig(t)
 	for i := range cfg.Operations {
-		if cfg.Operations[i].Name == "trace" {
+		if cfg.Operations[i].Name == "capture" {
 			cfg.Operations[i].Parameters = append(cfg.Operations[i].Parameters, config.ParameterDefinition{Name: "label", Type: config.ParamTypeString})
 			cfg.Operations[i].ArgsTemplate = append(cfg.Operations[i].ArgsTemplate, "{label}")
 		}
 	}
 	core, tr, ex := buildCoreWithRealTranslator(t, cfg)
-	req := policyRequest(t, "trace", []string{"netops"})
+	req := policyRequest(t, "capture", []string{"netops"})
 	resp := core.HandleRequest(context.Background(), req)
 	assertPolicyResponse(t, req, resp)
 	if resp.Result != contract.ResultRejected || !strings.HasPrefix(resp.Message, "translation: ") || !strings.Contains(resp.Message, `missing argument "label"`) {

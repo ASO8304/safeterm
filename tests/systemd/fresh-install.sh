@@ -51,6 +51,21 @@ python3 "$repo/tests/systemd/console-smoke.py" configured
 printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 9090 ; keep comment\n' >"$work/expected.ini"
 cmp "$work/expected.ini" /etc/safeterm-ci/options.ini
 [[ $(stat -c '%U:%G %a' /etc/safeterm-ci/options.ini) == 'root:root 644' ]]
+# Logical field aliases share one root-owned file and use the real writer.
+printf '\357\273\277; logical comment\n[Tunnel]\nTCPMSS = 1360 ; keep\n[Cat]\nPort_2 = 2420\nEnabled = true\n' >/etc/safeterm-ci/logical.ini
+chmod 0644 /etc/safeterm-ci/logical.ini
+cat >/etc/safeterm/resources.d/logical-options.json <<'JSON'
+{"id":"network-settings","description":"Logical settings","service":{"unit":"safeterm-audit.service","actions":{"restart":{"roles":["service-operator"]}}},"config":{"path":"/etc/safeterm-ci/logical.ini","format":"ini","permissions":{"read":["config-viewer","config-operator"],"edit":["config-operator"]},"contexts":[{"path":["tunnel"],"fields":[{"name":"Value_1","section":"Tunnel","key":"TCPMSS","type":"integer","min":1,"max":65535},{"name":"Value_2","section":"Cat","key":"Port_2","type":"port"}]},{"path":["application","cat"],"fields":[{"name":"enabled","section":"Cat","key":"Enabled","type":"boolean"}]}]}}
+JSON
+termctl check
+termctl apply
+wait_ready
+audit_pid_before=$(systemctl show -p MainPID --value safeterm-audit.service)
+python3 "$repo/tests/systemd/console-smoke.py" logical
+[[ $(systemctl show -p MainPID --value safeterm-audit.service) == "$audit_pid_before" ]]
+printf '\357\273\277; logical comment\n[Tunnel]\nTCPMSS = 1400 ; keep\n[Cat]\nPort_2 = 443\nEnabled = false\n' >"$work/expected-logical.ini"
+cmp "$work/expected-logical.ini" /etc/safeterm-ci/logical.ini
+[[ $(stat -c '%U:%G %a' /etc/safeterm-ci/logical.ini) == 'root:root 644' ]]
 # Exercise the real production access probe before and after a permissions failure.
 printf 'CI log fixture\n' >/var/log/safeterm-ci.log
 chmod 0644 /var/log/safeterm-ci.log

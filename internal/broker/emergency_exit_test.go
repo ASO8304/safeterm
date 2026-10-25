@@ -34,7 +34,7 @@ func (g *stalledGateway) Terminate(_ context.Context, _ contract.ControlRequest)
 }
 
 func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
-	for _, operation := range []string{"system_info", "trace"} {
+	for _, operation := range []string{"system_info", "capture"} {
 		t.Run(operation, func(t *testing.T) {
 			catalog, _ := NewCatalog(brokerTestConfig())
 			g := &stalledGateway{started: make(chan struct{})}
@@ -51,8 +51,8 @@ func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
 			finished := make(chan error, 1)
 			go func() { finished <- shell.Run(ctx) }()
 			command := "execute system\r"
-			if operation == "trace" {
-				command = "execute trace host=127.0.0.1 port=999\r"
+			if operation == "capture" {
+				command = "execute capture host=127.0.0.1 port=999\r"
 			}
 			if _, err := io.WriteString(writer, command); err != nil {
 				t.Fatal(err)
@@ -73,7 +73,7 @@ func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal("emergency exit remained blocked")
 			}
-			if operation == "trace" && !g.terminated {
+			if operation == "capture" && !g.terminated {
 				t.Fatal("active stream not terminated")
 			}
 		})
