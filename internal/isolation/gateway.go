@@ -9,6 +9,9 @@ import (
 	"safeterm/internal/audit"
 	"safeterm/internal/config"
 	"safeterm/internal/contract"
+	"safeterm/internal/execution"
+	"safeterm/internal/policy"
+	"safeterm/internal/validation"
 )
 
 // Client is a transport boundary to one isolated Runner service. Gateway has
@@ -29,11 +32,12 @@ type sessionRoute struct {
 }
 
 type Gateway struct {
-	catalog   *Store
-	clients   map[config.RunnerProfile]Client
-	sink      EventSink
-	sessionMu sync.RWMutex
-	sessions  map[string]sessionRoute
+	catalog      *Store
+	clients      map[config.RunnerProfile]Client
+	sink         EventSink
+	serviceLocks execution.ServiceLocks
+	sessionMu    sync.RWMutex
+	sessions     map[string]sessionRoute
 }
 
 type LifecycleEvent = audit.Event
@@ -164,8 +168,54 @@ func (g *Gateway) Dispatch(ctx context.Context, req *contract.ExecutionRequest) 
 	if err := g.record(ctx, req, profile, "routed", snapshot.Version(), nil); err != nil {
 		return nil, err
 	}
+	var release func()
+	operation, _ := snapshot.Operation(req.Command)
+	if operation.Systemd != nil {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		// Reserve in the single Gateway across all Runner profiles. Runner also
+		// independently rejects overlap and rechecks its exact signed plan.
+		if err := validation.New(snapshot.config).Validate(req); err != nil {
+			if auditErr := g.record(ctx, req, profile, "service-rejected", snapshot.Version(), nil); auditErr != nil {
+				return nil, auditErr
+			}
+			return nil, fmt.Errorf("isolation: invalid service request")
+		}
+		if err := policy.New(snapshot.config).Authorize(req); err != nil {
+			if auditErr := g.record(ctx, req, profile, "service-rejected", snapshot.Version(), nil); auditErr != nil {
+				return nil, auditErr
+			}
+			return nil, fmt.Errorf("isolation: unauthorized service request")
+		}
+		var acquired bool
+		release, acquired = g.serviceLocks.Acquire(operation.Systemd.OrderedUnits())
+		if !acquired {
+			if auditErr := g.record(ctx, req, profile, "service-conflict", snapshot.Version(), nil); auditErr != nil {
+				return nil, auditErr
+			}
+			return nil, fmt.Errorf("isolation: service operation conflicts with another active operation")
+		}
+		defer func() {
+			if release != nil {
+				release()
+			}
+		}()
+		// A caller disconnect must not release the cross-profile reservation
+		// while its privileged Runner continues a bounded service sequence.
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(context.WithoutCancel(ctx), time.Duration(operation.Systemd.Timeout()+30)*time.Second)
+		defer cancel()
+	}
 	response, err := client.Handle(ctx, req)
 	if err != nil {
+		if release != nil {
+			// Transport failure cannot prove the Runner has stopped. Retain the
+			// reservation through the bounded sequence timeout plus cleanup.
+			deadline, _ := ctx.Deadline()
+			time.AfterFunc(time.Until(deadline.Add(5*time.Second)), release)
+			release = nil
+		}
 		if recordErr := g.record(ctx, req, profile, "runner-error", snapshot.Version(), nil); recordErr != nil {
 			return nil, recordErr
 		}
@@ -240,6 +290,14 @@ func (h *ProfileHandler) Handle(ctx context.Context, req *contract.ExecutionRequ
 		ctx, expire = context.WithDeadline(ctx, req.Metadata.SessionExpiresAt)
 		defer expire()
 	}
+	ctx = execution.WithServiceReporter(ctx, func(reportCtx context.Context, step execution.ServiceStepEvent) error {
+		if h.sink == nil {
+			return nil
+		}
+		event := audit.NewEvent(req, snapshot.Version(), audit.ComponentRunner, string(h.profile), step.Outcome, nil)
+		event.ServiceUnit, event.ServiceAction, event.ServiceStep = step.Unit, step.Action, step.Index
+		return h.sink.Record(reportCtx, event)
+	})
 	response := h.core.HandleRequest(ctx, req)
 	// Execution cancellation must not cancel the durable completion record.
 	// Bound cleanup independently while retaining request-scoped context values.

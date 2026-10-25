@@ -24,14 +24,15 @@ const MaxFiles = 256
 const MaxFileBytes = 1 << 20
 
 var idPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,47}$`)
-var serviceUnitPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.@-]*\.service$`)
 
 type Grant struct {
 	Roles []string `json:"roles"`
 }
 type Service struct {
-	Unit    string           `json:"unit"`
-	Actions map[string]Grant `json:"actions"`
+	Unit           string           `json:"unit,omitempty"`
+	Units          []string         `json:"units,omitempty"`
+	TimeoutSeconds int              `json:"timeout_seconds,omitempty"`
+	Actions        map[string]Grant `json:"actions"`
 }
 type Permissions struct {
 	Read     []string `json:"read"`
@@ -301,8 +302,8 @@ func Compile(base *config.Config, items []Named) (*config.Config, *configmanager
 		}
 		seen[d.ID] = true
 		if d.Service != nil {
-			if !serviceUnitPattern.MatchString(d.Service.Unit) {
-				return fail(fmt.Errorf("service.unit must name one exact .service unit"))
+			if err := config.ValidateSystemdDefinition(&config.SystemdOperationDefinition{Unit: d.Service.Unit, Units: d.Service.Units, TimeoutSeconds: d.Service.TimeoutSeconds, Action: "status"}); err != nil {
+				return fail(fmt.Errorf("service: %w", err))
 			}
 			if len(d.Service.Actions) == 0 {
 				return fail(fmt.Errorf("service.actions must not be empty"))
@@ -318,7 +319,7 @@ func Compile(base *config.Config, items []Named) (*config.Config, *configmanager
 				default:
 					return fail(fmt.Errorf("unsupported service action %s", action))
 				}
-				op := config.OperationDefinition{Name: OperationID(d.ID, "service", action), Description: d.Description + ": " + action, RunnerProfile: config.ProfileServiceManager, ExecutorKind: config.ExecutorSystemd, Systemd: &config.SystemdOperationDefinition{Unit: d.Service.Unit, Action: action}, Parameters: []config.ParameterDefinition{}}
+				op := config.OperationDefinition{Name: OperationID(d.ID, "service", action), Description: d.Description + ": " + action, RunnerProfile: config.ProfileServiceManager, ExecutorKind: config.ExecutorSystemd, Systemd: &config.SystemdOperationDefinition{Unit: d.Service.Unit, Units: append([]string(nil), d.Service.Units...), Alias: d.ID, TimeoutSeconds: d.Service.TimeoutSeconds, Action: action}, Parameters: []config.ParameterDefinition{}}
 				if err := add(op, d.Service.Actions[action].Roles); err != nil {
 					return fail(err)
 				}

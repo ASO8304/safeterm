@@ -75,8 +75,11 @@ type OperationDefinition struct {
 }
 
 type SystemdOperationDefinition struct {
-	Unit   string `json:"unit"`
-	Action string `json:"action"`
+	Unit           string   `json:"unit,omitempty"`
+	Units          []string `json:"units,omitempty"`
+	Alias          string   `json:"alias,omitempty"`
+	TimeoutSeconds int      `json:"timeout_seconds,omitempty"`
+	Action         string   `json:"action"`
 }
 
 type ExecutableDefinition struct {

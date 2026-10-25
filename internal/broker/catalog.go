@@ -28,7 +28,7 @@ func NewCatalog(cfg *config.Config) (*Catalog, error) {
 		catalog.roles[role.Name] = true
 	}
 	for _, operation := range cfg.Operations {
-		clone := operation
+		clone := cloneServiceOperation(operation)
 		clone.ArgsTemplate = append([]string(nil), operation.ArgsTemplate...)
 		clone.RequiredAny = append([]string(nil), operation.RequiredAny...)
 		clone.ArgumentGroupSeparator = append([]string(nil), operation.ArgumentGroupSeparator...)
@@ -77,7 +77,7 @@ func (c *Catalog) AuthorizedOperations(roles []string) []config.OperationDefinit
 	sort.Strings(names)
 	result := make([]config.OperationDefinition, 0, len(names))
 	for _, name := range names {
-		result = append(result, c.operations[name])
+		result = append(result, cloneServiceOperation(c.operations[name]))
 	}
 	return result
 }
@@ -92,8 +92,17 @@ func (c *Catalog) AuthorizedOperation(name string, roles []string) (config.Opera
 	}
 	for _, role := range roles {
 		if c.allowed[role][name] {
-			return operation, true
+			return cloneServiceOperation(operation), true
 		}
 	}
 	return config.OperationDefinition{}, false
+}
+
+func cloneServiceOperation(operation config.OperationDefinition) config.OperationDefinition {
+	if operation.Systemd != nil {
+		systemd := *operation.Systemd
+		systemd.Units = append([]string(nil), systemd.Units...)
+		operation.Systemd = &systemd
+	}
+	return operation
 }

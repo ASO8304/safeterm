@@ -207,6 +207,28 @@ func TestExecutorRejectsInvalidConstructionAndCalls(t *testing.T) {
 	}
 }
 
+func TestEmptyProfileStaysAvailableWithoutGrantingExecutableAccess(t *testing.T) {
+	cfg := integrityConfig("/unused", digest(nil))
+	cfg.Operations = nil
+	cfg.Executables = nil
+	delegate := &recordingExecutor{}
+	executor, err := NewExecutor(cfg, config.ProfileDiagnostics, delegate)
+	if err != nil {
+		t.Fatalf("empty registered profile cannot start: %v", err)
+	}
+	for _, path := range []string{"/usr/bin/tail", "/bin/sh", ""} {
+		if err := executor.VerifyExecutable(path); err == nil {
+			t.Fatalf("empty profile approved %q", path)
+		}
+		if _, _, _, err := executor.Execute(context.Background(), path, nil); err == nil {
+			t.Fatalf("empty profile executed %q", path)
+		}
+	}
+	if delegate.calls != 0 {
+		t.Fatal("empty profile reached process executor")
+	}
+}
+
 // TEST-INTEGRITY-013
 func TestSystemctlControllerUsesVerifiedControllerBinary(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "systemctl")

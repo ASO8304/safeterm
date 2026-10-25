@@ -19,7 +19,7 @@ trap on_failure ERR
 printf 'SmokeTest42\n' | "$package/payload/bin/safeterm-password-hash" --stdin --output "$work/password.hash"
 "$package/install.sh" --local-signing --non-interactive --install-dependencies \
   --ssh-user ci-admin --ssh-password-hash-file "$work/password.hash"
-termctl user add console --id ci-admin --roles viewer,netops,config-viewer,config-operator --password-hash-file "$work/password.hash"
+termctl user add console --id ci-admin --roles viewer,netops,log-viewer,service-viewer,service-operator,config-viewer,config-operator --password-hash-file "$work/password.hash"
 # These demo directories must not be required, or manufactured as a workaround.
 for profile in application database network; do
   [[ ! -e /etc/safeterm-managed/$profile ]]
@@ -27,11 +27,11 @@ done
 wait_ready() {
   for attempt in {1..30}; do
     ready=true
-    for socket in /run/safeterm-gateway/gateway.sock /run/safeterm-config-writer/writer.sock \
+    for socket in /run/safeterm-gateway/gateway.sock /run/safeterm-log-reader/runner.sock /run/safeterm-config-writer/writer.sock \
       /run/safeterm-config-{application,database,network}/manager.sock; do
       [[ -S $socket ]] || ready=false
     done
-    if $ready; then return; fi
+    if $ready && systemctl --quiet is-active safeterm-runner-log-reader.service; then return; fi
     sleep 1
   done
   echo 'required SafeTerm sockets never became ready' >&2; return 1
@@ -82,7 +82,14 @@ if grep -F 'unsupported catalog administration' "$work/unreadable-log.log"; then
 chmod 0644 /var/log/safeterm-ci.log
 termctl apply
 wait_ready
+python3 "$repo/tests/systemd/console-smoke.py" logs
+# Removing the last log leaves a healthy, deny-all idle Runner, not a crashed
+# service. Exercise both empty -> configured and configured -> empty transitions.
+mv /etc/safeterm/resources.d/fresh-log.json /etc/safeterm/resources.d/fresh-log.json.disabled
+termctl apply
+wait_ready
 termctl service status all
+bash "$repo/tests/systemd/service-groups.sh" "$repo"
 printf 'Systemd fresh installation, Console discovery, completion and INI save: PASS\n'
 
 # Provision independent process and service-manager profiles from declarative sources.

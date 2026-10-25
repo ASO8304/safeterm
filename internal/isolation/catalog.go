@@ -49,6 +49,11 @@ func (s *Snapshot) Operation(name string) (config.OperationDefinition, bool) {
 		return config.OperationDefinition{}, false
 	}
 	operation, ok := s.definitions[name]
+	if operation.Systemd != nil {
+		copy := *operation.Systemd
+		copy.Units = append([]string(nil), copy.Units...)
+		operation.Systemd = &copy
+	}
 	operation.ArgsTemplate = append([]string(nil), operation.ArgsTemplate...)
 	operation.RequiredAny = append([]string(nil), operation.RequiredAny...)
 	operation.ArgumentGroupSeparator = append([]string(nil), operation.ArgumentGroupSeparator...)

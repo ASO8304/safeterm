@@ -188,8 +188,11 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 			if op.ExecutableRef != "" || len(op.ArgsTemplate) != 0 || len(op.ArgumentGroups) != 0 || len(op.RequiredAny) != 0 || len(op.ArgumentGroupSeparator) != 0 || op.Systemd == nil {
 				return nil, fmt.Errorf("config: systemd operation %q requires only a typed systemd definition", op.Name)
 			}
-			if len(op.Parameters) != 0 || !unitPattern.MatchString(op.Systemd.Unit) || strings.Contains(op.Systemd.Unit, "..") || !validSystemdAction(op.Systemd.Action) {
-				return nil, fmt.Errorf("config: systemd operation %q has invalid unit or action", op.Name)
+			if len(op.Parameters) != 0 {
+				return nil, fmt.Errorf("config: systemd operation %q cannot accept parameters", op.Name)
+			}
+			if err := ValidateSystemdDefinition(op.Systemd); err != nil {
+				return nil, fmt.Errorf("config: systemd operation %q: %w", op.Name, err)
 			}
 		default:
 			return nil, fmt.Errorf("config: operation %q: unsupported executor kind %q", op.Name, op.ExecutorKind)

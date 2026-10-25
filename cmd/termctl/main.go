@@ -200,7 +200,7 @@ func catalogCommand(dir string, args []string, out io.Writer) error {
 		}
 		fmt.Fprintf(out, "%s: %s\nprofile: %s\n", op.Name, op.Description, op.RunnerProfile)
 		if op.Systemd != nil {
-			fmt.Fprintf(out, "systemd: %s %s\n", op.Systemd.Action, op.Systemd.Unit)
+			fmt.Fprintf(out, "systemd: %s %s (timeout %ds)\n", op.Systemd.Action, strings.Join(op.Systemd.OrderedUnits(), ", "), op.Systemd.Timeout())
 		}
 		for _, p := range op.Parameters {
 			fmt.Fprintf(out, "parameter: %s (%s, required=%t, default=%s)\n", p.Name, p.Type, p.Required, p.Default)

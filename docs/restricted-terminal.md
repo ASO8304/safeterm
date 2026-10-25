@@ -188,3 +188,11 @@ continues to administer SafeTerm's own runtime services.
 
 The root-level show command is removed. Use execute COMMAND ? for command
 help. The show command inside a configuration context still displays values.
+
+Service resource IDs are public aliases for actual systemd units. A definition
+may target one unit or an ordered group. Execute service restart GROUP stops all
+members in reverse startup order and then starts them forward. The menu and Tab
+behavior stay the same. Responses display the alias, step/action and state, not
+raw systemctl output or physical unit names. An error stops the sequence without
+automatic recovery; consult the administrator and protected Audit record for
+physical-unit diagnostics. See the resource guide for group definitions.

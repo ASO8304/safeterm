@@ -61,7 +61,7 @@ func New(cfg *config.Config) (*Translator, error) {
 			defined[p.Name] = p
 		}
 		if op.ExecutorKind == config.ExecutorSystemd {
-			ops[op.Name] = operation{command: op.Systemd.Unit, args: []argument{{literal: op.Systemd.Action}}}
+			ops[op.Name] = operation{command: op.Name, args: []argument{{literal: op.Systemd.Action}}}
 			continue
 		}
 

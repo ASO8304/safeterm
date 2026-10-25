@@ -12,8 +12,8 @@ if os.geteuid() != 0 or os.environ.get('SAFETERM_DISPOSABLE_HOST') != '1':
     raise SystemExit('requires disposable root CI VM')
 
 mode = sys.argv[1]
-if mode not in ('empty', 'configured', 'site', 'logical'):
-    raise SystemExit('expected empty, configured, site or logical')
+if mode not in ('empty', 'configured', 'site', 'logical', 'logs', 'services'):
+    raise SystemExit('expected empty, configured, site, logical, logs or services')
 pid, fd = pty.fork()
 if pid == 0:
     os.execv('/usr/bin/sudo', ['sudo', '-iu', 'safeterm'])
@@ -64,6 +64,23 @@ try:
     result = command('execute disk')
     if b'result: success' not in result:
         raise RuntimeError('Gateway/Runner execution failed')
+    if mode == 'logs':
+        os.write(fd, b'execute logs fresh-log main\r')
+        result = expect(b'CI log fixture')
+        if b'error:' in result:
+            raise RuntimeError('registered log stream failed')
+        os.write(fd, b'\x03')
+        expect(b'\nsafeterm::ci-admin> ')
+    if mode == 'services':
+        result = command('execute service restart ?')
+        if b'application-stack' not in result:
+            raise RuntimeError('service group missing from contextual help')
+        for action in ('start', 'status', 'restart', 'stop'):
+            result = command('execute service ' + action + ' application-st\t')
+            if b'result: success exit=0' not in result or b'application-stack' not in result:
+                raise RuntimeError('service group action failed: ' + action)
+            if b'ci-chain-' in result or b'.service' in result:
+                raise RuntimeError('physical service name leaked to Console')
     if mode == 'site':
         result = command('execute site_uname')
         if b'Linux' not in result or b'result: success exit=0' not in result:

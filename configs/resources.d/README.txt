@@ -394,3 +394,82 @@ The log-viewer role and isolated log-reader profile are ready to use.
 After changes run sudo termctl check, then sudo termctl apply and reconnect.
 Older explicit operations.d/log.json overrides are preserved on upgrade; remove
 them after migrating their paths here if you no longer want the old command.
+
+Service aliases and ordered groups
+----------------------------------
+The resource id is the public service name. For example id web with
+service.unit nginx.service exposes execute service restart web. Restricted
+terminal responses contain the alias and step results, never raw systemctl or
+journal output. Status reports active or inactive or failed; detailed diagnosis
+is performed by the administrator using systemd and the protected Audit log.
+Administrator-visible source files and audit records still contain real units;
+aliases are presentation, not an operating-system confidentiality boundary.
+
+A service can specify exactly one unit or an ordered units array (1..32 unique,
+exact .service names). The array specifies STARTUP order, dependencies first.
+Do not combine unit and units. Example /etc/safeterm/resources.d/akbar-all.json:
+
+```json
+{
+  "id": "akbar-all",
+  "description": "Akbar application stack",
+  "service": {
+    "units": ["akbar_1.service", "akbar_2.service", "akbar_3.service"],
+    "timeout_seconds": 120,
+    "actions": {
+      "status": {"roles": ["service-viewer", "service-operator"]},
+      "start": {"roles": ["service-operator"]},
+      "stop": {"roles": ["service-operator"]},
+      "restart": {"roles": ["service-operator"]},
+      "enable": {"roles": ["service-operator"]},
+      "disable": {"roles": ["service-operator"]}
+    }
+  }
+}
+```
+
+Run sudo termctl check, sudo termctl apply and reconnect. Existing Tab and ?
+completion offer only authorized action/alias pairs:
+
+    execute service start akbar-all
+    execute service restart akbar-all
+    execute service status akbar-all
+
+Start, enable, status and reload process members in array order. Stop and disable
+process them in reverse. Group restart stops ALL members in reverse order before
+starting ANY member in array order. A single unit retains normal systemd restart.
+Enable/disable only change boot enablement; they do not implicitly start/stop.
+Each synchronous systemctl step must finish before the next one starts.
+
+No action or role is implicitly granted by a group. A restart-only group receives
+exact stop/start sudoers pairs, not a wildcard or access to unrelated units.
+The signed sequence order, alias and timeout are part of the catalog signature.
+
+Total sequence timeout defaults to 120 seconds; timeout_seconds may be 1..240
+(0 also selects the default). The Runner profile timeout independently bounds
+each controller call and may be shorter. Stop at the first failed/timed-out step
+or unavailable Audit service. Report the alias, step number and action; preserve
+successful prior steps. No automatic retry or recovery starts other services.
+An interrupted or failed sequence can leave a partially stopped/started group;
+a timed-out systemctl client does not guarantee its systemd job was canceled.
+An inactive/failed status is reported as a successful state query, not as a
+successful service start. A missing unit or other controller failure fails the
+query. Use systemd directly as administrator for detailed diagnosis.
+
+Gateway reserves the complete exact-unit set across Runner profiles; Runner
+also rejects local overlap. Conflicting requests fail rather than queue. A
+caller disconnect does not release the reservation while a bounded sequence
+continues. After uncertain transport failure, the reservation is retained through
+the sequence deadline and cleanup allowance. Disjoint groups can run concurrently.
+These guards cover SafeTerm operations, not manual systemctl calls, automatic
+systemd activity, or implicit dependencies not listed in the group. Use canonical
+unit names consistently: different systemd aliases of one unit are not resolved
+into one lock key. Arrange the array consistently with systemd dependencies and
+service readiness settings; SafeTerm does not infer an application dependency
+DAG or application health checks. Gateway/Runner restarts are administrative
+interruptions, not resumable transactions.
+
+The protected Audit log records each step before execution and after its result,
+with real unit/action, step number, request id and initiating identity. The
+restricted user only sees the public alias. Renaming a resource changes its
+public commands. Existing single-unit definitions need no schema change.

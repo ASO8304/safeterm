@@ -146,3 +146,37 @@ func TestShippedCatalogHasValidDetachedSignature(t *testing.T) {
 		t.Fatalf("shipped catalog signature: %v", err)
 	}
 }
+
+func TestServiceGroupSignatureCoversOrderAliasAndTimeout(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.Operations = append(cfg.Operations, config.OperationDefinition{Name: "service_group", RunnerProfile: config.ProfileServiceManager, ExecutorKind: config.ExecutorSystemd, Systemd: &config.SystemdOperationDefinition{Units: []string{"one.service", "two.service"}, Alias: "public", Action: "restart", TimeoutSeconds: 120}})
+	signature, err := SignCatalog(cfg, privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyCatalog(cfg, publicKey, signature); err != nil {
+		t.Fatal(err)
+	}
+	plan := cfg.Operations[len(cfg.Operations)-1].Systemd
+	plan.Units[0], plan.Units[1] = plan.Units[1], plan.Units[0]
+	if err := VerifyCatalog(cfg, publicKey, signature); err == nil {
+		t.Fatal("unsigned order change accepted")
+	}
+	plan.Units[0], plan.Units[1] = plan.Units[1], plan.Units[0]
+	plan.Alias = "other"
+	if err := VerifyCatalog(cfg, publicKey, signature); err == nil {
+		t.Fatal("unsigned alias change accepted")
+	}
+	plan.Alias = "public"
+	plan.TimeoutSeconds = 240
+	if err := VerifyCatalog(cfg, publicKey, signature); err == nil {
+		t.Fatal("unsigned timeout change accepted")
+	}
+}

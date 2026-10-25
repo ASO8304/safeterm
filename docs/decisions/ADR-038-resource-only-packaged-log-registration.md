@@ -32,3 +32,10 @@ Regression tests reject packaged log operations/policy grants and sample-file
 creation. Terminal tests check that only registered resource names appear in
 log completion and retain authorization and signed operation-ID checks. Generic
 mapped-argument isolation tests use explicit test-only fixtures.
+
+An operation-free registered Runner starts with an empty executable allowlist
+instead of exiting. Every executable verification and execution attempt remains
+denied. Registering an operation supplies its signed binding on the next apply.
+This also covers removal of the last resource log. The systemd smoke test waits
+for the log-reader socket before registering any logs, streams a registered log,
+and checks readiness again after removing the last log.

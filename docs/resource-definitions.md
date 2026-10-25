@@ -74,3 +74,15 @@ its paths into resources.d and remove that override before applying. Merely
 renaming that file to .json.disabled is also sufficient to exclude it. The new
 package does not restore the old built-in operation. Other registered logs and
 the actual log files are not removed.
+
+## Service aliases and ordered groups
+
+The resource id is the public service alias; service.unit is the physical unit.
+For a group use service.units in startup order instead of service.unit. Start
+runs forward, stop runs backward, and restart completes all reverse stops before
+all forward starts. Only explicitly granted actions appear in Tab/contextual help.
+Output uses the alias; full systemd status and journal text are not forwarded.
+
+See [the installed resource guide](../configs/resources.d/README.md#service-aliases-and-ordered-groups)
+for the complete JSON example, timeouts, partial-failure behavior, exact grants,
+Audit records and concurrency limits. Single-unit definitions remain supported.

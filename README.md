@@ -411,3 +411,9 @@ Details are recorded in `docs/decisions/` (Architecture Decision Records) and
 | M17 | Online and Air-Gapped Installation Package | ✅ Tagged: v0.18.0-m17 |
 | M18 | Transactional Installation Rollback | ✅ Tagged: v0.19.0-m18 |
 | M19 | Operator Catalog, Log Streaming, and Terminal UX | ✅ Tagged: v0.20.1-m19 |
+
+Service aliases and ordered groups are defined in resources.d. The resource id
+is the public execute service name; service.unit maps one unit and service.units
+lists a group's members in startup order. Group restart stops in reverse order
+then starts forward, with exact signed grants and per-step Audit records. See
+[service resource definitions](docs/resource-definitions.md#service-aliases-and-ordered-groups).

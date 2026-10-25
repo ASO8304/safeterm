@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,7 +61,12 @@ func systemdSudoers(cfg *config.Config) ([]string, error) {
 	byProfile := map[config.RunnerProfile][]string{}
 	for _, op := range cfg.Operations {
 		if op.ExecutorKind == config.ExecutorSystemd {
-			byProfile[op.RunnerProfile] = append(byProfile[op.RunnerProfile], "/usr/bin/systemctl --no-pager "+op.Systemd.Action+" "+op.Systemd.Unit)
+			for _, step := range op.Systemd.Steps() {
+				command := "/usr/bin/systemctl --no-pager " + step.Action + " " + step.Unit
+				if !slices.Contains(byProfile[op.RunnerProfile], command) {
+					byProfile[op.RunnerProfile] = append(byProfile[op.RunnerProfile], command)
+				}
+			}
 		}
 	}
 	lines := []string{}

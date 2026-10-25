@@ -84,7 +84,15 @@ func NewExecutor(cfg *config.Config, profile config.RunnerProfile, delegate agen
 		bindings[executable.Path] = candidate
 	}
 	if len(bindings) == 0 {
-		return nil, fmt.Errorf("integrity: profile %q has no approved executables", profile)
+		// A registered process profile may intentionally have no operations yet
+		// (for example log-reader before any resource logs are added). Keep its
+		// IPC service available with an empty allowlist; every executable path
+		// still fails closed. Never accept a populated profile without bindings.
+		for _, operation := range cfg.Operations {
+			if operation.RunnerProfile == profile {
+				return nil, fmt.Errorf("integrity: profile %q has no approved executables", profile)
+			}
+		}
 	}
 	return &Executor{delegate: delegate, bindings: bindings}, nil
 }

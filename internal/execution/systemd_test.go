@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"safeterm/internal/agent"
@@ -62,8 +63,8 @@ func TestSystemdExecutorAllowsOnlyCompiledUnitAction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stdout, stderr, exitCode, err := executor.Execute(context.Background(), "demo.service", []string{"restart"})
-	if err != nil || stdout != "controlled" || stderr != "" || exitCode != 0 || controller.calls != 1 || controller.action != "restart" || controller.unit != "demo.service" {
+	stdout, stderr, exitCode, err := executor.Execute(context.Background(), "restart_demo", []string{"restart"})
+	if err != nil || !strings.Contains(stdout, "restart_demo: step 1/1 restart: ok") || stderr != "" || exitCode != 0 || controller.calls != 1 || controller.action != "restart" || controller.unit != "demo.service" {
 		t.Fatalf("unexpected result: %q %q %d %v controller=%+v", stdout, stderr, exitCode, err, controller)
 	}
 }
@@ -77,7 +78,8 @@ func TestSystemdExecutorRejectsFreeFormInputsBeforeController(t *testing.T) {
 		args []string
 	}{
 		{"other.service", []string{"restart"}},
-		{"demo.service", []string{"start"}},
+		{"restart_demo", []string{"start"}},
+		{"demo.service", []string{"restart"}},
 		{"demo.service", []string{"restart", "--no-block"}},
 		{"demo.service;id", []string{"restart"}},
 	} {
