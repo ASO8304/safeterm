@@ -39,3 +39,38 @@ section/key coordinates. The [resource guide](../configs/resources.d/README.md)
 contains the full JSON schema example, limits and permission behavior.
 End saves files only; config.on_change is rejected. Manage services explicitly
 through execute service. Existing config.fields definitions remain supported.
+
+## Logs have one registration path
+
+Packaged defaults do not register any log sources. Define application logs in
+resources.d; no operations.d override is needed. The log-viewer role, tail
+executable binding and isolated log-reader profile remain available.
+
+For example, create /etc/safeterm/resources.d/product.json:
+
+```json
+{
+  "id": "product",
+  "description": "Product logs",
+  "logs": [
+    {
+      "id": "main",
+      "description": "Main application log",
+      "path": "/var/log/product/application.log",
+      "roles": ["log-viewer"]
+    }
+  ]
+}
+```
+
+After granting the log reader only the necessary read/traverse access, run
+sudo termctl check and sudo termctl apply, reconnect and use
+execute logs product main. Tab and contextual help list only authorized logs.
+The filename above is an example: the log file must already exist on the host.
+
+Upgrades preserve administrator inputs. If an older installation has an explicit
+operations.d override defining the old log operation (often log.json), migrate
+its paths into resources.d and remove that override before applying. Merely
+renaming that file to .json.disabled is also sufficient to exclude it. The new
+package does not restore the old built-in operation. Other registered logs and
+the actual log files are not removed.

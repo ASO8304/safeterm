@@ -263,8 +263,9 @@ sudo /usr/local/sbin/safeterm-install-rollback latest
 M19 adds administrator-facing `TEMPLATE.jsonc` files, mapped parameters that
 turn public aliases into fixed catalog values, an isolated streaming Log Reader,
 and exact typed systemd controls backed by a generated no-wildcard sudoers
-policy. The terminal accepts `execute log service_A`, completes mapped values, and
-provides topic and operation help. See
+policy. Current releases register logs through `resources.d` and expose
+`execute logs RESOURCE LOG` with completion and contextual help. No sample log
+sources are enabled by default. See
 [REQ-019](docs/requirements/REQ-019-operator-catalog-and-terminal-ux.md),
 [ADR-021](docs/decisions/ADR-021-mapped-parameters-and-typed-service-control.md),
 and the [catalog authoring guide](docs/catalog-authoring.md).

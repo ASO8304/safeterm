@@ -219,10 +219,13 @@ func TestOperatorCatalogTemplatesAndPrivilegeAssets(t *testing.T) {
 		}
 	}
 	installer := readText(t, filepath.Join(repository, "deploy", "scripts", "install.sh"))
-	for _, marker := range []string{"--sudoers-plan", "visudo -cf", "/etc/sudoers.d/safeterm-service-manager", "safeterm-log-reader", "/var/log/safeterm-readable"} {
+	for _, marker := range []string{"--sudoers-plan", "visudo -cf", "/etc/sudoers.d/safeterm-service-manager", "safeterm-log-reader"} {
 		if !strings.Contains(installer, marker) {
 			t.Errorf("installer missing operator control %q", marker)
 		}
+	}
+	if strings.Contains(installer, "service_A.log") || strings.Contains(installer, "install -d -o root -g adm -m 0750 /var/log/safeterm-readable") {
+		t.Fatal("installer still creates a sample log")
 	}
 	shell := readText(t, filepath.Join(repository, "internal", "broker", "shell.go"))
 	if strings.Contains(shell, "show COMMAND") {

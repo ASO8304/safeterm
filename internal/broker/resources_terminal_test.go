@@ -88,6 +88,9 @@ func TestGeneratedResourceCommandsUseSignedIDsAndPerActionRoles(t *testing.T) {
 		t.Fatal("unregistered service dispatched")
 	}
 	s.principal.Roles = []string{"log-viewer"}
+	if got := strings.Join(s.completionCandidates(context.Background(), "execute logs ", ""), ","); got != "product" {
+		t.Fatalf("only registered resources should appear in logs menu: %q", got)
+	}
 	if got := s.completionCandidates(context.Background(), "execute logs product m", "m"); strings.Join(got, ",") != "main" {
 		t.Fatalf("completion=%v", got)
 	}

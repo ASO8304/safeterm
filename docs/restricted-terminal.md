@@ -129,7 +129,7 @@ Common presentation names are:
 | `execute system` | `system_info` |
 | `execute memory` | `memory_info` |
 | `execute disk` | `disk_usage` |
-| `execute logs service_A` | `log source=service_A` |
+| `execute logs product main` | Generated resource operation with a fixed log path |
 | `execute service status ssh` | `status_safeterm_ssh` |
 | `execute service restart gateway` | `restart_safeterm_gateway` |
 | `execute capture host=192.0.2.1` | `trace host=192.0.2.1` |
@@ -158,13 +158,18 @@ an installation snapshot. Ordinary users never handle signing keys.
 
 ## Log completion and service permissions
 
-`execute logs ` offers approved log names directly, such as
-`authentication`, `service_A` and `system`. The built-in operation stores the
-selection in its `source` parameter internally; users can type
-`execute logs system`. Explicit `source=system` remains accepted, and typing
-`source=` completes only concrete approved values. A selected log is not
-repeatedly offered as an unused parameter. Resource-defined logs keep their
-existing `execute logs RESOURCE LOG` paths and per-log authorization.
+Logs are registered only through administrator definitions in
+`/etc/safeterm/resources.d/*.json`. No default log sources are registered.
+For a resource with id `product` and a log with id `main`, use
+`execute logs product main`. Tab and `?` list only authorized registered
+resources/logs; users cannot provide arbitrary filesystem paths. The inactive
+`resources.d/TEMPLATE.json` shows the `logs` structure. See
+[resource definitions](resource-definitions.md) for setup and file permissions.
+
+Older installations may have an explicit `operations.d` override for the old
+`log` operation. Remove that override and apply after migrating its paths to
+resources.d; upgrades preserve administrator files. The built-in `log-viewer`
+role and isolated log-reader profile remain available for resource-defined logs.
 
 Service menus list only actions and units authorized for the session's roles.
 `admin` is an identity name, not an implicit superuser. `whoami` shows the roles;

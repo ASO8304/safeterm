@@ -126,10 +126,6 @@ while IFS="$tab" read -r source target owner; do
 done <"$managed_plan"
 rm -f -- "$managed_plan"
 [ -d /etc/cat ] || install -d -o root -g root -m 0750 /etc/cat
-[ -d /var/log/safeterm-readable ] || install -d -o root -g adm -m 0750 /var/log/safeterm-readable
-if [ ! -e /var/log/safeterm-readable/service_A.log ]; then
-  install -o root -g adm -m 0640 /dev/null /var/log/safeterm-readable/service_A.log
-fi
 install -d -o root -g root -m 0755 /etc/sudoers.d
 install -o root -g root -m 0440 "$sudoers_plan" /etc/sudoers.d/safeterm-service-manager
 

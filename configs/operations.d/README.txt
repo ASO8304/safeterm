@@ -25,3 +25,8 @@ See ../README.md and the site-configuration documentation for ordering, isolatio
 ceilings, recovery, offline signing and examples. Profile definitions select a
 packaged base template, never arbitrary systemd text, root users or sockets.
 Templates and reference guides refresh on update; custom *.json files survive.
+
+Application logs belong in resources.d using its logs section. The package does
+not provide the old mapped log operation or sample sources. operations.d remains
+available for custom executable commands; no operation override is needed to
+register a resource log.

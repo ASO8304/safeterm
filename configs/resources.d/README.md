@@ -384,3 +384,13 @@ custom source files and identities, then rebuild generated data. A package
 upgrade needing a new signature requires the existing local signer; offline
 operators must prepare matching signed inputs. It fails rather than silently
 trusting or importing previously generated definitions.
+
+Log registration
+----------------
+No sample log sources are enabled by the package. Register logs here using the
+logs section in TEMPLATE.json; service and config sections are optional and can
+be omitted for a log-only resource. Use execute logs RESOURCE_ID LOG_ID.
+The log-viewer role and isolated log-reader profile are ready to use.
+After changes run sudo termctl check, then sudo termctl apply and reconnect.
+Older explicit operations.d/log.json overrides are preserved on upgrade; remove
+them after migrating their paths here if you no longer want the old command.

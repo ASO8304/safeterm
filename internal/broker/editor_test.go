@@ -155,6 +155,19 @@ func TestLogCompletionOffersOnlyMappedSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cfg.Operations = append(cfg.Operations, config.OperationDefinition{
+		Name: "log", Description: "Test-only mapped log", RunnerProfile: config.ProfileLogReader,
+		ExecutorKind: config.ExecutorProcess, ExecutableRef: "tail",
+		ArgsTemplate: []string{"-n", "50", "-F", "--", "{source}"},
+		Parameters: []config.ParameterDefinition{{Name: "source", Type: config.ParamTypeString, Required: true,
+			ValueMap: map[string]string{"service_A": "/var/log/safeterm-readable/service_A.log", "system": "/var/log/syslog", "authentication": "/var/log/auth.log"}}},
+		LongRunning: true,
+	})
+	for i := range cfg.Policies {
+		if cfg.Policies[i].Role == "log-viewer" {
+			cfg.Policies[i].Operations = []string{"log"}
+		}
+	}
 	catalog, err := NewCatalog(cfg)
 	if err != nil {
 		t.Fatal(err)

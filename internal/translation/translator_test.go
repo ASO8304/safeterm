@@ -103,6 +103,14 @@ func TestTranslate_ShippedPingUsesBoundedFixedArguments(t *testing.T) {
 
 func TestTranslate_MappedLogAliasNeverUsesCallerPath(t *testing.T) {
 	cfg := shippedConfig(t)
+	cfg.Operations = append(cfg.Operations, config.OperationDefinition{
+		Name: "log", Description: "Test-only mapped log", RunnerProfile: config.ProfileLogReader,
+		ExecutorKind: config.ExecutorProcess, ExecutableRef: "tail",
+		ArgsTemplate: []string{"-n", "50", "-F", "--", "{source}"},
+		Parameters: []config.ParameterDefinition{{Name: "source", Type: config.ParamTypeString, Required: true,
+			ValueMap: map[string]string{"service_A": "/var/log/safeterm-readable/service_A.log", "system": "/var/log/syslog", "authentication": "/var/log/auth.log"}}},
+		LongRunning: true,
+	})
 	req := &contract.ExecutionRequest{Command: "log", Arguments: map[string]string{"source": "service_A"}}
 	if err := validation.New(cfg).Validate(req); err != nil {
 		t.Fatal(err)

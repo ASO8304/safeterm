@@ -35,3 +35,23 @@ func TestShippedCatalogIncludesDiagnosticsAndServiceOperations(t *testing.T) {
 		t.Fatalf("ping must pass the declared host as its final argument: %+v", ping.ArgsTemplate)
 	}
 }
+
+// Default log names must never appear without an administrator resource definition.
+func TestShippedCatalogHasNoBuiltInLogOperation(t *testing.T) {
+	cfg, err := LoadConfig(filepath.Join("..", "defaults", "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range cfg.Operations {
+		if op.Name == "log" || op.RunnerProfile == ProfileLogReader {
+			t.Fatalf("unexpected packaged log operation: %s", op.Name)
+		}
+	}
+	for _, policy := range cfg.Policies {
+		for _, name := range policy.Operations {
+			if name == "log" {
+				t.Fatal("policy still grants removed default log")
+			}
+		}
+	}
+}
