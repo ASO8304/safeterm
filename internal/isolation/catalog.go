@@ -49,6 +49,10 @@ func (s *Snapshot) Operation(name string) (config.OperationDefinition, bool) {
 		return config.OperationDefinition{}, false
 	}
 	operation, ok := s.definitions[name]
+	if operation.TCPProbe != nil {
+		copy := *operation.TCPProbe
+		operation.TCPProbe = &copy
+	}
 	if operation.Systemd != nil {
 		copy := *operation.Systemd
 		copy.Units = append([]string(nil), copy.Units...)

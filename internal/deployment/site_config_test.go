@@ -20,6 +20,7 @@ func TestSiteSudoersDoNotGrantAnotherProfileOperations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	base.Operations = append(base.Operations, config.OperationDefinition{Name: "explicit_default_profile_status", RunnerProfile: config.ProfileServiceManager, ExecutorKind: config.ExecutorSystemd, Systemd: &config.SystemdOperationDefinition{Unit: "another-app.service", Action: "status"}})
 	cfg, err := siteconfig.Prepare(base, siteconfig.Inputs{Profiles: []siteconfig.Named[siteconfig.Profile]{{Value: siteconfig.Profile{Name: "site-control", Base: config.ProfileServiceManager}}}})
 	if err != nil {
 		t.Fatal(err)

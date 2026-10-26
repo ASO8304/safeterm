@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"safeterm/internal/config"
 	"safeterm/internal/contract"
 	"safeterm/internal/isolation"
 )
@@ -34,9 +35,22 @@ func (g *stalledGateway) Terminate(_ context.Context, _ contract.ControlRequest)
 }
 
 func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
-	for _, operation := range []string{"system_info", "capture"} {
+	for _, operation := range []string{"system_info", "capture", "telnet"} {
 		t.Run(operation, func(t *testing.T) {
-			catalog, _ := NewCatalog(brokerTestConfig())
+			cfg := brokerTestConfig()
+			if operation == "telnet" {
+				source, err := config.LoadConfig("../defaults/catalog")
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, op := range source.Operations {
+					if op.Name == "telnet" {
+						cfg.Operations = append(cfg.Operations, op)
+					}
+				}
+				cfg.Policies[1].Operations = append(cfg.Policies[1].Operations, "telnet")
+			}
+			catalog, _ := NewCatalog(cfg)
 			g := &stalledGateway{started: make(chan struct{})}
 			reader, writer := io.Pipe()
 			defer reader.Close()
@@ -51,6 +65,9 @@ func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
 			finished := make(chan error, 1)
 			go func() { finished <- shell.Run(ctx) }()
 			command := "execute system_info host\r"
+			if operation == "telnet" {
+				command = "execute telnet 127.0.0.1 23\r"
+			}
 			if operation == "capture" {
 				command = "execute capture host=127.0.0.1 port=999\r"
 			}

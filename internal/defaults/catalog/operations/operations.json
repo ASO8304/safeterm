@@ -77,93 +77,15 @@
     "long_running": false
   },
   {
-    "name": "status_safeterm_audit",
-    "description": "Show SafeTerm Audit Service status.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-audit.service", "action": "status" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "status_safeterm_gateway",
-    "description": "Show SafeTerm Gateway status.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-gateway.service", "action": "status" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "status_safeterm_ssh",
-    "description": "Show SafeTerm SSH Broker status.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "status" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "restart_safeterm_audit",
-    "description": "Restart the SafeTerm Audit Service.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-audit.service", "action": "restart" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "restart_safeterm_gateway",
-    "description": "Restart the SafeTerm Gateway.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-gateway.service", "action": "restart" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "start_safeterm_ssh",
-    "description": "Start the SafeTerm SSH Broker.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "start" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "stop_safeterm_ssh",
-    "description": "Stop the SafeTerm SSH Broker; the current SSH session will close.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "stop" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "restart_safeterm_ssh",
-    "description": "Restart the SafeTerm SSH Broker; the current SSH session may close.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "restart" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "enable_safeterm_ssh",
-    "description": "Enable the SafeTerm SSH Broker at boot.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "enable" },
-    "parameters": [],
-    "long_running": false
-  },
-  {
-    "name": "disable_safeterm_ssh",
-    "description": "Disable the SafeTerm SSH Broker at boot without stopping it.",
-    "runner_profile": "service-manager",
-    "executor_kind": "systemd",
-    "systemd": { "unit": "safeterm-ssh-broker.service", "action": "disable" },
-    "parameters": [],
-    "long_running": false
+    "name": "telnet",
+    "description": "Test a TCP port with a bounded connection attempt; no login or application data.",
+    "runner_profile": "network-observer",
+    "executor_kind": "tcp-probe",
+    "tcp_probe": { "timeout_seconds": 5 },
+    "parameters": [
+      { "name": "host", "type": "string", "required": true },
+      { "name": "port", "type": "int", "required": false, "default": "23", "min": 1, "max": 65535 }
+    ],
+    "long_running": true
   }
 ]

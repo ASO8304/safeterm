@@ -108,3 +108,158 @@ func TestSystemInfoSubcommandsPreserveSignedOperationIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T) {
+	s, _, out := editorFixture(t)
+	api := &networkFixtureAPI{view: networkmanager.View{Version: "base", Interfaces: map[string]networkmanager.Interface{"ens19": {Name: "ens19", ID: "ens19"}, "ens20": {Name: "ens20", ID: "ens20", ReadOnly: "interface is outside administrator policy"}}, Routes: map[string]networkmanager.Route{}}}
+	s.SetNetworkClient(api)
+	for _, tc := range []struct{ line, want string }{
+		{"execute network ?", "Apply the saved candidate as a timed trial"},
+		{"execute network apply ?", "confirmation is required"},
+		{"execute network confirm ?", "persist its Netplan changes"},
+		{"config network interface ?", "Select an existing network interface"},
+		{"config network route ?", "choose a name for a new route"},
+	} {
+		out.Reset()
+		editorCommands(t, s, tc.line)
+		if !strings.Contains(strings.Join(strings.Fields(out.String()), " "), strings.Join(strings.Fields(tc.want), " ")) {
+			t.Fatalf("%s: %q", tc.line, out.String())
+		}
+		if s.networkEdit != nil || len(api.requests) != 0 {
+			t.Fatalf("help entered an editor or called the manager: %s", tc.line)
+		}
+	}
+	editorCommands(t, s, "config network interface", "edit ens19", "set mtu 1400")
+	beforeView := s.networkEdit.view
+	beforeChanges := len(s.networkEdit.changes)
+	beforeRequests := len(api.requests)
+	tabBefore := s.completionCandidates(context.Background(), "set ", "")
+	for _, tc := range []struct{ line, want string }{
+		{"?", "Add values to a list"},
+		{"edit ?", "ens20                   Select network interface; read-only: interface is outside administrator policy"},
+		{"set ?", "Static interface addresses in CIDR form"},
+		{"set addresses ?", "<IP/CIDR> [...]"},
+		{"set dhcp4 ?", "Enable IPv4 DHCP"},
+		{"append ?", "DNS search domains"},
+		{"unselect ?", "DNS server IP addresses"},
+		{"unset mtu ?", "Clear this field in the editor"},
+		{"end ?", "does not apply networking"},
+		{"abort ?", "discard unsaved editor changes"},
+		{"next ?", "keep staged edits"},
+	} {
+		out.Reset()
+		editorCommands(t, s, tc.line)
+		if !strings.Contains(strings.Join(strings.Fields(out.String()), " "), strings.Join(strings.Fields(tc.want), " ")) {
+			t.Fatalf("%s: %q", tc.line, out.String())
+		}
+	}
+	if s.networkEdit == nil || s.networkEdit.item != "ens19" || len(s.networkEdit.changes) != beforeChanges || !reflect.DeepEqual(beforeView, s.networkEdit.view) || len(api.requests) != beforeRequests {
+		t.Fatal("help changed editor state or contacted manager")
+	}
+	if got := s.completionCandidates(context.Background(), "set ", ""); !reflect.DeepEqual(got, tabBefore) {
+		t.Fatalf("Tab changed: %v -> %v", tabBefore, got)
+	}
+	editorCommands(t, s, "abort", "config network route", "edit office")
+	beforeRequests = len(api.requests)
+	for _, tc := range []struct{ line, want string }{
+		{"?", "Remove a named route from the candidate"},
+		{"set ?", "Destination network CIDR"},
+		{"set destination ?", "<network/CIDR>"},
+		{"set interface ?", "ens19                   Use this allowed outgoing interface"},
+		{"edit ?", "Choose a new route name"},
+	} {
+		out.Reset()
+		editorCommands(t, s, tc.line)
+		if !strings.Contains(strings.Join(strings.Fields(out.String()), " "), strings.Join(strings.Fields(tc.want), " ")) {
+			t.Fatalf("%s: %q", tc.line, out.String())
+		}
+		if tc.line == "set interface ?" && strings.Contains(out.String(), "ens20") {
+			t.Fatal("help offered read-only interface for a route")
+		}
+	}
+	if len(api.requests) != beforeRequests || len(s.networkEdit.changes) != 0 || s.networkEdit.item != "office" {
+		t.Fatal("route help mutated state")
+	}
+}
+
+func TestRouteShowGroupsOnlyCandidateRoutesByInterface(t *testing.T) {
+	s, _, out := editorFixture(t)
+	metric := uint32(100)
+	api := &networkFixtureAPI{view: networkmanager.View{Version: "private-version", Interfaces: map[string]networkmanager.Interface{
+		"ip0": {Name: "ip0", ID: "ip0", Addresses: []string{"192.168.222.10/24"}, DNS: []string{"9.9.9.9"}, Files: []string{"etc/netplan/private-file.yaml"}},
+		"ip1": {Name: "ip1", ID: "ip1", DHCP4: true},
+	}, Routes: map[string]networkmanager.Route{
+		"office":         {Name: "office", Interface: "ip0", Destination: "10.50.0.0/16", Gateway: "192.168.222.1", Metric: &metric},
+		"default-uplink": {Name: "default-uplink", Interface: "ip1", Destination: "0.0.0.0/0", Gateway: "192.168.89.1"},
+	}}}
+	s.SetNetworkClient(api)
+	editorCommands(t, s, "config network route")
+	requests := len(api.requests)
+	out.Reset()
+	editorCommands(t, s, "show")
+	text := out.String()
+	for _, want := range []string{"Configured routes (candidate)", "Interface ip0", "Interface ip1", "NAME", "DESTINATION", "GATEWAY", "METRIC", "office", "10.50.0.0/16", "192.168.222.1", "100", "default-uplink", "0.0.0.0/0", "auto"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q: %s", want, text)
+		}
+	}
+	if strings.Index(text, "Interface ip0") > strings.Index(text, "Interface ip1") {
+		t.Fatal("interface groups are not sorted")
+	}
+	for _, hidden := range []string{"private-version", "192.168.222.10/24", "9.9.9.9", "private-file.yaml", "\"interfaces\"", "\"dhcp4\"", "\"pending\""} {
+		if strings.Contains(text, hidden) {
+			t.Fatalf("route view leaked unrelated data %q: %s", hidden, text)
+		}
+	}
+	if len(api.requests) != requests {
+		t.Fatal("show contacted manager")
+	}
+	editorCommands(t, s, "edit office", "set metric 25")
+	out.Reset()
+	editorCommands(t, s, "show")
+	if strings.Contains(out.String(), "default-uplink") || !strings.Contains(out.String(), "25") {
+		t.Fatalf("selected route was not scoped or staged: %s", out.String())
+	}
+	if *api.view.Routes["office"].Metric != 100 || len(api.requests) != requests {
+		t.Fatal("show saved staged changes")
+	}
+	editorCommands(t, s, "next")
+	out.Reset()
+	editorCommands(t, s, "show")
+	if !strings.Contains(out.String(), "default-uplink") {
+		t.Fatal("next did not restore full route table")
+	}
+}
+
+func TestRouteShowExplainsEmptyAndIncompleteRoutes(t *testing.T) {
+	s, _, out := editorFixture(t)
+	api := &networkFixtureAPI{view: networkmanager.View{Version: "base", Interfaces: map[string]networkmanager.Interface{"ip1": {Name: "ip1", ID: "ip1"}}, Routes: map[string]networkmanager.Route{}}}
+	s.SetNetworkClient(api)
+	editorCommands(t, s, "config network route")
+	out.Reset()
+	editorCommands(t, s, "show", "edit ?")
+	if !strings.Contains(out.String(), "No entries in the Netplan routes list.") || !strings.Contains(out.String(), "Use edit NAME") || !strings.Contains(out.String(), "Choose a new route name") {
+		t.Fatalf("empty route guidance missing: %s", out.String())
+	}
+	editorCommands(t, s, "edit new-route")
+	out.Reset()
+	editorCommands(t, s, "show")
+	if !strings.Contains(out.String(), "has no fields yet") {
+		t.Fatalf("new route guidance missing: %s", out.String())
+	}
+	editorCommands(t, s, "set destination 10.60.0.0/16")
+	out.Reset()
+	editorCommands(t, s, "show")
+	if !strings.Contains(out.String(), "Unassigned routes") || !strings.Contains(out.String(), "new-route") {
+		t.Fatal(out.String())
+	}
+	editorCommands(t, s, "set interface ip1")
+	out.Reset()
+	editorCommands(t, s, "show")
+	if !strings.Contains(out.String(), "Interface ip1") || !strings.Contains(out.String(), "10.60.0.0/16") {
+		t.Fatal(out.String())
+	}
+	if len(api.requests) != 1 {
+		t.Fatal("route show sent mutation requests")
+	}
+}

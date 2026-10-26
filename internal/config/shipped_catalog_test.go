@@ -8,7 +8,7 @@ import (
 // Keep the checked-in operator catalog executable as a tested artifact. This
 // catches a missing executable binding, policy entry, or malformed typed
 // systemd operation before a package is built.
-func TestShippedCatalogIncludesDiagnosticsAndServiceOperations(t *testing.T) {
+func TestShippedCatalogIncludesDiagnostics(t *testing.T) {
 	cfg, err := LoadConfig(filepath.Join("..", "defaults", "catalog"))
 	if err != nil {
 		t.Fatalf("load shipped catalog: %v", err)
@@ -19,8 +19,7 @@ func TestShippedCatalogIncludesDiagnosticsAndServiceOperations(t *testing.T) {
 	}
 	for _, name := range []string{
 		"ping",
-		"status_safeterm_audit", "status_safeterm_gateway", "status_safeterm_ssh",
-		"restart_safeterm_audit", "restart_safeterm_gateway", "restart_safeterm_ssh",
+		"system_info", "memory_info", "disk_usage", "capture",
 	} {
 		if _, ok := operations[name]; !ok {
 			t.Errorf("shipped catalog is missing %q", name)
@@ -52,6 +51,44 @@ func TestShippedCatalogHasNoBuiltInLogOperation(t *testing.T) {
 			if name == "log" {
 				t.Fatal("policy still grants removed default log")
 			}
+		}
+	}
+}
+
+// Service targets must come from administrator resources, never package defaults.
+func TestShippedCatalogHasNoBuiltInServiceOperationsOrGrants(t *testing.T) {
+	cfg, err := LoadConfig(filepath.Join("..", "defaults", "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range cfg.Operations {
+		if op.ExecutorKind == ExecutorSystemd || op.Systemd != nil || op.RunnerProfile == ProfileServiceManager {
+			t.Fatalf("unexpected packaged service operation: %s", op.Name)
+		}
+	}
+	for _, policy := range cfg.Policies {
+		if (policy.Role == "service-viewer" || policy.Role == "service-operator") && len(policy.Operations) != 0 {
+			t.Fatalf("packaged service role has implicit grants: %+v", policy)
+		}
+	}
+	foundProfile := false
+	for _, p := range cfg.Profiles {
+		if p.Name == ProfileServiceManager {
+			foundProfile = true
+		}
+	}
+	if !foundProfile {
+		t.Fatal("service isolation template missing")
+	}
+	for _, role := range []string{"service-viewer", "service-operator"} {
+		found := false
+		for _, r := range cfg.Roles {
+			if r.Name == role {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("resource role missing: %s", role)
 		}
 	}
 }

@@ -89,7 +89,7 @@ func NewExecutor(cfg *config.Config, profile config.RunnerProfile, delegate agen
 		// IPC service available with an empty allowlist; every executable path
 		// still fails closed. Never accept a populated profile without bindings.
 		for _, operation := range cfg.Operations {
-			if operation.RunnerProfile == profile {
+			if operation.RunnerProfile == profile && operation.ExecutorKind == config.ExecutorProcess {
 				return nil, fmt.Errorf("integrity: profile %q has no approved executables", profile)
 			}
 		}

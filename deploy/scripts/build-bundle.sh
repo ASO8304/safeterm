@@ -41,7 +41,7 @@ for entry in audit network-manager config-manager config-writer console gateway 
 done
 cp -R "$config_dir" "$staging/etc/safeterm"
 cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/etc/safeterm/"
-cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/network.json" "$staging/etc/safeterm/"
+cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/NETWORK-DIAGNOSTICS.md" "$repo_dir/configs/NETWORK-DIAGNOSTICS.txt" "$repo_dir/configs/network.json" "$staging/etc/safeterm/"
 for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
  mkdir -p "$staging/etc/safeterm/$definitions"
  cp "$repo_dir/configs/$definitions/TEMPLATE.json" "$repo_dir/configs/$definitions/README.md" "$repo_dir/configs/$definitions/README.txt" "$staging/etc/safeterm/$definitions/"

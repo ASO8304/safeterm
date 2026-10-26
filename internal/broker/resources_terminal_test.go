@@ -18,6 +18,31 @@ func TestGeneratedResourceCommandsUseSignedIDsAndPerActionRoles(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Fresh defaults expose no service branch, even to service operators.
+	defaultCatalog, err := NewCatalog(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultClient := &fakeGateway{}
+	defaultShell, err := NewShell(defaultClient, defaultCatalog, Principal{UserID: "admin", Roles: []string{"viewer", "service-viewer", "service-operator"}}, strings.NewReader(""), &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, choice := range defaultShell.completionCandidates(context.Background(), "execute ", "") {
+		if choice == "service" {
+			t.Fatal("fresh catalog exposes service branch")
+		}
+	}
+	if got := defaultShell.completionCandidates(context.Background(), "execute service status ", ""); len(got) != 0 {
+		t.Fatalf("implicit service targets: %v", got)
+	}
+	if _, err := defaultShell.executeLine(context.Background(), "execute service status gateway", nil); err == nil {
+		t.Fatal("removed packaged service target still accepted")
+	}
+	if len(defaultClient.requests) != 0 {
+		t.Fatal("default service command dispatched")
+	}
 	data, err := os.ReadFile(filepath.Join("..", "..", "deploy", "runtime", "resources.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +69,9 @@ func TestGeneratedResourceCommandsUseSignedIDsAndPerActionRoles(t *testing.T) {
 	client := &fakeGateway{}
 	out := &bytes.Buffer{}
 	s, _ := NewShell(client, catalog, Principal{UserID: "viewer", Roles: []string{"service-viewer"}}, strings.NewReader(""), out)
+	if got := s.completionCandidates(context.Background(), "execute service status ", ""); strings.Join(got, ",") != "product" {
+		t.Fatalf("only registered service should be listed: %v", got)
+	}
 	editorCommands(t, s, "execute service status product")
 	if client.requests[0].Command != resources.OperationID("product", "service", "status") {
 		t.Fatal("friendly path changed signed ID")

@@ -290,6 +290,13 @@ func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix s
 		if !ok {
 			return nil
 		}
+		if positionalDiagnostic(operation) {
+			completed := fields[2:]
+			if !trailing && len(completed) > 0 {
+				completed = completed[:len(completed)-1]
+			}
+			return diagnosticCompletion(operation, completed, prefix)
+		}
 		used := map[string]bool{}
 		for _, field := range fields[2:] {
 			if parts := strings.SplitN(field, "=", 2); len(parts) > 0 {

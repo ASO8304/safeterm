@@ -51,14 +51,23 @@ func TestSystemdSudoersContainsOnlySignedExactCommands(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// An explicitly registered target gets exact grants; defaults alone get none.
+	empty, err := systemdSudoers(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(empty, "\n"), "NOPASSWD") {
+		t.Fatal("empty service catalog has sudo grants")
+	}
+	cfg.Operations = append(cfg.Operations, config.OperationDefinition{Name: "custom_service", RunnerProfile: config.ProfileServiceManager, ExecutorKind: config.ExecutorSystemd, Systemd: &config.SystemdOperationDefinition{Unit: "my-application.service", Action: "status"}})
 	lines, err := systemdSudoers(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := strings.Join(lines, "\n")
 	for _, expected := range []string{
-		"/usr/bin/systemctl --no-pager status safeterm-gateway.service",
-		"/usr/bin/systemctl --no-pager restart safeterm-ssh-broker.service",
+		"/usr/bin/systemctl --no-pager status my-application.service",
 		"safeterm-service-manager ALL=(root) NOPASSWD: SAFETERM_SYSTEMD",
 	} {
 		if !strings.Contains(text, expected) {

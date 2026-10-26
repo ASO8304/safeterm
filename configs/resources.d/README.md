@@ -477,3 +477,5 @@ public commands. Existing single-unit definitions need no schema change.
 Audit step identity uses operation=service-step:PARENT_OPERATION:INDEX:ACTION:UNIT
 with existing accepted/completed outcomes and the initiating request id. This
 keeps the V1 audit envelope readable by older package binaries during rollback.
+
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.

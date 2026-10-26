@@ -290,7 +290,7 @@ func InstallAdministration(source, target string) error {
 	if err := copyOne("trust/catalog-ed25519.pub", false, 0644); err != nil {
 		return err
 	}
-	for _, name := range []string{"NETWORK.md", "NETWORK.txt"} {
+	for _, name := range []string{"NETWORK.md", "NETWORK.txt", "NETWORK-DIAGNOSTICS.md", "NETWORK-DIAGNOSTICS.txt"} {
 		if _, err := os.Stat(filepath.Join(source, name)); err == nil {
 			if err = copyOne(name, false, 0644); err != nil {
 				return err

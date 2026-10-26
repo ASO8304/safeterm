@@ -400,3 +400,51 @@ func TestNetopsHasDefaultNetworkPrivileges(t *testing.T) {
 		}
 	}
 }
+
+func TestUnsafeSourceReportsSpecificMetadataFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		prepare func(*testing.T, string)
+		want    []string
+	}{
+		{"writable", func(t *testing.T, path string) {
+			if err := os.Chmod(path, 0666); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"mode=0666", "group/world write"}},
+		{"hardlink", func(t *testing.T, path string) {
+			if err := os.Link(path, path+".link"); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"hard-link count=2"}},
+		{"oversized", func(t *testing.T, path string) {
+			if err := os.Truncate(path, (1<<20)+1); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"size=1048577 bytes", "maximum is 1048576 bytes"}},
+		{"fifo", func(t *testing.T, path string) {
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+			if err := unix.Mkfifo(path, 0600); err != nil {
+				t.Fatal(err)
+			}
+		}, []string{"expected a regular file"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, _ := testTree(t)
+			relative := "etc/netplan/arbitrary-name.yaml"
+			path := filepath.Join(root, relative)
+			tc.prepare(t, path)
+			_, err := readTrusted(root, relative)
+			if err == nil {
+				t.Fatal("unsafe file accepted")
+			}
+			for _, want := range append(tc.want, path) {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("missing %q: %v", want, err)
+				}
+			}
+		})
+	}
+}

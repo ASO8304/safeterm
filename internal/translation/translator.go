@@ -60,6 +60,10 @@ func New(cfg *config.Config) (*Translator, error) {
 			}
 			defined[p.Name] = p
 		}
+		if op.ExecutorKind == config.ExecutorTCPProbe {
+			ops[op.Name] = operation{command: op.Name, args: []argument{{parameter: "host"}, {parameter: "port", defaultValue: op.Parameters[1].Default}}}
+			continue
+		}
 		if op.ExecutorKind == config.ExecutorSystemd {
 			ops[op.Name] = operation{command: op.Name, args: []argument{{literal: op.Systemd.Action}}}
 			continue

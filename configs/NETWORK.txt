@@ -24,7 +24,24 @@ A cloud-init marker makes an interface read-only by default. Setting `allow_gene
 
 ## Read, edit and save a candidate
 
-`?` followed by Enter shows contextual help. Tab retains the existing Linux-style completion behavior.
+`?` followed by Enter shows contextual help. Tab retains the existing Linux-style completion behavior. Help lists one choice per line with a short English description. For example:
+
+```text
+?                       Editor commands and their effects
+set ?                   Editable fields, formats and limits
+set dhcp4 ?             Meaning of enable and disable
+set addresses ?         CIDR address syntax
+unselect ?              Lists supporting removal of selected values
+edit ?                  Existing items, including read-only reasons
+end ?                   Save semantics, without saving anything
+execute network ?       Status, candidate and timed trial actions
+execute network apply ? Trial semantics, without applying anything
+```
+
+Help inside an editor uses its cached view; it never selects an item, changes
+staged values, saves a candidate or contacts the privileged manager. Tab continues
+to insert/complete tokens and list alternatives using the existing Linux workflow.
+
 
 ```text
 config network interface
@@ -66,6 +83,20 @@ config network route
     next
 end
 ```
+
+`edit office` creates a new route draft when that name does not exist; choose a
+name yourself rather than waiting for it to appear in completion. `edit ?` lists
+existing routes and explains how to create a new named route.
+
+Within `config network route`, `show` displays only candidate route tables,
+grouped by interface, with name, destination, gateway and metric columns. It does
+not dump interface addresses, DNS, source filenames, internal versions or the
+whole network view. Empty interfaces have an explicit empty-list message. A
+selected route limits `show` to that route; `next` returns to all route tables.
+Incomplete drafts receive instructions for missing fields. These are configured
+Netplan `routes` entries, not DHCP/kernel-learned routes; use `execute network
+status` for live state. Legacy `gateway4`/`gateway6` fields are not imported into
+this table, and their interface remains read-only as described below.
 
 Use `delete office` in the route context to remove a route. Destination must be a canonical network CIDR; gateway must be an IP of the same address family. The route's interface must be editable under policy. Several routes and several addresses per interface are supported. Existing routes receive stable displayed names; names created in SafeTerm remain available after confirmation.
 

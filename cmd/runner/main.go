@@ -93,7 +93,10 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	var executor agent.Executor
 	switch profile.ExecutorKind {
 	case config.ExecutorProcess:
-		executor = verifiedRunner
+		executor, err = execution.NewTCPProbeExecutor(profileConfig, verifiedRunner)
+		if err != nil {
+			return err
+		}
 	case config.ExecutorSystemd:
 		controllerPath, err := executablePath(profileConfig, profile.ControllerExecutableRef)
 		if err != nil {

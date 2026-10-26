@@ -26,8 +26,9 @@ const (
 type ExecutorKind string
 
 const (
-	ExecutorProcess ExecutorKind = "process"
-	ExecutorSystemd ExecutorKind = "systemd"
+	ExecutorProcess  ExecutorKind = "process"
+	ExecutorSystemd  ExecutorKind = "systemd"
+	ExecutorTCPProbe ExecutorKind = "tcp-probe"
 )
 
 // ParameterDefinition describes one argument an Operation accepts.
@@ -70,6 +71,7 @@ type OperationDefinition struct {
 	ExecutableRef          string                      `json:"executable_ref,omitempty"`
 	ArgsTemplate           []string                    `json:"args_template,omitempty"`
 	Systemd                *SystemdOperationDefinition `json:"systemd,omitempty"`
+	TCPProbe               *TCPProbeDefinition         `json:"tcp_probe,omitempty"`
 	Parameters             []ParameterDefinition       `json:"parameters"`
 	LongRunning            bool                        `json:"long_running"`
 }
@@ -130,4 +132,9 @@ type Config struct {
 	Profiles    []ProfileDefinition
 	Roles       []RoleDefinition
 	Policies    []PolicyDefinition
+}
+
+// TCPProbeDefinition configures a single literal-IP TCP connect attempt, without application data.
+type TCPProbeDefinition struct {
+	TimeoutSeconds int `json:"timeout_seconds"`
 }

@@ -122,7 +122,7 @@ func TestConsoleRequestsCarryAuthenticatedSession(t *testing.T) {
 	}
 }
 
-func TestPingCompletionOffersCanonicalParameters(t *testing.T) {
+func TestPingCompletionOffersOnlyStandardCountFlag(t *testing.T) {
 	cfg, err := config.LoadConfig("../defaults/catalog")
 	if err != nil {
 		t.Fatal(err)
@@ -136,13 +136,14 @@ func TestPingCompletionOffersCanonicalParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ before, prefix, want string }{
-		{"execute ping ", "", "count=,host="},
-		{"execute ping host=192.168.222.10 ", "", "count="},
-		{"execute ping host=192.168.222.10 co", "co", "count="},
-		{"execute ping host=192.168.222.10 count=5 ", "", ""},
-		{"execute ping count=5 ", "", "host="},
-		{"execute ping count=", "count=", "count="},
-		{"execute ping -", "-", "-c"},
+		{"execute ping ", "", "-c"},
+		{"execute ping 192.168.222.10 ", "", "-c"},
+		{"execute ping 192.168.222.10 -", "-", "-c"},
+		{"execute ping 192.168.222.10 -c 5 ", "", ""},
+		{"execute ping -c 5 ", "", ""},
+		{"execute ping host=", "host=", ""},
+		{"execute ping co", "co", ""},
+		{"execute ping -c ", "", "1,10,100,1000,5"},
 	} {
 		if got := strings.Join(shell.completionCandidates(context.Background(), tc.before, tc.prefix), ","); got != tc.want {
 			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)

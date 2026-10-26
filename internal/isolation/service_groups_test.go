@@ -90,7 +90,14 @@ func TestGatewayBlocksOverlappingGroupsAcrossProfiles(t *testing.T) {
 }
 
 func TestGatewayRetainsServiceReservationAfterUncertainTransportFailure(t *testing.T) {
-	store, err := NewStore(testCatalog(t))
+	cfg := testCatalog(t)
+	cfg.Operations = append(cfg.Operations, config.OperationDefinition{Name: "restart_test_service", RunnerProfile: config.ProfileServiceManager, ExecutorKind: config.ExecutorSystemd, Systemd: &config.SystemdOperationDefinition{Unit: "example.service", Action: "restart"}})
+	for i := range cfg.Policies {
+		if cfg.Policies[i].Role == "service-operator" {
+			cfg.Policies[i].Operations = append(cfg.Policies[i].Operations, "restart_test_service")
+		}
+	}
+	store, err := NewStore(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +113,7 @@ func TestGatewayRetainsServiceReservationAfterUncertainTransportFailure(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	req, err := contract.NewExecutionRequest("restart_safeterm_ssh", nil, contract.Metadata{BrokerType: "ssh", UserID: "alice", ClaimedRoles: []string{"service-operator"}})
+	req, err := contract.NewExecutionRequest("restart_test_service", nil, contract.Metadata{BrokerType: "ssh", UserID: "alice", ClaimedRoles: []string{"service-operator"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +125,7 @@ func TestGatewayRetainsServiceReservationAfterUncertainTransportFailure(t *testi
 	if _, err := g.Dispatch(context.Background(), req); err == nil || calls != 1 {
 		t.Fatal("transport error not propagated")
 	}
-	if release, ok := g.serviceLocks.Acquire([]string{"safeterm-ssh-broker.service"}); ok {
+	if release, ok := g.serviceLocks.Acquire([]string{"example.service"}); ok {
 		release()
 		t.Fatal("uncertain sequence lost reservation")
 	}

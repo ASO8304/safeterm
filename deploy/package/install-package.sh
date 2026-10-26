@@ -338,7 +338,7 @@ for name in audit network-manager config-manager config-writer console gateway r
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
 cp "$payload/catalog-source/README.md" "$payload/catalog-source/README.txt" "$work/bundle/etc/safeterm/"
-cp "$payload/catalog-source/NETWORK.md" "$payload/catalog-source/NETWORK.txt" "$payload/catalog-source/network.json" "$work/bundle/etc/safeterm/"
+cp "$payload/catalog-source/NETWORK.md" "$payload/catalog-source/NETWORK.txt" "$payload/catalog-source/NETWORK-DIAGNOSTICS.md" "$payload/catalog-source/NETWORK-DIAGNOSTICS.txt" "$payload/catalog-source/network.json" "$work/bundle/etc/safeterm/"
 for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
  mkdir -p "$work/bundle/etc/safeterm/$definitions"
  cp "$payload/catalog-source/$definitions/TEMPLATE.json" "$payload/catalog-source/$definitions/README.md" "$payload/catalog-source/$definitions/README.txt" "$work/bundle/etc/safeterm/$definitions/"

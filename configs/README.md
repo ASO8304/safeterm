@@ -318,3 +318,7 @@ policies/overrides referencing removed operation IDs must be revised explicitly.
 Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See `/etc/safeterm/NETWORK.txt` (also shipped as `NETWORK.md`) for setup, examples and recovery.
 
 System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.
+
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
+
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See `NETWORK-DIAGNOSTICS.txt` for full details.

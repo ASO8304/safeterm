@@ -86,3 +86,5 @@ Output uses the alias; full systemd status and journal text are not forwarded.
 See [the installed resource guide](../configs/resources.d/README.md#service-aliases-and-ordered-groups)
 for the complete JSON example, timeouts, partial-failure behavior, exact grants,
 Audit records and concurrency limits. Single-unit definitions remain supported.
+
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.

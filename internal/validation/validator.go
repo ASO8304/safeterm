@@ -12,6 +12,7 @@ package validation
 
 import (
 	"fmt"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -52,6 +53,33 @@ func (v *Validator) Validate(req *contract.ExecutionRequest) error {
 		return fmt.Errorf("validation: unknown operation %q", req.Command)
 	}
 
+	if op.ExecutorKind == config.ExecutorTCPProbe {
+		addr, err := netip.ParseAddr(req.Arguments["host"])
+		if err != nil || addr.Zone() != "" || addr.IsUnspecified() || addr.IsMulticast() {
+			return fmt.Errorf("validation: TCP probe requires a literal unicast IP address")
+		}
+	}
+	if op.Name == "ping" {
+		ip, err := netip.ParseAddr(req.Arguments["host"])
+		if err != nil || !ip.Is4() || ip.IsUnspecified() || ip.IsMulticast() {
+			return fmt.Errorf("validation: ping requires a literal IPv4 host address")
+		}
+		count := req.Arguments["count"]
+		if count == "" {
+			for _, p := range op.Parameters {
+				if p.Name == "count" {
+					count = p.Default
+				}
+			}
+		}
+		n, err := strconv.Atoi(count)
+		if err == nil && n > 1000 {
+			return fmt.Errorf("validation: ping count exceeds maximum 1000")
+		}
+		if err != nil || n < 1 || n > 1000 {
+			return fmt.Errorf("validation: ping count must be between 1 and 1000")
+		}
+	}
 	defined := make(map[string]config.ParameterDefinition, len(op.Parameters))
 	for _, p := range op.Parameters {
 		defined[p.Name] = p

@@ -37,8 +37,10 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	}
 	if f[0] == "execute" {
 		if len(f) == 2 || (len(f) == 3 && f[2] == "?") {
-			s.writeTerminalData([]byte(strings.Join(networkActions, "  ") + "\n"))
-			return true, nil
+			return true, s.networkActionHelp(nil)
+		}
+		if len(f) > 3 && f[len(f)-1] == "?" {
+			return true, s.networkActionHelp(f[2 : len(f)-1])
 		}
 		if len(f) != 3 {
 			return true, fmt.Errorf("usage: execute network ACTION")
@@ -51,6 +53,10 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	}
 	if len(f) == 2 || (len(f) == 3 && f[2] == "?") {
 		s.writeTerminalData([]byte("interface    Addresses, DHCP, DNS and MTU\nroute        Static routes\n"))
+		return true, nil
+	}
+	if len(f) == 4 && f[3] == "?" && (f[2] == "interface" || f[2] == "route") {
+		s.networkContextHelp(f[2], false)
 		return true, nil
 	}
 	if len(f) != 3 || (f[2] != "interface" && f[2] != "route") {
@@ -74,14 +80,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		return nil
 	}
 	if f[len(f)-1] == "?" {
-		before := strings.Join(f[:len(f)-1], " ")
-		if before != "" {
-			before += " "
-		}
-		values, _ := s.networkCompletion(before, "")
-		s.writeTerminalData([]byte(strings.Join(values, "  ") + "\n"))
-		return nil
+		return s.networkEditorHelp(f[:len(f)-1])
 	}
+
 	switch f[0] {
 	case "abort", "cancel":
 		if len(f) != 1 {
@@ -109,6 +110,10 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 	case "show":
 		if len(f) != 1 {
 			break
+		}
+		if e.kind == "route" {
+			s.showNetworkRoutes(e)
+			return nil
 		}
 		var value any = e.view
 		if e.item != "" {

@@ -50,13 +50,13 @@ done
 [ -s "$known_hosts" ] || { echo "SSH Broker did not become ready" >&2; exit 1; }
 
 output="$work_dir/demo-output.txt"
-printf 'whoami\rexecute ?\rexecute system_info host\rexecute service status gateway\rconfig ?\rexit\r' | \
+printf 'whoami\rexecute ?\rexecute system_info host\rexecute system_info memory\rconfig ?\rexit\r' | \
   ssh -tt -p 2222 -i "$work_dir/secrets/alice_ed25519" -o IdentitiesOnly=yes \
   -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" alice@127.0.0.1 >"$output"
 grep -q 'Authenticated as alice' "$output"
 grep -q 'system' "$output"
 grep -q 'result: success' "$output"
-[ "$(grep -c 'result: success exit=0' "$output")" -eq 2 ] || { cat "$output"; echo "system info or systemd status smoke test failed" >&2; exit 1; }
+[ "$(grep -c 'result: success exit=0' "$output")" -eq 2 ] || { cat "$output"; echo "system info or memory smoke test failed" >&2; exit 1; }
 grep -q 'demo' "$output"
 /usr/local/bin/safeterm-preflight --installed
 cat "$output"

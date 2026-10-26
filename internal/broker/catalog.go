@@ -99,6 +99,10 @@ func (c *Catalog) AuthorizedOperation(name string, roles []string) (config.Opera
 }
 
 func cloneServiceOperation(operation config.OperationDefinition) config.OperationDefinition {
+	if operation.TCPProbe != nil {
+		copy := *operation.TCPProbe
+		operation.TCPProbe = &copy
+	}
 	if operation.Systemd != nil {
 		systemd := *operation.Systemd
 		systemd.Units = append([]string(nil), systemd.Units...)

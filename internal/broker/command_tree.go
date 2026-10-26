@@ -71,6 +71,10 @@ func (s *Shell) resolveOperation(fields []string) (config.OperationDefinition, [
 }
 
 func (s *Shell) operationTreeHelp(fields []string) error {
+	if op, args, ok := s.resolveOperation(fields); ok && positionalDiagnostic(op) {
+		s.diagnosticHelp(op, args)
+		return nil
+	}
 	row := func(name, description string) {
 		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, strings.Join(strings.Fields(description), " "))))
 	}

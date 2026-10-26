@@ -11,9 +11,11 @@ safeterm::admin> ?
 safeterm::admin> execute ?
 safeterm::admin> execute service ?
 safeterm::admin> execute service status ?
-safeterm::admin> execute service status ssh ?
-safeterm::admin> execute service status ssh
+safeterm::admin> execute service status myapp ?
+safeterm::admin> execute service status myapp
 ```
+
+Service commands appear only after an administrator registers a service in `resources.d`; `myapp` above is an example resource alias. There are no packaged service targets.
 
 A separate `?` followed by Enter lists valid choices with short descriptions.
 Tab completes commands, registered files, sections, fields and enum/boolean
@@ -130,13 +132,13 @@ Common presentation names are:
 | `execute system_info memory` | `memory_info` |
 | `execute system_info disk` | `disk_usage` |
 | `execute logs product main` | Generated resource operation with a fixed log path |
-| `execute service status ssh` | `status_safeterm_ssh` |
-| `execute service restart gateway` | `restart_safeterm_gateway` |
+| `execute service status myapp` | Generated resource operation for the registered service |
+| `execute service restart myapp` | Generated resource operation for the registered service |
 | `execute capture host=192.0.2.1` | `trace host=192.0.2.1` |
 | `execute capture port=999` | `trace port=999` |
 | `execute capture host=192.0.2.1 port=999 protocol=tcp` | `capture` with all three filters |
 
-`execute ping host=127.0.0.1 count=5` retains its familiar name.
+`execute ping 127.0.0.1 -c 5` retains its familiar name.
 The packaged nslookup and traceroute operations are removed; capture replaces trace.
 Service actions/targets appear only if their corresponding signed operations
 exist and the role is authorized. Presentation aliases do not grant permissions,
@@ -196,3 +198,5 @@ behavior stay the same. Responses display the alias, step/action and state, not
 raw systemctl output or physical unit names. An error stops the sequence without
 automatic recovery; consult the administrator and protected Audit record for
 physical-unit diagnostics. See the resource guide for group definitions.
+
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See [network diagnostics](network-diagnostics.md).

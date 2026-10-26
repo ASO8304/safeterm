@@ -272,6 +272,11 @@ func (s *Shell) readConfigValue(ctx context.Context, input <-chan byte, prompt s
 }
 
 func (s *Shell) describe(operation config.OperationDefinition) {
+	if positionalDiagnostic(operation) {
+		s.writeTerminalData([]byte(operation.Description + "\n"))
+		s.diagnosticHelp(operation, nil)
+		return
+	}
 	fmt.Fprintf(s.output, "%s: %s\r\nprofile: %s\r\nmode: %s\r\n", operation.Name, operation.Description, operation.RunnerProfile, map[bool]string{true: "stream", false: "bounded"}[operation.LongRunning])
 	if len(operation.Parameters) == 0 {
 		fmt.Fprintf(s.output, "parameters: none\r\nexample: %s\r\n", operationExample(operation))
@@ -314,6 +319,9 @@ func (s *Shell) describe(operation config.OperationDefinition) {
 }
 
 func parseOperationArguments(operation config.OperationDefinition, fields []string) (map[string]string, error) {
+	if positionalDiagnostic(operation) {
+		return parseDiagnosticArguments(operation, fields)
+	}
 	arguments := make(map[string]string, len(fields))
 	canonical := func(name string) string {
 		for _, parameter := range operation.Parameters {
@@ -387,6 +395,12 @@ func (s *Shell) writeHelp(topic string) error {
 }
 
 func operationExample(operation config.OperationDefinition) string {
+	if operation.Name == "ping" {
+		return "execute ping 192.0.2.1 -c 5"
+	}
+	if operation.Name == "telnet" {
+		return "execute telnet 192.0.2.1 443"
+	}
 	parts := append([]string{"execute"}, operationWords(operation.Name)...)
 	for _, parameter := range operation.Parameters {
 		value := "VALUE"

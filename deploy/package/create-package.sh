@@ -44,7 +44,7 @@ done
 
 cp -R "$repo_dir/internal/defaults/catalog/." "$staging/payload/catalog-source/"
 cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/payload/catalog-source/"
-cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/network.json" "$staging/payload/catalog-source/"
+cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/NETWORK-DIAGNOSTICS.md" "$repo_dir/configs/NETWORK-DIAGNOSTICS.txt" "$repo_dir/configs/network.json" "$staging/payload/catalog-source/"
 for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
   cp -R "$repo_dir/configs/$definitions" "$staging/payload/catalog-source/"
 done

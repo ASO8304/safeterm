@@ -5,6 +5,9 @@ import os
 import pty
 import select
 import signal
+import socket
+import shutil
+import subprocess
 import sys
 import time
 
@@ -59,6 +62,46 @@ try:
     expect(b'Password: ')
     os.write(fd, b'SmokeTest42\r')
     expect(b'\nsafeterm::ci-admin> ')
+    if mode == 'empty':
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen(1)
+            listener.settimeout(5)
+            result = command('execute telnet 127.0.0.1 ' + str(listener.getsockname()[1]))
+            if b'TCP port is open' not in result or b'result: success' not in result:
+                raise RuntimeError('native TCP test failed')
+            conn, _ = listener.accept()
+            with conn:
+                conn.settimeout(2)
+                if conn.recv(1) != b'':
+                    raise RuntimeError('TCP probe sent application data')
+        # Delay only this disposable loopback destination so Ctrl+C crosses the
+        # real Console -> Gateway -> Runner -> native dial cancellation path.
+        firewall = shutil.which('iptables')
+        if firewall is None:
+            raise RuntimeError('disposable TCP cancellation test requires iptables')
+        with socket.socket() as blocked:
+            blocked.bind(('127.0.0.1', 0))
+            blocked.listen(1)
+            port = str(blocked.getsockname()[1])
+            rule = ['OUTPUT', '-p', 'tcp', '-d', '127.0.0.1', '--dport', port,
+                    '--syn', '-m', 'comment', '--comment', 'safeterm-ci-cancel', '-j', 'DROP']
+            subprocess.run([firewall, '-w', '5', '-I', *rule], check=True)
+            try:
+                os.write(fd, ('execute telnet 127.0.0.1 ' + port + '\r').encode('ascii'))
+                expect(('Trying 127.0.0.1:' + port).encode('ascii'))
+                os.write(fd, b'\x03')
+                expect(b'\nsafeterm::ci-admin> ')
+                if b'user: ci-admin' not in command('whoami'):
+                    raise RuntimeError('Ctrl+C closed SafeTerm instead of only the probe')
+            finally:
+                subprocess.run([firewall, '-w', '5', '-D', *rule], check=True)
+        result = command('execute ping 127.0.0.1 -c 1')
+        if b'result: success' not in result:
+            raise RuntimeError('positional ping failed')
+        result = command('execute ?')
+        if b'Authorized service commands' in result or b'execute service ' in result:
+            raise RuntimeError('package registered implicit service commands')
     command('config ?')
     command('config')
     result = command('execute system_info disk')

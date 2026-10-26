@@ -46,7 +46,7 @@ func readTrusted(root, relative string) (File, error) {
 	if err := checkParents(root, path); err != nil {
 		return File{}, err
 	}
-	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
+	fd, err := unix.Open(path, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_CLOEXEC|unix.O_NONBLOCK, 0)
 	if err != nil {
 		return File{}, &os.PathError{Op: "open", Path: relative, Err: err}
 	}
@@ -61,8 +61,27 @@ func readTrusted(root, relative string) (File, error) {
 	if root != "/" {
 		expected = uint32(os.Geteuid())
 	}
-	if !ok || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 || st.Uid != expected || st.Nlink != 1 || info.Size() > 1<<20 {
-		return File{}, fmt.Errorf("network: %s must be a trusted single-link regular file <=1 MiB without group/world write", relative)
+	if !ok {
+		return File{}, fmt.Errorf("network: %s: cannot inspect Unix ownership/link metadata", path)
+	}
+	reasons := []string{}
+	if !info.Mode().IsRegular() {
+		reasons = append(reasons, fmt.Sprintf("type=%s; expected a regular file", info.Mode().Type()))
+	}
+	if info.Mode().Perm()&0022 != 0 {
+		reasons = append(reasons, fmt.Sprintf("mode=%04o permits group/world write; remove those write permissions", info.Mode().Perm()))
+	}
+	if st.Uid != expected {
+		reasons = append(reasons, fmt.Sprintf("owner uid=%d; expected uid=%d", st.Uid, expected))
+	}
+	if st.Nlink != 1 {
+		reasons = append(reasons, fmt.Sprintf("hard-link count=%d; expected exactly 1", st.Nlink))
+	}
+	if info.Size() > 1<<20 {
+		reasons = append(reasons, fmt.Sprintf("size=%d bytes; maximum is %d bytes", info.Size(), 1<<20))
+	}
+	if len(reasons) > 0 {
+		return File{}, fmt.Errorf("network: %s: %s", path, strings.Join(reasons, "; "))
 	}
 	data, err := io.ReadAll(io.LimitReader(file, (1<<20)+1))
 	if err != nil || len(data) > 1<<20 {
