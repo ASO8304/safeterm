@@ -24,6 +24,29 @@ cat >/etc/safeterm/resources.d/application-stack.json <<'JSON'
 {"id":"application-stack","description":"Application stack","service":{"units":["ci-chain-db.service","ci-chain-api.service","ci-chain-web.service"],"timeout_seconds":120,"actions":{"start":{"roles":["service-operator"]},"stop":{"roles":["service-operator"]},"restart":{"roles":["service-operator"]},"status":{"roles":["service-viewer"]}}}}
 JSON
 termctl check
+# A group must inspect every member, not pass an empty singular unit to
+# systemctl (whose empty-name behavior differs across systemd versions).
+python3 - <<'PY'
+import json
+from pathlib import Path
+path = Path('/etc/safeterm/resources.d/application-stack.json')
+data = json.loads(path.read_text())
+data['service']['units'].append('safeterm-ci-missing-member.service')
+path.write_text(json.dumps(data))
+PY
+if termctl check >/etc/safeterm-ci/group-check-error.log 2>&1; then
+  echo 'check accepted a missing service group member' >&2; exit 1
+fi
+grep -F 'resources.d/application-stack.json: service: units[3] "safeterm-ci-missing-member.service"' /etc/safeterm-ci/group-check-error.log
+python3 - <<'PY'
+import json
+from pathlib import Path
+path = Path('/etc/safeterm/resources.d/application-stack.json')
+data = json.loads(path.read_text())
+data['service']['units'].pop()
+path.write_text(json.dumps(data))
+PY
+termctl check
 termctl apply
 for attempt in {1..30}; do
   [[ -S /run/safeterm-gateway/gateway.sock && -S /run/safeterm-service-manager/runner.sock ]] && break

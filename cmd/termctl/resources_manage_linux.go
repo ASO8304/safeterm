@@ -380,12 +380,29 @@ func (r resourceRuntime) apply(items []resources.Named, check bool, signed strin
 }
 
 func checkResourceService(service *resources.Service) error {
-	data, err := catalogRun("/usr/bin/systemctl", "show", "--property=LoadState", "--value", service.Unit)
-	if err != nil {
+	return checkResourceServiceWith(service, catalogRun)
+}
+
+func checkResourceServiceWith(service *resources.Service, run func(string, ...string) ([]byte, error)) error {
+	if service == nil {
+		return fmt.Errorf("service definition is missing")
+	}
+	plan := config.SystemdOperationDefinition{Unit: service.Unit, Units: service.Units, TimeoutSeconds: service.TimeoutSeconds, Action: "status"}
+	if err := config.ValidateSystemdDefinition(&plan); err != nil {
 		return err
 	}
-	if strings.TrimSpace(string(data)) != "loaded" {
-		return fmt.Errorf("unit %s is not loaded (missing or masked)", service.Unit)
+	for i, unit := range plan.OrderedUnits() {
+		field := "unit"
+		if len(service.Units) > 0 {
+			field = fmt.Sprintf("units[%d]", i)
+		}
+		data, err := run("/usr/bin/systemctl", "show", "--property=LoadState", "--value", unit)
+		if err != nil {
+			return fmt.Errorf("%s %q: load-state check failed: %w", field, unit, err)
+		}
+		if state := strings.TrimSpace(string(data)); state != "loaded" {
+			return fmt.Errorf("%s %q: LoadState=%q; expected loaded (unit may be missing or masked)", field, unit, state)
+		}
 	}
 	return nil
 }
