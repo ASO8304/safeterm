@@ -44,7 +44,7 @@ func TestConsoleNeverDispatchesBeforeSuccessfulLogin(t *testing.T) {
 	gateway := &fakeGateway{}
 	var out bytes.Buffer
 	attempts := 0
-	shell, _ := NewAuthenticatedConsoleShell(gateway, catalog, strings.NewReader("alice\rbad\ralice\rbad\ralice\rbad\rexecute system\r"), &out, nil, func(context.Context, string, []byte) (Principal, time.Time, error) {
+	shell, _ := NewAuthenticatedConsoleShell(gateway, catalog, strings.NewReader("alice\rbad\ralice\rbad\ralice\rbad\rexecute system_info host\r"), &out, nil, func(context.Context, string, []byte) (Principal, time.Time, error) {
 		attempts++
 		return Principal{}, time.Time{}, errors.New("denied")
 	}, func(context.Context, Principal) error { return nil })

@@ -36,7 +36,7 @@ mkdir -p "$staging/payload/bin" "$staging/payload/catalog-source" "$staging/payl
   "$staging/payload/console" "$staging/payload/systemd" \
   "$staging/payload/templates"
 
-for entry in audit config-manager config-writer console gateway runner ssh-broker preflight termctl catalog-prepare catalog-sign password-hash identity; do
+for entry in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl catalog-prepare catalog-sign password-hash identity; do
   (cd "$repo_dir" && CGO_ENABLED=0 GOOS=linux GOARCH="$target_arch" \
     go build -trimpath -o "$staging/payload/bin/safeterm-$entry" "./cmd/$entry")
   chmod 0555 "$staging/payload/bin/safeterm-$entry"
@@ -44,6 +44,7 @@ done
 
 cp -R "$repo_dir/internal/defaults/catalog/." "$staging/payload/catalog-source/"
 cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/payload/catalog-source/"
+cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/network.json" "$staging/payload/catalog-source/"
 for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
   cp -R "$repo_dir/configs/$definitions" "$staging/payload/catalog-source/"
 done

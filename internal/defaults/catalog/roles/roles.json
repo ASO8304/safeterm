@@ -6,5 +6,7 @@
   { "name": "service-operator", "description": "Start, stop, restart, enable, or disable catalog-approved systemd services." },
   { "name": "config-viewer", "description": "Read registered non-secret configuration fields." },
   { "name": "config-operator", "description": "Validate, preview, and apply registered configuration fields." },
-  { "name": "config-approver", "description": "Independently approve protected configuration proposals." }
+  { "name": "config-approver", "description": "Independently approve protected configuration proposals." },
+ {"name":"network-viewer","description":"Inspect Netplan interfaces, routes and network candidates."},
+ {"name":"network-operator","description":"Edit allowlisted network interfaces and apply confirmed network trials."}
 ]

@@ -1,8 +1,13 @@
 #!/bin/sh
 set -eu
+# Never snapshot/replace a daemon while a network trial is awaiting confirmation.
+if [ -e /var/lib/safeterm/network/pending.json ]; then
+ echo "Network trial pending: execute network confirm or execute network rollback before installation/update/rollback" >&2
+ exit 1
+fi
 
 transaction_root=/var/backups/safeterm-installer
-units='safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
+units='safeterm-network-manager.service safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 usage() {
   echo "usage: $0 [latest|TRANSACTION_ID]" >&2

@@ -61,7 +61,7 @@ try:
     expect(b'\nsafeterm::ci-admin> ')
     command('config ?')
     command('config')
-    result = command('execute disk')
+    result = command('execute system_info disk')
     if b'result: success' not in result:
         raise RuntimeError('Gateway/Runner execution failed')
     if mode == 'logs':

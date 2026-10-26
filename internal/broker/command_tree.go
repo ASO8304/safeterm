@@ -24,11 +24,11 @@ func operationWords(name string) []string {
 	case "log":
 		return []string{"logs"}
 	case "memory_info":
-		return []string{"memory"}
+		return []string{"system_info", "memory"}
 	case "disk_usage":
-		return []string{"disk"}
+		return []string{"system_info", "disk"}
 	case "system_info":
-		return []string{"system"}
+		return []string{"system_info", "host"}
 
 	}
 	return []string{name}
@@ -90,6 +90,9 @@ func (s *Shell) operationTreeHelp(fields []string) error {
 		desc := op.Description
 		if len(path) > len(fields)+1 {
 			desc = "Authorized " + name + " commands"
+			if name == "system_info" {
+				desc = "System information: host, memory and disk"
+			}
 		}
 		row(name, desc)
 	}

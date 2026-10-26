@@ -61,6 +61,9 @@ func ValidateContextRoutes(items []ResourceSummary) error {
 			}
 		}
 		for _, path := range paths {
+			if len(path) > 0 && path[0] == "network" {
+				return fmt.Errorf("configmanager: network is reserved for typed Netplan management")
+			}
 			total++
 			if total > 4096 || len(path) == 0 || len(path) > 8 {
 				return fmt.Errorf("configmanager: excessive or invalid config routes")

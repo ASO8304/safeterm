@@ -46,6 +46,7 @@ safeterm_definition_directories: {}
 safeterm_services:
   - safeterm-audit.service
   - safeterm-config-writer.service
+  - safeterm-network-manager.service
   - safeterm-identity.service
   - safeterm-runner-diagnostics.service
   - safeterm-runner-network-observer.service

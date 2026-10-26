@@ -35,12 +35,13 @@ if find "$config_dir" "$managed_dir" -type l -print -quit | grep -q .; then
 fi
 
 mkdir -p "$staging/bin" "$staging/etc" "$staging/systemd"
-for entry in audit config-manager config-writer console gateway runner ssh-broker preflight termctl identity; do
+for entry in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl identity; do
   (cd "$repo_dir" && go build -trimpath -o "$staging/bin/safeterm-$entry" "./cmd/$entry")
   chmod 0555 "$staging/bin/safeterm-$entry"
 done
 cp -R "$config_dir" "$staging/etc/safeterm"
 cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/etc/safeterm/"
+cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/network.json" "$staging/etc/safeterm/"
 for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
  mkdir -p "$staging/etc/safeterm/$definitions"
  cp "$repo_dir/configs/$definitions/TEMPLATE.json" "$repo_dir/configs/$definitions/README.md" "$repo_dir/configs/$definitions/README.txt" "$staging/etc/safeterm/$definitions/"

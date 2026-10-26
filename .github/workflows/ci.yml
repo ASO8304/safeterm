@@ -7,6 +7,9 @@ on:
     branches: [ "main" ]
 
 jobs:
+  netplan:
+    uses: ./.github/workflows/netplan.yml
+
   verify:
     name: Build, Vet, Test
     runs-on: ubuntu-latest

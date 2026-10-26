@@ -8,9 +8,11 @@ import (
 	"sort"
 	"strings"
 
+	"encoding/json"
 	"safeterm/internal/config"
 	"safeterm/internal/configmanager"
 	"safeterm/internal/layout"
+	"safeterm/internal/networkmanager"
 	"safeterm/internal/siteconfig"
 )
 
@@ -212,6 +214,29 @@ func InstallAdministration(source, target string) error {
 			return fmt.Errorf("unsafe administrator directory %s", path)
 		}
 	}
+	policyPath := filepath.Join(target, "network.json")
+	if _, err := os.Lstat(policyPath); os.IsNotExist(err) {
+		data, readErr := os.ReadFile(filepath.Join(source, "network.json"))
+		if os.IsNotExist(readErr) {
+			data, _ = json.MarshalIndent(networkmanager.DefaultPolicy(), "", "  ")
+		} else if readErr != nil {
+			return readErr
+		}
+		var policy networkmanager.Policy
+		if err := networkmanager.DecodeJSON(data, &policy); err != nil {
+			return fmt.Errorf("network.json: %w", err)
+		}
+		if err := policy.Validate(); err != nil {
+			return err
+		}
+		if err := os.WriteFile(policyPath, append(data, '\n'), 0600); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	} else if info, err := os.Lstat(policyPath); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 {
+		return fmt.Errorf("unsafe network.json")
+	}
 	copyOne := func(name string, preserve bool, mode os.FileMode) error {
 		dst := filepath.Join(target, name)
 		if info, err := os.Lstat(dst); err == nil {
@@ -264,6 +289,15 @@ func InstallAdministration(source, target string) error {
 	}
 	if err := copyOne("trust/catalog-ed25519.pub", false, 0644); err != nil {
 		return err
+	}
+	for _, name := range []string{"NETWORK.md", "NETWORK.txt"} {
+		if _, err := os.Stat(filepath.Join(source, name)); err == nil {
+			if err = copyOne(name, false, 0644); err != nil {
+				return err
+			}
+		} else if !os.IsNotExist(err) {
+			return err
+		}
 	}
 	for _, name := range []string{"README.md", "README.txt"} {
 		if err := copyOne(name, false, 0644); err != nil {

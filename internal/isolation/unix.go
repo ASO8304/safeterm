@@ -59,6 +59,12 @@ func (p PeerPolicy) authorize(req *contract.ExecutionRequest, peer PeerIdentity)
 	return nil
 }
 
+// ListenUnixWithPeerPolicies exposes the same strict bounded unary framing with
+// per-peer identity verification; privileged typed services cannot opt into streams.
+func ListenUnixWithPeerPolicies(path string, mode os.FileMode, policies map[uint32]PeerPolicy, handler Client) (*UnixServer, error) {
+	return listenUnix(path, mode, policies, handler, nil)
+}
+
 func ListenUnix(path string, mode os.FileMode, allowedUIDs []uint32, handler Client) (*UnixServer, error) {
 	return listenUnix(path, mode, permissivePeerPolicies(allowedUIDs, false), handler, nil)
 }

@@ -12,6 +12,7 @@ import (
 	"safeterm/internal/config"
 	"safeterm/internal/contract"
 	"safeterm/internal/isolation"
+	"safeterm/internal/networkmanager"
 )
 
 const maxShellLineBytes = 4096
@@ -25,6 +26,8 @@ type GatewayClient interface {
 }
 
 type Shell struct {
+	network       networkmanager.API
+	networkEdit   *networkEditSession
 	editing       *configEditSession
 	consoleLogin  func(context.Context, string, []byte) (Principal, time.Time, error)
 	consoleLogout func(context.Context, Principal) error
@@ -174,6 +177,12 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	if line == "" {
 		return false, nil
 	}
+	if s.networkEdit != nil {
+		return false, s.networkEditor(ctx, line)
+	}
+	if handled, err := s.networkCommand(ctx, strings.Fields(line)); handled {
+		return false, err
+	}
 	if s.editing != nil {
 		return s.configEditor(ctx, line, input)
 	}
@@ -244,6 +253,9 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	}
 	switch fields[0] {
 	case "execute":
+		if s.network != nil && len(fields) == 1 {
+			s.writeTerminalData([]byte("network                  Network status, candidate and confirmed apply\n"))
+		}
 		return s.operationTreeHelp(fields[1:])
 	case "config":
 		return s.configPath(ctx, fields[1:], true)
@@ -463,6 +475,9 @@ func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 
 func (s *Shell) prompt() string {
 	context := ""
+	if e := s.networkEdit; e != nil {
+		return fmt.Sprintf("safeterm::%s(network/%s/%s)> ", s.principal.UserID, e.kind, e.item)
+	}
 	if e := s.editing; e != nil {
 		if e.logical {
 			return fmt.Sprintf("safeterm::%s(%s)> ", s.principal.UserID, strings.Join(e.path, "/"))

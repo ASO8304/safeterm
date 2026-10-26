@@ -23,6 +23,7 @@ import (
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
 	"safeterm/internal/layout"
+	"safeterm/internal/networkmanager"
 )
 
 const (
@@ -117,6 +118,11 @@ func run() error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	networkClient, err := networkmanager.NewClient(networkmanager.Socket, 0)
+	if err != nil {
+		return err
+	}
+	shell.SetNetworkClient(networkClient)
 	return shell.Run(ctx)
 }
 

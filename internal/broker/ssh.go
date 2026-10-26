@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"safeterm/internal/networkmanager"
 )
 
 var terminalPattern = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
@@ -17,6 +18,7 @@ var terminalPattern = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
 const maxSSHConnections = 128
 
 type SSHServer struct {
+	network networkmanager.API
 	address string
 	config  *ssh.ServerConfig
 	client  GatewayClient
@@ -204,6 +206,7 @@ func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requ
 						accepted = false
 						shellStarted = false
 					} else {
+						shell.SetNetworkClient(s.network)
 						go func() { shellDone <- shell.Run(ctx) }()
 					}
 				}
@@ -235,3 +238,6 @@ func validWindowChange(payload []byte) bool {
 	rows := binary.BigEndian.Uint32(payload[4:8])
 	return columns > 0 && rows > 0 && columns <= 1000 && rows <= 1000
 }
+
+// SetNetworkClient must be called before serving connections.
+func (s *SSHServer) SetNetworkClient(client networkmanager.API) { s.network = client }

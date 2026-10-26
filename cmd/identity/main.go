@@ -87,7 +87,7 @@ func run() error {
 	if e != nil {
 		return e
 	}
-	var verifiers []uint32
+	verifiers := []uint32{0}
 	for _, name := range []string{"safeterm-gateway", "safeterm-config-application", "safeterm-config-database", "safeterm-config-network"} {
 		v, e := uid(name)
 		if e != nil {

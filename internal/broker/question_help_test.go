@@ -12,7 +12,7 @@ func TestQuestionHelpListsDescriptionsWithoutExecution(t *testing.T) {
 	for _, tc := range []struct{ input, contains string }{
 		{"?", "Execute an authorized command"},
 		{"execute ?", "System information"},
-		{"execute system ?", "parameters: none"},
+		{"execute system_info host ?", "parameters: none"},
 	} {
 		var output bytes.Buffer
 		client := &fakeGateway{}

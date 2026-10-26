@@ -1,5 +1,10 @@
 #!/bin/sh
 set -eu
+# Never snapshot/replace a daemon while a network trial is awaiting confirmation.
+if [ -e /var/lib/safeterm/network/pending.json ]; then
+ echo "Network trial pending: execute network confirm or execute network rollback before installation/update/rollback" >&2
+ exit 1
+fi
 
 usage() {
   cat >&2 <<'EOF'
@@ -44,7 +49,7 @@ start_services=true
 local_key_dir=/root/.config/safeterm
 transaction_root=/var/backups/safeterm-installer
 transaction=
-units='safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
+units='safeterm-network-manager.service safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 stop_units_if_present() {
   for unit in "$@"; do
@@ -162,6 +167,7 @@ create_install_transaction() {
   replace_paths='/usr/local/bin/safeterm-audit
 /usr/local/bin/safeterm-identity
 /usr/local/bin/safeterm-config-manager
+/usr/local/bin/safeterm-network-manager
 /usr/local/bin/safeterm-config-writer
 /usr/local/bin/safeterm-console
 /usr/local/bin/safeterm-gateway
@@ -178,6 +184,7 @@ create_install_transaction() {
 /etc/safeterm
 /etc/safeterm-managed
 /etc/cat
+/etc/systemd/system/safeterm-network-manager.service
 /etc/systemd/system/safeterm-config-writer.service
 /etc/systemd/system/safeterm-config-writer.service.d
 /etc/systemd/system/safeterm-audit.service
@@ -326,11 +333,12 @@ install -m 0644 "$payload/resources.json" "$work/config/resources.json"
 
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
-for name in audit config-manager config-writer console gateway runner ssh-broker preflight termctl password-hash identity; do
+for name in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl password-hash identity; do
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
 cp "$payload/catalog-source/README.md" "$payload/catalog-source/README.txt" "$work/bundle/etc/safeterm/"
+cp "$payload/catalog-source/NETWORK.md" "$payload/catalog-source/NETWORK.txt" "$payload/catalog-source/network.json" "$work/bundle/etc/safeterm/"
 for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
  mkdir -p "$work/bundle/etc/safeterm/$definitions"
  cp "$payload/catalog-source/$definitions/TEMPLATE.json" "$payload/catalog-source/$definitions/README.md" "$payload/catalog-source/$definitions/README.txt" "$work/bundle/etc/safeterm/$definitions/"
@@ -374,6 +382,7 @@ if [ -f /etc/systemd/system/safeterm-ssh-broker.service ]; then
   stop_units_if_present safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   stop_units_if_present safeterm-gateway.service
   stop_units_if_present safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
+  stop_units_if_present safeterm-network-manager.service
   stop_units_if_present safeterm-config-writer.service
   stop_units_if_present safeterm-identity.service
   stop_units_if_present safeterm-audit.service
@@ -397,15 +406,16 @@ else
 fi
 /usr/local/bin/safeterm-preflight --installed
 if [ "$start_services" = true ]; then
-  systemctl enable safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl enable safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
   systemctl restart safeterm-config-writer.service
   systemctl restart safeterm-identity.service
+  systemctl restart safeterm-network-manager.service
   systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl restart safeterm-gateway.service
   systemctl restart safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl restart safeterm-ssh-broker.service
-  systemctl --quiet is-active safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl --quiet is-active safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 echo "SafeTerm package installation: PASS"
 # Retain one pre-install snapshot; operators never need to track IDs and

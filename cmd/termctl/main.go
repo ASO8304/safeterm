@@ -36,12 +36,13 @@ var serviceUnits = map[string]string{
 	"config-network":     "safeterm-config-manager-network.service",
 	"identity":           "safeterm-identity.service",
 	"config-writer":      "safeterm-config-writer.service",
+	"network-manager":    "safeterm-network-manager.service",
 }
 
 // serviceOrder is the dependency order used for bulk lifecycle operations.
 // Stopping and disabling use the reverse order so dependents leave first.
 var serviceOrder = []string{
-	"audit", "config-writer", "identity", "diagnostics", "network", "logs", "services", "gateway",
+	"audit", "config-writer", "identity", "network-manager", "diagnostics", "network", "logs", "services", "gateway",
 	"config-application", "config-database", "config-network", "ssh",
 }
 
@@ -865,7 +866,7 @@ func writeCompletion(out io.Writer, args []string) error {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
 	commands := "check apply defaults profile executable catalog role service config user shell update rollback uninstall completion help"
-	services := "audit config-writer identity gateway ssh diagnostics network logs services config-application config-database config-network all"
+	services := "audit config-writer identity network-manager gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
 		fmt.Fprintf(out, `_termctl_complete() {

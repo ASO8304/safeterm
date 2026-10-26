@@ -50,7 +50,7 @@ func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
 			defer cancel()
 			finished := make(chan error, 1)
 			go func() { finished <- shell.Run(ctx) }()
-			command := "execute system\r"
+			command := "execute system_info host\r"
 			if operation == "capture" {
 				command = "execute capture host=127.0.0.1 port=999\r"
 			}

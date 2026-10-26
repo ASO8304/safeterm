@@ -126,9 +126,9 @@ Common presentation names are:
 
 | Terminal command | Signed catalog operation |
 |---|---|
-| `execute system` | `system_info` |
-| `execute memory` | `memory_info` |
-| `execute disk` | `disk_usage` |
+| `execute system_info host` | `system_info` |
+| `execute system_info memory` | `memory_info` |
+| `execute system_info disk` | `disk_usage` |
 | `execute logs product main` | Generated resource operation with a fixed log path |
 | `execute service status ssh` | `status_safeterm_ssh` |
 | `execute service restart gateway` | `restart_safeterm_gateway` |

@@ -201,28 +201,25 @@ func TestRootDiscoveryUsesMinimalMenuAndConfigListsFiles(t *testing.T) {
 	}
 }
 
-func TestConflictingFriendlyOperationNamesNeverChooseArbitrarily(t *testing.T) {
-	cfg := brokerTestConfig()
-	duplicate := cfg.Operations[0]
-	duplicate.Name = "system"
-	cfg.Operations = append(cfg.Operations, duplicate)
-	cfg.Policies[0].Operations = append(cfg.Policies[0].Operations, "system")
-	catalog, err := NewCatalog(cfg)
+func TestSystemInfoGroupRequiresAuthorizedSubcommand(t *testing.T) {
+	catalog, err := NewCatalog(brokerTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
 	client := &fakeGateway{}
 	s, _ := NewShell(client, catalog, Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader(""), &bytes.Buffer{})
-	if _, err = s.executeLine(context.Background(), "execute system", nil); err == nil {
-		t.Fatal("ambiguous alias accepted")
+	if _, err = s.executeLine(context.Background(), "execute system_info", nil); err != nil {
+		t.Fatal(err)
 	}
 	if len(client.requests) != 0 {
-		t.Fatal("ambiguous alias executed")
+		t.Fatal("group dispatched without a subcommand")
 	}
-	if _, err = s.executeLine(context.Background(), "execute system_info", nil); err == nil {
-		t.Fatal("removed legacy alias accepted")
+	for _, line := range []string{"execute system", "execute memory", "execute disk"} {
+		if _, err = s.executeLine(context.Background(), line, nil); err == nil {
+			t.Fatalf("removed root command accepted: %s", line)
+		}
 	}
 	if len(client.requests) != 0 {
-		t.Fatal("legacy alias dispatched")
+		t.Fatal("removed root command dispatched")
 	}
 }

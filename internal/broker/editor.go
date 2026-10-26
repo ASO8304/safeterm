@@ -100,7 +100,7 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 				}
 				fmt.Fprint(s.output, "\r\n")
 				value := string(line)
-				if useHistory && value != "" && len(strings.Fields(value)) > 0 && strings.Fields(value)[0] != "set" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
+				if useHistory && value != "" && len(strings.Fields(value)) > 0 && strings.Fields(value)[0] != "set" && strings.Fields(value)[0] != "append" && strings.Fields(value)[0] != "unselect" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
 					s.history = append(s.history, value)
 					if len(s.history) > maxShellHistory {
 						s.history = s.history[len(s.history)-maxShellHistory:]
@@ -241,6 +241,9 @@ func matching(values []string, prefix string) []string {
 }
 
 func (s *Shell) completionCandidates(ctx context.Context, before, prefix string) []string {
+	if values, ok := s.networkCompletion(before, prefix); ok {
+		return values
+	}
 	if s.editing != nil {
 		return s.editorCompletion(before, prefix)
 	}

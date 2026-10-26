@@ -79,7 +79,7 @@ func TestDeploymentScriptsAreExecutableValidShellAndComplete(t *testing.T) {
 
 	builder := readText(t, scripts[0])
 	for _, artifact := range []string{
-		"audit config-manager config-writer console gateway runner ssh-broker preflight",
+		"audit network-manager config-manager config-writer console gateway runner ssh-broker preflight",
 		`"$staging/bin/safeterm-$entry"`,
 		"SHA256SUMS",
 	} {
@@ -279,7 +279,7 @@ func TestOperatorDemoExercisesPublicWorkflowAndReportsPass(t *testing.T) {
 	demo := readText(t, filepath.Join(repository, "deploy", "demo", "run-demo.sh"))
 	for _, required := range []string{
 		"ssh-keygen", "ssh-keyscan", "StrictHostKeyChecking=yes",
-		"whoami", "execute ?", "execute system", "config ?",
+		"whoami", "execute ?", "execute system_info host", "config ?",
 		"result: success", "safeterm-preflight --installed",
 		"SafeTerm end-to-end demo: PASS",
 	} {

@@ -193,7 +193,7 @@ func Prepare(base *config.Config, input Inputs) (*config.Config, error) {
 	seen = map[string]bool{}
 	for _, n := range input.Operations {
 		o := n.Value.Operation
-		if !validName(o.Name) || seen[o.Name] || strings.HasPrefix(o.Name, "resource_") {
+		if !validName(o.Name) || seen[o.Name] || strings.HasPrefix(o.Name, "resource_") || o.Name == "network" || strings.HasPrefix(o.Name, "network_") {
 			return nil, fmt.Errorf("%s: invalid, reserved or duplicate operation", n.File)
 		}
 		seen[o.Name] = true

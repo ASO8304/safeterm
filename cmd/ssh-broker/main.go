@@ -18,6 +18,7 @@ import (
 	"safeterm/internal/integrity"
 	"safeterm/internal/isolation"
 	"safeterm/internal/layout"
+	"safeterm/internal/networkmanager"
 )
 
 func main() {
@@ -107,6 +108,12 @@ func run(configDir, listenAddress, hostKeyPath, identitiesPath, gatewaySocket, g
 	if err != nil {
 		return err
 	}
+	networkClient, err := networkmanager.NewClient(networkmanager.Socket, 0)
+	if err != nil {
+		return err
+	}
+	server.SetNetworkClient(networkClient)
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return server.Serve(ctx)

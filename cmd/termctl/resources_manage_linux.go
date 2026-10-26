@@ -17,6 +17,7 @@ import (
 	"safeterm/internal/configmanager"
 	"safeterm/internal/integrity"
 	"safeterm/internal/layout"
+	"safeterm/internal/networkmanager"
 	"safeterm/internal/resources"
 	"safeterm/internal/siteconfig"
 )
@@ -134,6 +135,9 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 		return fmt.Errorf("interrupted activation: run sudo termctl apply --recover")
 	} else if !os.IsNotExist(err) {
 		return err
+	}
+	if _, err := networkmanager.ReadPolicy("/"); err != nil {
+		return fmt.Errorf("network.json: %w", err)
 	}
 	if action == "initialize" {
 		// The installer has staged verified package defaults; identities may already

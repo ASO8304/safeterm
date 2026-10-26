@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "interfaces": [],
+  "files": [],
+  "read_roles": [
+    "netops",
+    "network-viewer",
+    "network-operator"
+  ],
+  "edit_roles": [
+    "netops",
+    "network-operator"
+  ],
+  "confirm_seconds": 120,
+  "allow_generated_files": false
+}

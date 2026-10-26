@@ -417,3 +417,9 @@ is the public execute service name; service.unit maps one unit and service.units
 lists a group's members in startup order. Group restart stops in reverse order
 then starts forward, with exact signed grants and per-step Audit records. See
 [service resource definitions](docs/resource-definitions.md#service-aliases-and-ordered-groups).
+
+## Ubuntu Server 24.04 network management
+
+Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See [the network guide](docs/network-configuration.md) for setup, examples and recovery.
+
+System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.

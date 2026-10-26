@@ -1,5 +1,10 @@
 #!/bin/sh
 set -eu
+# Never snapshot/replace a daemon while a network trial is awaiting confirmation.
+if [ -e /var/lib/safeterm/network/pending.json ]; then
+ echo "Network trial pending: execute network confirm or execute network rollback before installation/update/rollback" >&2
+ exit 1
+fi
 
 usage() {
   echo "usage: $0 --bundle DIR [--dry-run] [--no-start]" >&2
@@ -140,14 +145,15 @@ if [ "$start_services" = true ]; then
   /usr/local/bin/safeterm-preflight --installed
 fi
 if [ "$start_services" = true ]; then
-  systemctl enable safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl enable safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
   systemctl restart safeterm-config-writer.service
   systemctl restart safeterm-identity.service
+  systemctl restart safeterm-network-manager.service
   systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl restart safeterm-gateway.service
   systemctl restart safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl restart safeterm-ssh-broker.service
-  systemctl --quiet is-active safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl --quiet is-active safeterm-network-manager.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 echo "SafeTerm installation: PASS"

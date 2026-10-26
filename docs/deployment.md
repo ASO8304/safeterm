@@ -88,7 +88,7 @@ Connect with an authorized key:
 ssh -t -p 2222 alice@HOST
 ```
 
-Inside the restricted terminal, run `whoami`, `list`, `execute system_info`, and
+Inside the restricted terminal, run `whoami`, `list`, `execute system_info host`, and
 `config list`. Long-running `trace` output can be stopped with Ctrl+C, which
 maps to the semantic terminate protocol.
 

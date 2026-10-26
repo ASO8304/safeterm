@@ -312,3 +312,9 @@ service separately. The root show command is removed; show inside configuration
 contexts remains available. Capture replaces trace; packaged nslookup/traceroute
 operations and their installation dependencies have been removed. Administrator
 policies/overrides referencing removed operation IDs must be revised explicitly.
+
+## Ubuntu Server 24.04 network management
+
+Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See `/etc/safeterm/NETWORK.txt` (also shipped as `NETWORK.md`) for setup, examples and recovery.
+
+System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.

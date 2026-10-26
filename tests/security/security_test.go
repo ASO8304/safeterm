@@ -96,7 +96,7 @@ func TestProductionSourceCannotIntroduceAnotherProcessOrShellBoundary(t *testing
 		}
 		for _, spec := range file.Imports {
 			value, _ := strconv.Unquote(spec.Path.Value)
-			trustedProcessBoundary := strings.HasPrefix(filepath.ToSlash(relative), "internal/execution/") || filepath.ToSlash(relative) == "cmd/termctl/main.go"
+			trustedProcessBoundary := strings.HasPrefix(filepath.ToSlash(relative), "internal/execution/") || (filepath.ToSlash(relative) == "cmd/termctl/main.go" || filepath.ToSlash(relative) == "internal/networkmanager/backend_linux.go")
 			if value == "os/exec" && !trustedProcessBoundary {
 				t.Errorf("production os/exec import outside Runner: %s", relative)
 			}
@@ -104,7 +104,7 @@ func TestProductionSourceCannotIntroduceAnotherProcessOrShellBoundary(t *testing
 		ast.Inspect(file, func(node ast.Node) bool {
 			if call, ok := node.(*ast.CallExpr); ok {
 				if selector, ok := call.Fun.(*ast.SelectorExpr); ok {
-					if identifier, ok := selector.X.(*ast.Ident); ok && identifier.Name == "exec" && (selector.Sel.Name == "Command" || selector.Sel.Name == "CommandContext") && filepath.ToSlash(relative) != "internal/execution/runner.go" && filepath.ToSlash(relative) != "cmd/termctl/main.go" {
+					if identifier, ok := selector.X.(*ast.Ident); ok && identifier.Name == "exec" && (selector.Sel.Name == "Command" || selector.Sel.Name == "CommandContext") && filepath.ToSlash(relative) != "internal/execution/runner.go" && filepath.ToSlash(relative) != "cmd/termctl/main.go" && filepath.ToSlash(relative) != "internal/networkmanager/backend_linux.go" {
 						t.Errorf("process creation outside bounded Runner: %s", relative)
 					}
 				}
@@ -176,6 +176,9 @@ func TestDeployedServicesRetainExplicitResourceAndPrivilegeBounds(t *testing.T) 
 		}
 		if entry.Name() == "safeterm-config-writer.service" {
 			expectedBounding = "CAP_CHOWN CAP_FOWNER CAP_DAC_READ_SEARCH"
+		}
+		if entry.Name() == "safeterm-network-manager.service" {
+			expectedBounding = "CAP_NET_ADMIN CAP_NET_RAW CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_CHOWN CAP_FOWNER"
 		}
 		if privilegedController {
 			expectedBounding = "CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE"

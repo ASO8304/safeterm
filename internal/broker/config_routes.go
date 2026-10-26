@@ -47,6 +47,9 @@ func (s *Shell) configRoutes(ctx context.Context) ([]configRoute, error) {
 
 func (s *Shell) configPath(ctx context.Context, path []string, help bool) error {
 	routes, err := s.configRoutes(ctx)
+	if s.network != nil && len(path) == 0 {
+		s.writeTerminalData([]byte("network                  Interfaces and routes; use config network ?\n"))
+	}
 	if err != nil {
 		return err
 	}

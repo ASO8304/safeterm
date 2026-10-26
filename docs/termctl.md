@@ -109,3 +109,9 @@ bounds. `termctl defaults TYPE NAME` prints an editable packaged default.
 `termctl executable hash PATH` provide discovery and digest inspection. All new
 sources share check/apply/recovery and shell completion. `termctl service ...`
 also accepts site-NAME for a provisioned Runner.
+
+## Ubuntu Server 24.04 network management
+
+Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See [the network guide](network-configuration.md) for setup, examples and recovery.
+
+System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.
