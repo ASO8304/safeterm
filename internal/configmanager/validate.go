@@ -20,6 +20,30 @@ func normalizeValue(field FieldSchema, candidate string) (any, string, error) {
 		return nil, "", fmt.Errorf("configmanager: field %q.%q is required", field.Section, field.Key)
 	}
 	switch field.Type {
+	case FieldList:
+		if err := validateTextConstraints(field, candidate); err != nil {
+			return nil, "", err
+		}
+		if field.Separator != "," || field.ItemType == "" || field.ItemType == FieldList {
+			return nil, "", fmt.Errorf("configmanager: invalid list schema")
+		}
+		items := strings.Split(candidate, field.Separator)
+		if field.MinItems != nil && len(items) < *field.MinItems {
+			return nil, "", fmt.Errorf("configmanager: field %q.%q needs at least %d items; got %d", field.Section, field.Key, *field.MinItems, len(items))
+		}
+		if field.MaxItems != nil && len(items) > *field.MaxItems {
+			return nil, "", fmt.Errorf("configmanager: field %q.%q accepts at most %d items; got %d", field.Section, field.Key, *field.MaxItems, len(items))
+		}
+		for i, item := range items {
+			if item == "" || strings.TrimSpace(item) != item {
+				return nil, "", fmt.Errorf("configmanager: field %q.%q list item %d is empty or has surrounding whitespace", field.Section, field.Key, i+1)
+			}
+			if _, _, err := normalizeValue(FieldSchema{Section: field.Section, Key: field.Key, Type: field.ItemType}, item); err != nil {
+				return nil, "", fmt.Errorf("configmanager: list item %d: %w", i+1, err)
+			}
+		}
+		return candidate, candidate, nil
+
 	case FieldInteger, FieldPort:
 		value, err := strconv.ParseInt(strings.TrimSpace(candidate), 10, 64)
 		if err != nil {
@@ -221,6 +245,15 @@ func validateCompleteDocument(resource Resource, document document) error {
 
 func fieldValidationError(resource Resource, field FieldSchema, state string, cause error) error {
 	bounds := ""
+	if field.Type == FieldList {
+		bounds = fmt.Sprintf(", item_type=%s, separator=%q", field.ItemType, field.Separator)
+		if field.MinItems != nil {
+			bounds += fmt.Sprintf(", min_items=%d", *field.MinItems)
+		}
+		if field.MaxItems != nil {
+			bounds += fmt.Sprintf(", max_items=%d", *field.MaxItems)
+		}
+	}
 	if field.Type == FieldPort {
 		bounds = ", range=1..65535"
 	}

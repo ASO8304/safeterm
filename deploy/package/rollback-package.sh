@@ -34,6 +34,8 @@ transaction="$transaction_root/$transaction_id"
 (cd "$transaction" && sha256sum -c SNAPSHOT-SHA256SUMS)
 
 # Validate every removal path before stopping services or deleting files.
+# /etc/safeterm-managed is accepted only for historical transaction manifests;
+# new installations no longer create or snapshot that legacy demo root.
 while IFS= read -r path; do
   case "$path" in
     /etc/systemd/system/safeterm-gateway.service.d/60-site-runners.conf|/etc/systemd/system/safeterm-config-writer.service.d|/usr/share/safeterm/defaults|/usr/share/bash-completion/completions/termctl|/usr/local/bin/termctl|/usr/local/sbin/safeterm-uninstall) ;;

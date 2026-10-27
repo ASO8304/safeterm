@@ -158,6 +158,11 @@ try:
             raise RuntimeError('physical field name exposed instead of alias')
         command('set Value_1\t1400', b'\nsafeterm::ci-admin(tunnel)> ')
         command('set Value_2 443', b'\nsafeterm::ci-admin(tunnel)> ')
+        os.write(fd, b'set pat-ips 192.0.2.1,999.1.1.1\r')
+        rejected = expect(b'\nsafeterm::ci-admin(tunnel)> ')
+        if b'error:' not in rejected or b'list item 2' not in rejected:
+            raise RuntimeError('invalid IPv4 list item was not rejected')
+        command('set pat-i\t192.168.222.10,10.20.30.40', b'\nsafeterm::ci-admin(tunnel)> ')
         result = command('diff', b'\nsafeterm::ci-admin(tunnel)> ')
         if b'Value_1: 1360 -> 1400' not in result:
             raise RuntimeError('alias diff missing')

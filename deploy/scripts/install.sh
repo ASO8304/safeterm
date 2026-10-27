@@ -63,7 +63,6 @@ SafeTerm deployment plan
   binaries:     /usr/local/bin/safeterm-*
   configuration:/etc/safeterm
   units:        /etc/systemd/system/safeterm-*.service
-  managed data: /etc/safeterm-managed
   start:        $start_services
 EOF
 [ "$dry_run" = false ] || { echo "Dry run: PASS"; exit 0; }
@@ -117,7 +116,6 @@ chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
 chown root:safeterm-identity /etc/safeterm/console/users.json
 chmod 0640 /etc/safeterm/console/users.json
 
-[ -d /etc/safeterm-managed ] || install -d -o root -g root -m 0755 /etc/safeterm-managed
 managed_plan="$work/managed-plan"
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --managed-plan >"$managed_plan"
 tab=$(printf '\t')

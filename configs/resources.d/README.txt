@@ -162,7 +162,7 @@ Inside SSH or Console:
     diff
     end
 
-Field types: string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr, ip_port.
+Field types: list, string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr, ip_port.
 Existing typed field schema
 options remain supported: required, allow_empty, secret, read_only, enum, min/max,
 min_length/max_length, pattern and path policy. Section and key names match the
@@ -479,3 +479,50 @@ with existing accepted/completed outcomes and the initiating request id. This
 keeps the V1 audit envelope readable by older package binaries during rollback.
 
 Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
+
+### Typed comma-separated lists
+
+Use `list` for a string containing one or more typed items:
+
+```json
+{
+  "name": "pat-ips",
+  "section": "Sultan",
+  "key": "PATIP",
+  "type": "list",
+  "item_type": "ipv4",
+  "separator": ",",
+  "required": true,
+  "allow_empty": false,
+  "min_items": 1,
+  "max_items": 100
+}
+```
+
+For example: `PATIP = 192.168.222.10,10.20.30.40`.
+In a logical context named `tunnel`, edit it with:
+
+```text
+config tunnel
+set pat-ips 192.168.222.10,10.20.30.40
+diff
+end
+```
+
+Put this field inside the context's `fields` array. Set `section` to the real
+INI section name (use `""` only for a key outside sections). `name` is the CLI
+alias; `key` is the physical INI key. Activate schema changes with
+`sudo termctl check` followed by `sudo termctl apply` and reconnect.
+Every item is validated independently. Leading/trailing commas, empty items,
+and surrounding item whitespace are rejected. The value remains a string in
+INI and JSON; order and spelling are preserved. Duplicates are allowed.
+`separator` must explicitly be `","`. Supported `item_type` values are
+`string`, `integer`, `port`, `boolean`, `ipv4`, `ipv6`, `ip`, `cidr`, and
+`ip_port`. Nested lists, enum and path items are unsupported. `min_items` and
+`max_items` are optional positive bounds. Without bounds at least one item is
+required. `allow_empty: true` permits an entirely empty value and bypasses those
+bounds, as with scalar fields. `pattern` and length constraints apply to the
+whole string. List options are rejected on scalar fields.
+`pattern` uses Go regular expressions; it does not expand `{ipv4}` into a type
+validator. Use `list` with `item_type: "ipv4"` instead of duplicating IPv4 syntax
+in a regex. Validation errors identify the failing item by its one-based position.

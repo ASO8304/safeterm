@@ -77,6 +77,19 @@
             "type": "ipv4",
             "required": true,
             "allow_empty": false
+          },
+          {
+            "name": "pat-ips",
+            "section": "Server",
+            "key": "PATIP",
+            "description": "Comma-separated IPv4 addresses; adapt to the real file",
+            "type": "list",
+            "item_type": "ipv4",
+            "separator": ",",
+            "required": false,
+            "allow_empty": true,
+            "min_items": 1,
+            "max_items": 100
           }
         ]
       }

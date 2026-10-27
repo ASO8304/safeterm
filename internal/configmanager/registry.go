@@ -172,7 +172,21 @@ func validateFields(resource Resource) error {
 			return fmt.Errorf("configmanager: resource %q has duplicate field %q.%q", resource.ID, field.Section, field.Key)
 		}
 		seen[coordinate] = true
+
+		if field.Type != FieldList && (field.ItemType != "" || field.Separator != "" || field.MinItems != nil || field.MaxItems != nil) {
+			return invalidField(resource, *field)
+		}
 		switch field.Type {
+		case FieldList:
+			switch field.ItemType {
+			case FieldString, FieldInteger, FieldPort, FieldBoolean, FieldIPv4, FieldIPv6, FieldIP, FieldCIDR, FieldIPPort:
+			default:
+				return invalidField(resource, *field)
+			}
+			if field.Separator != "," || field.MinItems != nil && *field.MinItems < 1 || field.MaxItems != nil && *field.MaxItems < 1 || field.MinItems != nil && field.MaxItems != nil && *field.MinItems > *field.MaxItems || len(field.Enum) != 0 || field.Min != nil || field.Max != nil || field.Path != nil {
+				return invalidField(resource, *field)
+			}
+
 		case FieldString, FieldIPv4, FieldIPv6, FieldIP, FieldCIDR, FieldIPPort:
 			if len(field.Enum) != 0 || field.Min != nil || field.Max != nil || field.Path != nil {
 				return invalidField(resource, *field)

@@ -223,3 +223,16 @@ func TestCompileLogicalContextsAndNames(t *testing.T) {
 		}
 	}
 }
+
+func TestCompileListField(t *testing.T) {
+	base, _ := compilerFixture(t)
+	item := parseTest(t, `{"id":"jungle","description":"IP list","config":{"path":"/etc/jungle/settings.ini","format":"ini","permissions":{"read":["config-viewer"],"edit":["config-operator"]},"fields":[{"section":"","key":"PATIP","type":"list","item_type":"ipv4","separator":",","min_items":1,"max_items":10}]}}`)
+	_, registry, _, err := Compile(base, []Named{item})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := registry.Resources[0].Fields[0]
+	if f.Type != configmanager.FieldList || f.ItemType != configmanager.FieldIPv4 || f.Separator != "," || f.MinItems == nil || *f.MinItems != 1 || f.MaxItems == nil || *f.MaxItems != 10 {
+		t.Fatalf("list metadata lost: %+v", f)
+	}
+}

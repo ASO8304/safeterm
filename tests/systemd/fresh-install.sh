@@ -20,10 +20,8 @@ printf 'SmokeTest42\n' | "$package/payload/bin/safeterm-password-hash" --stdin -
 "$package/install.sh" --local-signing --non-interactive --install-dependencies \
   --ssh-user ci-admin --ssh-password-hash-file "$work/password.hash"
 termctl user add console --id ci-admin --roles viewer,netops,log-viewer,service-viewer,service-operator,config-viewer,config-operator --password-hash-file "$work/password.hash"
-# These demo directories must not be required, or manufactured as a workaround.
-for profile in application database network; do
-  [[ ! -e /etc/safeterm-managed/$profile ]]
-done
+# The legacy demo root must not be manufactured on a fresh installation.
+[[ ! -e /etc/safeterm-managed ]]
 wait_ready() {
   for attempt in {1..30}; do
     ready=true
@@ -52,10 +50,10 @@ printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 9090 ; keep commen
 cmp "$work/expected.ini" /etc/safeterm-ci/options.ini
 [[ $(stat -c '%U:%G %a' /etc/safeterm-ci/options.ini) == 'root:root 644' ]]
 # Logical field aliases share one root-owned file and use the real writer.
-printf '\357\273\277; logical comment\n[Tunnel]\nTCPMSS = 1360 ; keep\n[Cat]\nPort_2 = 2420\nEnabled = true\n' >/etc/safeterm-ci/logical.ini
+printf '\357\273\277; logical comment\n[Tunnel]\nTCPMSS = 1360 ; keep\nPATIP = 192.0.2.1 ; retain IP comment\n[Cat]\nPort_2 = 2420\nEnabled = true\n' >/etc/safeterm-ci/logical.ini
 chmod 0644 /etc/safeterm-ci/logical.ini
 cat >/etc/safeterm/resources.d/logical-options.json <<'JSON'
-{"id":"network-settings","description":"Logical settings","service":{"unit":"safeterm-audit.service","actions":{"restart":{"roles":["service-operator"]}}},"config":{"path":"/etc/safeterm-ci/logical.ini","format":"ini","permissions":{"read":["config-viewer","config-operator"],"edit":["config-operator"]},"contexts":[{"path":["tunnel"],"fields":[{"name":"Value_1","section":"Tunnel","key":"TCPMSS","type":"integer","min":1,"max":65535},{"name":"Value_2","section":"Cat","key":"Port_2","type":"port"}]},{"path":["application","cat"],"fields":[{"name":"enabled","section":"Cat","key":"Enabled","type":"boolean"}]}]}}
+{"id":"network-settings","description":"Logical settings","service":{"unit":"safeterm-audit.service","actions":{"restart":{"roles":["service-operator"]}}},"config":{"path":"/etc/safeterm-ci/logical.ini","format":"ini","permissions":{"read":["config-viewer","config-operator"],"edit":["config-operator"]},"contexts":[{"path":["tunnel"],"fields":[{"name":"Value_1","section":"Tunnel","key":"TCPMSS","type":"integer","min":1,"max":65535},{"name":"Value_2","section":"Cat","key":"Port_2","type":"port"},{"name":"pat-ips","section":"Tunnel","key":"PATIP","type":"list","item_type":"ipv4","separator":",","required":true,"min_items":1,"max_items":4}]},{"path":["application","cat"],"fields":[{"name":"enabled","section":"Cat","key":"Enabled","type":"boolean"}]}]}}
 JSON
 termctl check
 termctl apply
@@ -63,7 +61,7 @@ wait_ready
 audit_pid_before=$(systemctl show -p MainPID --value safeterm-audit.service)
 python3 "$repo/tests/systemd/console-smoke.py" logical
 [[ $(systemctl show -p MainPID --value safeterm-audit.service) == "$audit_pid_before" ]]
-printf '\357\273\277; logical comment\n[Tunnel]\nTCPMSS = 1400 ; keep\n[Cat]\nPort_2 = 443\nEnabled = false\n' >"$work/expected-logical.ini"
+printf '\357\273\277; logical comment\n[Tunnel]\nTCPMSS = 1400 ; keep\nPATIP = 192.168.222.10,10.20.30.40 ; retain IP comment\n[Cat]\nPort_2 = 443\nEnabled = false\n' >"$work/expected-logical.ini"
 cmp "$work/expected-logical.ini" /etc/safeterm-ci/logical.ini
 [[ $(stat -c '%U:%G %a' /etc/safeterm-ci/logical.ini) == 'root:root 644' ]]
 # Exercise the real production access probe before and after a permissions failure.

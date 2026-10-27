@@ -21,6 +21,7 @@ const (
 type FieldType string
 
 const (
+	FieldList    FieldType = "list"
 	FieldString  FieldType = "string"
 	FieldInteger FieldType = "integer"
 	FieldPort    FieldType = "port"
@@ -69,6 +70,10 @@ type PathPolicy struct {
 }
 
 type FieldSchema struct {
+	ItemType    FieldType   `json:"item_type,omitempty"`
+	Separator   string      `json:"separator,omitempty"`
+	MinItems    *int        `json:"min_items,omitempty"`
+	MaxItems    *int        `json:"max_items,omitempty"`
 	Description string      `json:"description,omitempty"`
 	Section     string      `json:"section"`
 	Key         string      `json:"key"`
@@ -147,6 +152,10 @@ type FieldAlias struct {
 }
 
 type FieldDescription struct {
+	ItemType    FieldType `json:"item_type,omitempty"`
+	Separator   string    `json:"separator,omitempty"`
+	MinItems    *int      `json:"min_items,omitempty"`
+	MaxItems    *int      `json:"max_items,omitempty"`
 	Description string    `json:"description,omitempty"`
 	Section     string    `json:"section"`
 	Key         string    `json:"key"`

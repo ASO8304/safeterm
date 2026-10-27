@@ -182,7 +182,6 @@ create_install_transaction() {
 /usr/local/sbin/safeterm-install-rollback
 /usr/local/sbin/safeterm-uninstall
 /etc/safeterm
-/etc/safeterm-managed
 /etc/cat
 /etc/systemd/system/safeterm-network-manager.service
 /etc/systemd/system/safeterm-config-writer.service

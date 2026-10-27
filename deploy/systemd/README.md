@@ -140,6 +140,8 @@ mounts and need no legacy /etc/safeterm-managed directories. Empty profiles are
 valid. File updates go exclusively through the restricted root writer, whose
 sandbox is generated from administrator definitions and preserves application
 ownership, ACLs, UTF-8 BOM and INI comments. Do not create/chown dummy directories.
+Fresh installations do not create `/etc/safeterm-managed`. Existing directories
+and files are left intact; registered files use their explicit resource paths.
 
 Use resources.d for configuration files and site JSON directories for roles,
 operations, executable approvals, policies and Runner profiles. Apply provisions

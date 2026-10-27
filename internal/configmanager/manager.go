@@ -145,6 +145,7 @@ func (m *Manager) Describe(ctx context.Context, actor Actor, resourceID string) 
 	fields := make([]FieldDescription, 0, len(resource.Fields))
 	for _, field := range resource.Fields {
 		fields = append(fields, FieldDescription{
+			ItemType: field.ItemType, Separator: field.Separator, MinItems: cloneInt(field.MinItems), MaxItems: cloneInt(field.MaxItems),
 			Description: field.Description, Section: field.Section, Key: field.Key, Type: field.Type, Required: field.Required, AllowEmpty: field.AllowEmpty,
 			Secret: field.Secret, ReadOnly: field.ReadOnly, Enum: append([]string(nil), field.Enum...), Min: cloneInt64(field.Min),
 			Max: cloneInt64(field.Max), MinLength: cloneInt(field.MinLength), MaxLength: cloneInt(field.MaxLength), Pattern: field.Pattern,
