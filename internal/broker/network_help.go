@@ -16,7 +16,7 @@ var networkActionDescriptions = map[string]string{
 }
 var networkEditorDescriptions = map[string]string{
 	"edit":     "Select an interface or named route to edit",
-	"show":     "Show the candidate for the selected item, or the whole network view",
+	"show":     "Show a compact interface table; edit NAME then show for addresses, DNS, MTU and source files",
 	"diff":     "Show edits staged in this editor session",
 	"set":      "Replace a field value or its entire list in the editor",
 	"append":   "Add values to a list without removing existing entries",

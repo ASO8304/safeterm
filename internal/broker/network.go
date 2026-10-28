@@ -151,16 +151,7 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 			s.showNetworkRoutes(e)
 			return nil
 		}
-		var value any = e.view
-		if e.item != "" {
-			if e.kind == "interface" {
-				value = e.view.Interfaces[e.item]
-			} else {
-				value = e.view.Routes[e.item]
-			}
-		}
-		data, _ := json.MarshalIndent(value, "", "  ")
-		s.writeTerminalData(append(data, '\n'))
+		s.showNetworkInterfaces(e)
 		return nil
 	case "diff":
 		if len(f) != 1 {

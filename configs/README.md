@@ -26,6 +26,10 @@ you are leaving and shows its parent menu. `next` keeps staged item edits.
 Manage credentials with
 `sudo termctl user`; preserve their existing roles when changing them.
 
+`show` in the network interface editor displays a compact table; use `edit NAME`
+and `show` for one interface's details. Editing access is separate from live link
+state.
+
 Network policy starts with no editable interfaces. Add exact device names to
 `network/policy.json` as root. Reopen the SafeTerm network editor after changing
 policy. `end` saves a network candidate; `execute network apply` starts a timed

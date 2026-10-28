@@ -65,6 +65,13 @@ try:
     if b'Show available commands' not in login_menu or b'Show your identity and roles' not in login_menu:
         raise RuntimeError('login did not show the command menu')
     if mode == 'empty':
+        command('config network interface', b'\nsafeterm::ci-admin(network/interface)> ')
+        interfaces = command('show', b'\nsafeterm::ci-admin(network/interface)> ')
+        if b'Interfaces (configuration draft)' not in interfaces:
+            raise RuntimeError('network interface summary missing')
+        if b'\"interfaces\"' in interfaces or b'\"pending\"' in interfaces or b'\"version\"' in interfaces:
+            raise RuntimeError('network summary exposed protocol JSON')
+        command('abort')
         with socket.socket() as listener:
             listener.bind(('127.0.0.1', 0))
             listener.listen(1)
