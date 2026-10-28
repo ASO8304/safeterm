@@ -46,6 +46,45 @@ func discoverTest(t *testing.T, root string, p Policy) *Snapshot {
 	}
 	return s
 }
+func TestInterfacePolicyDenialExplainsAdministratorFix(t *testing.T) {
+	root, p := testTree(t)
+	p.Interfaces = nil
+	s := discoverTest(t, root, p)
+	change := Change{Kind: "interface", Name: "ens19", Field: "addresses", Action: "append", Values: []string{"192.168.222.11/24"}}
+	_, err := Modify(s.View, []Change{change})
+	if err == nil {
+		t.Fatal("unlisted interface was editable")
+	}
+	for _, want := range []string{"outside administrator policy", `"ens19"`, PolicyPath, "reopen config network interface"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("missing remediation %q: %v", want, err)
+		}
+	}
+	// A newly opened view uses the changed policy; the previous view stays denied.
+	p.Interfaces = []string{"ens19"}
+	if _, err := Modify(discoverTest(t, root, p).View, []Change{change}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Modify(s.View, []Change{change}); err == nil {
+		t.Fatal("cached view silently gained access")
+	}
+}
+
+func TestReadPolicyUsesGroupedAdministratorPath(t *testing.T) {
+	root, p := testTree(t)
+	if err := os.Mkdir(filepath.Join(root, "etc/safeterm/network"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeTest(t, root, "etc/safeterm/network/policy.json", string(data))
+	got, err := ReadPolicy(root)
+	if err != nil || len(got.Interfaces) != 1 || got.Interfaces[0] != "ens19" {
+		t.Fatalf("grouped policy not loaded: %+v %v", got, err)
+	}
+}
 func TestDiscoverAndPatchArbitraryFilename(t *testing.T) {
 	root, p := testTree(t)
 	s := discoverTest(t, root, p)

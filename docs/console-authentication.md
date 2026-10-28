@@ -31,7 +31,7 @@ sequenceDiagram
 
 Gateway routes accepted operations to the existing isolated Runners. Identity
 never executes commands or edits application configuration. The existing SSH
-Broker keeps its own authentication and `/etc/safeterm/ssh/users.json`; creating
+Broker keeps its own authentication and `/etc/safeterm/access/ssh/users.json`; creating
 an SSH user does not create a Console user, even when their names are equal.
 
 ## Provisioning and login
@@ -111,7 +111,7 @@ boundaries. SSH remains available according to its independent configuration.
 
 ## Credential and session boundaries
 
-- `/etc/safeterm/console/users.json` is root:safeterm-identity mode 0640. Its
+- `/etc/safeterm/access/console/users.json` is root:safeterm-identity mode 0640. Its
   parent directories must be root-owned and not group/world-writable. The
   shared account must never join the `safeterm-identity` group. Identity refuses
   unsafe credential ownership, extended credential ACLs or entry-account group membership at startup; reads reject symbolic/hard links,
@@ -162,7 +162,7 @@ requests, while the other session continues. Check that the shared account
 cannot read the credential file and that no per-person account was created:
 
 ```sh
-sudo -u safeterm test ! -r /etc/safeterm/console/users.json
+sudo -u safeterm test ! -r /etc/safeterm/access/console/users.json
 getent passwd alice   # no output unless an unrelated account already existed
 sudo journalctl -u safeterm-identity --no-pager -n 25
 ```

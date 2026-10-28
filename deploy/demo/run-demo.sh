@@ -18,14 +18,14 @@ mkdir -p "$work_dir/bin" "$work_dir/secrets"
 "$work_dir/bin/catalog-sign" -generate-key -private-key "$work_dir/secrets/catalog.key" -public-key "$work_dir/config/trust/catalog-ed25519.pub"
 "$work_dir/bin/catalog-sign" -config "$work_dir/config" -private-key "$work_dir/secrets/catalog.key" -signature "$work_dir/config/catalog.sig"
 
-mkdir -p "$work_dir/config/ssh" "$work_dir/config/console"
-ssh-keygen -q -t ed25519 -N '' -f "$work_dir/config/ssh/ssh_host_ed25519_key"
+mkdir -p "$work_dir/config/access/ssh" "$work_dir/config/access/console"
+ssh-keygen -q -t ed25519 -N '' -f "$work_dir/config/access/ssh/ssh_host_ed25519_key"
 ssh-keygen -q -t ed25519 -N '' -f "$work_dir/secrets/alice_ed25519"
 alice_key=$(cat "$work_dir/secrets/alice_ed25519.pub")
-cat >"$work_dir/config/ssh/users.json" <<EOF
+cat >"$work_dir/config/access/ssh/users.json" <<EOF
 {"users":[{"user_id":"alice","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"authorized_keys":["$alice_key"]}]}
 EOF
-cp "$repo_dir/deploy/console/users.example.json" "$work_dir/config/console/users.json"
+cp "$repo_dir/deploy/console/users.example.json" "$work_dir/config/access/console/users.json"
 cp "$repo_dir/deploy/runtime/resources.json" "$work_dir/config/resources.json"
 mkdir -p "$work_dir/config/resources.d" /etc/safeterm-demo
 printf '[Server]\nPort = 8080\n' >/etc/safeterm-demo/options.ini
@@ -34,7 +34,7 @@ chmod 0644 /etc/safeterm-demo/options.ini
 cat >"$work_dir/config/resources.d/demo.json" <<'RESOURCE'
 {"id":"demo","description":"Demo configuration","config":{"path":"/etc/safeterm-demo/options.ini","format":"ini","permissions":{"read":["config-viewer","config-operator"],"edit":["config-operator"]},"fields":[{"section":"Server","key":"Port","type":"integer","min":1,"max":65535}]}}
 RESOURCE
-chmod 0600 "$work_dir/config/ssh/ssh_host_ed25519_key" "$work_dir/config/ssh/users.json" "$work_dir/config/console/users.json"
+chmod 0600 "$work_dir/config/access/ssh/ssh_host_ed25519_key" "$work_dir/config/access/ssh/users.json" "$work_dir/config/access/console/users.json"
 chmod 0644 "$work_dir/config/catalog.sig" "$work_dir/config/trust/catalog-ed25519.pub" "$work_dir/config/resources.json"
 
 "$repo_dir/deploy/scripts/build-bundle.sh" --config "$work_dir/config" --managed "$repo_dir/deploy/demo/managed" --output "$work_dir/bundle"

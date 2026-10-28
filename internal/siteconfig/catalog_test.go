@@ -33,9 +33,9 @@ func TestCustomRoleOperationExecutableAndIsolatedProfileCompile(t *testing.T) {
 	base := fixture(t)
 	before, _ := json.Marshal(base)
 	in := Inputs{
-		Roles:      []Named[Role]{{File: "roles.d/a.json", Value: Role{Name: "site-reader", Description: "Read site"}}},
-		Profiles:   []Named[Profile]{{File: "profiles.d/a.json", Value: Profile{Name: "site-demo", Base: config.ProfileDiagnostics, MemoryLimitMiB: 96, TimeoutSeconds: 12}}},
-		Operations: []Named[Operation]{{File: "operations.d/a.json", Value: Operation{Operation: config.OperationDefinition{Name: "site_system", Description: "Site system", RunnerProfile: "site-demo", ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname", ArgsTemplate: []string{"-s"}}, Roles: stringsPtr("site-reader")}}},
+		Roles:      []Named[Role]{{File: "access/roles.d/a.json", Value: Role{Name: "site-reader", Description: "Read site"}}},
+		Profiles:   []Named[Profile]{{File: "commands/profiles.d/a.json", Value: Profile{Name: "site-demo", Base: config.ProfileDiagnostics, MemoryLimitMiB: 96, TimeoutSeconds: 12}}},
+		Operations: []Named[Operation]{{File: "commands/operations.d/a.json", Value: Operation{Operation: config.OperationDefinition{Name: "site_system", Description: "Site system", RunnerProfile: "site-demo", ExecutorKind: config.ExecutorProcess, ExecutableRef: "uname", ArgsTemplate: []string{"-s"}}, Roles: stringsPtr("site-reader")}}},
 	}
 	c, e := Prepare(base, in)
 	if e != nil {
@@ -128,7 +128,7 @@ func TestProfileCeilingsAndStrictJSON(t *testing.T) {
 		}
 	}
 	for _, raw := range []string{`{"name":"x","name":"y","base":"diagnostics"}`, `{"name":"x","base":"diagnostics","run_as_user":"root"}`, `{"name":"x","base":"diagnostics","socket_path":"/tmp/attack"}`} {
-		if _, e := Parse[Profile]("profiles.d/test.json", []byte(raw)); e == nil {
+		if _, e := Parse[Profile]("commands/profiles.d/test.json", []byte(raw)); e == nil {
 			t.Fatalf("accepted %s", raw)
 		}
 	}

@@ -100,7 +100,7 @@ func TestStrictDefinitionsAndInvalidReferencesFailClosed(t *testing.T) {
 		strings.Replace(serviceOnly, "restart", "shell", 1),
 		strings.Replace(serviceOnly, "service-operator", "missing-role", 1),
 		strings.Replace(serviceOnly, "myapp.service", "*.service", 1),
-		strings.Replace(logsOnly, "/var/log/product/output.log", "/etc/safeterm/ssh/users.json", 1),
+		strings.Replace(logsOnly, "/var/log/product/output.log", "/etc/safeterm/access/ssh/users.json", 1),
 		strings.Replace(configOnly, "\"format\":\"ini\"", "\"format\":\"ini\",\"on_change\":\"restart\"", 1),
 		strings.Replace(configOnly, "config-operator", "unknown-role", 1),
 	}

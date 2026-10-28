@@ -89,10 +89,10 @@ func (r *catalogRuntime) validate(cfg, baseline *config.Config, dir string) erro
 	if err != nil {
 		return err
 	}
-	if _, err = broker.LoadSSHAuthenticator(filepath.Join(layout.Authority(r.live), "ssh/users.json"), catalog.KnownRoles()); err != nil {
+	if _, err = broker.LoadSSHAuthenticator(filepath.Join(layout.Authority(r.live), "access/ssh/users.json"), catalog.KnownRoles()); err != nil {
 		return err
 	}
-	users, err := broker.ReadConsoleUsersData(filepath.Join(layout.Authority(r.live), "console/users.json"))
+	users, err := broker.ReadConsoleUsersData(filepath.Join(layout.Authority(r.live), "access/console/users.json"))
 	if err != nil {
 		return err
 	}

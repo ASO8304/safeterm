@@ -4,7 +4,7 @@ SafeTerm reads Netplan YAML, presents typed interface/route commands and keeps a
 
 ## Administrator setup
 
-The root-owned policy is `/etc/safeterm/network.json`. An empty `interfaces` list (the installed default) allows no network edits. Set exact interface names after inspecting `ip link` and the existing Netplan files:
+The root-owned policy is `/etc/safeterm/network/policy.json`. An empty `interfaces` list (the installed default) allows no network edits. Set exact interface names after inspecting `ip link` and the existing Netplan files:
 
 ```json
 {

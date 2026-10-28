@@ -136,8 +136,8 @@ func buildTestBundle(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(configDir, "catalog.sig"), integrity.EncodeBase64(signature), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	sshDir := filepath.Join(configDir, "ssh")
-	if err := os.Mkdir(sshDir, 0o755); err != nil {
+	sshDir := filepath.Join(configDir, "access/ssh")
+	if err := os.MkdirAll(sshDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	_, hostPrivate, _ := ed25519.GenerateKey(rand.Reader)
@@ -155,8 +155,8 @@ func buildTestBundle(t *testing.T) string {
 	}
 	identities := map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "authorized_keys": []string{string(ssh.MarshalAuthorizedKey(sshPublic))}}}}
 	writeJSON(t, filepath.Join(sshDir, "users.json"), identities, 0o600)
-	consoleDir := filepath.Join(configDir, "console")
-	if err := os.Mkdir(consoleDir, 0o755); err != nil {
+	consoleDir := filepath.Join(configDir, "access/console")
+	if err := os.MkdirAll(consoleDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 	writeJSON(t, filepath.Join(consoleDir, "users.json"), map[string]any{"users": []any{map[string]any{"os_user": "safeterm", "user_id": "safeterm", "roles": []string{"viewer"}}}}, 0o600)

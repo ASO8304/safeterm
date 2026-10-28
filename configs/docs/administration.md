@@ -6,14 +6,19 @@ or adding a site-specific capability.
 
 ```text
 /etc/safeterm/
-  resources.d/       Service, managed configuration and log resources
-  roles.d/           Custom roles and role descriptions
-  operations.d/      Command definitions, arguments and optional role grants
-  executables.d/     Binary paths, approved SHA-256 hashes and allowed profiles
-  profiles.d/        Runner templates and bounded resource/isolation limits
-  policies.d/        Exact role-to-operation permissions
-  ssh/, console/     Internal credentials
-  trust/             Trusted catalog public key
+  access/
+    ssh/                 SSH users and host key
+    console/             Console users
+    roles.d/             Role definitions
+    policies.d/          Exact role-to-operation permissions
+  commands/
+    operations.d/        Command definitions and arguments
+    executables.d/       Approved binary paths and SHA-256 hashes
+    profiles.d/          Runner isolation and resource limits
+  resources.d/           Application configuration, services and logs
+  network/policy.json    Editable interfaces and network roles
+  trust/                 Trusted catalog public key
+  docs/                  Administration, network and diagnostic guides
 ```
 
 Each definition directory contains an always-inactive TEMPLATE.json and English
@@ -25,8 +30,8 @@ or merging of generated data is supported.
 For an existing default, emit a correctly formatted override:
 
 ```sh
-sudo termctl defaults operation ping | sudo tee /etc/safeterm/operations.d/ping.json >/dev/null
-sudo nano /etc/safeterm/operations.d/ping.json
+sudo termctl defaults operation ping | sudo tee /etc/safeterm/commands/operations.d/ping.json >/dev/null
+sudo nano /etc/safeterm/commands/operations.d/ping.json
 sudo termctl check
 sudo termctl apply
 ```
@@ -34,7 +39,7 @@ sudo termctl apply
 Other default types: role, profile, executable, policy. Built-in values remain
 unchanged when no override exists. Removing an override restores the packaged
 default; removing an added definition removes it if no references remain.
-policies.d entries are exact replacements, without implicit inherited grants.
+access/policies.d entries are exact replacements, without implicit inherited grants.
 Use termctl executable hash PATH to obtain a hash; approvals never refresh silently.
 Use termctl role/profile/executable list or describe to inspect compiled values.
 
@@ -74,11 +79,11 @@ not supported. This extends ADR-032 without restoring legacy source loading.
 | Directory | Object in each active JSON file |
 |---|---|
 | resources.d | Independent service/config/log resources |
-| roles.d | Role name and description |
-| operations.d | Operation definition, optional role assignment or disabled flag |
-| executables.d | Executable ID, exact path, approved SHA-256 and allowed profiles |
-| profiles.d | Runner template and bounded isolation/runtime limits |
-| policies.d | One role's exact list of authorized operations |
+| access/roles.d | Role name and description |
+| commands/operations.d | Operation definition, optional role assignment or disabled flag |
+| commands/executables.d | Executable ID, exact path, approved SHA-256 and allowed profiles |
+| commands/profiles.d | Runner template and bounded isolation/runtime limits |
+| access/policies.d | One role's exact list of authorized operations |
 
 Every directory has an inactive TEMPLATE.json and English README.md/README.txt.
 The exact TEMPLATE.json is skipped before opening, even if invalid or a symlink.
@@ -96,8 +101,8 @@ an added definition removes it, but still-referenced definitions fail closed.
 From a normal Linux administrator shell:
 
 ```sh
-sudo termctl defaults operation ping | sudo tee /etc/safeterm/operations.d/ping.json >/dev/null
-sudo nano /etc/safeterm/operations.d/ping.json
+sudo termctl defaults operation ping | sudo tee /etc/safeterm/commands/operations.d/ping.json >/dev/null
+sudo nano /etc/safeterm/commands/operations.d/ping.json
 sudo termctl check
 sudo termctl apply
 ```
@@ -118,13 +123,13 @@ list/describe` and `termctl executable list/describe` inspect compiled definitio
 
 ## Add a role and operation
 
-roles.d/site-reader.json:
+access/roles.d/site-reader.json:
 
 ```json
 {"name":"site-reader","description":"Read site system information"}
 ```
 
-operations.d/site-system.json:
+commands/operations.d/site-system.json:
 
 ```json
 {
@@ -148,7 +153,7 @@ Remove a role from identities before rolling back to a generation without it.
 
 ## Policies
 
-policies.d/site-reader.json can explicitly replace a role's entire operation list:
+access/policies.d/site-reader.json can explicitly replace a role's entire operation list:
 
 ```json
 {"role":"site-reader","operations":["system_info","site_system"]}
@@ -158,20 +163,20 @@ There are no wildcard grants or role inheritance. An empty operation list is
 valid. Resource config read/edit permissions remain in resources.d and are
 independent of operation policies. Compilation order is defaults, role/profile/
 executable/operation overrides, generated resources, then exact policy replacements.
-Thus a policies.d entry is authoritative over operation-level/generated grants
+Thus a access/policies.d entry is authoritative over operation-level/generated grants
 for that role; list every operation it should retain. The final model must pass
 all cross-reference, translation, integrity and identity validation.
 
 ## Executables
 
-operations select executable IDs. executables.d defines their actual paths,
+operations select executable IDs. commands/executables.d defines their actual paths,
 SHA-256 approvals and allowed profiles. Use:
 
 ```sh
 termctl executable hash /usr/bin/uptime
 ```
 
-Put that digest into a definition based on executables.d/TEMPLATE.json. Its zero
+Put that digest into a definition based on commands/executables.d/TEMPLATE.json. Its zero
 digest is only an inactive placeholder. Hashing does not activate anything or
 refresh stored approvals. Changed executable bytes require explicit source hash
 updates and check/apply. Scripts and non-native/writable executables remain
@@ -180,7 +185,7 @@ never silently rewrite administrator-approved executable hashes.
 
 ## Independent Runner profiles
 
-profiles.d/site-diagnostics.json:
+commands/profiles.d/site-diagnostics.json:
 
 ```json
 {
@@ -222,7 +227,7 @@ Omitted/zero numeric overrides inherit the default. Built-in profile names may
 also be overridden, with their own base and immutable identities/sockets.
 
 Custom profiles initially inherit the base's hashed executable allowlist. An
-executables.d replacement is exact and must retain all intended profile members.
+commands/executables.d replacement is exact and must retain all intended profile members.
 
 ## Activation, rollback, update and signing
 
@@ -286,8 +291,8 @@ Inspect defaults in administrator-editable source format:
 
 To override a packaged operation, export one definition, edit it and activate:
 
-    sudo termctl defaults operation ping | sudo tee /etc/safeterm/operations.d/ping.json >/dev/null
-    sudo nano /etc/safeterm/operations.d/ping.json
+    sudo termctl defaults operation ping | sudo tee /etc/safeterm/commands/operations.d/ping.json >/dev/null
+    sudo nano /etc/safeterm/commands/operations.d/ping.json
     sudo termctl check
     sudo termctl apply
 
@@ -315,10 +320,10 @@ policies/overrides referencing removed operation IDs must be revised explicitly.
 
 ## Ubuntu Server 24.04 network management
 
-Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See `/etc/safeterm/NETWORK.txt` (also shipped as `NETWORK.md`) for setup, examples and recovery.
+Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network/policy.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See `/etc/safeterm/docs/network.txt` (also shipped as `docs/network.md`) for setup, examples and recovery.
 
 System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.
 
-Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
 
-Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See `NETWORK-DIAGNOSTICS.txt` for full details.
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See `docs/network-diagnostics.txt` for full details.

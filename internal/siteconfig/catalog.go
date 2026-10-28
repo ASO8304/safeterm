@@ -12,7 +12,7 @@ import (
 	"safeterm/internal/resources"
 )
 
-var Directories = []string{"roles.d", "profiles.d", "executables.d", "operations.d", "policies.d"}
+var Directories = []string{"access/roles.d", "commands/profiles.d", "commands/executables.d", "commands/operations.d", "access/policies.d"}
 
 const MaxProfiles = 16
 

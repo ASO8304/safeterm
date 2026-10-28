@@ -111,10 +111,10 @@ if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
 fi
 install -d -o root -g root -m 0755 /etc/safeterm /var/lib/safeterm /var/lib/safeterm/generated
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --install-configuration
-chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
-chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key /etc/safeterm/ssh/users.json
-chown root:safeterm-identity /etc/safeterm/console/users.json
-chmod 0640 /etc/safeterm/console/users.json
+chown root:safeterm-broker /etc/safeterm/access/ssh/ssh_host_ed25519_key /etc/safeterm/access/ssh/users.json
+chmod 0640 /etc/safeterm/access/ssh/ssh_host_ed25519_key /etc/safeterm/access/ssh/users.json
+chown root:safeterm-identity /etc/safeterm/access/console/users.json
+chmod 0640 /etc/safeterm/access/console/users.json
 
 managed_plan="$work/managed-plan"
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --managed-plan >"$managed_plan"

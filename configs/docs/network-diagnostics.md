@@ -51,7 +51,7 @@ application health, authenticate or negotiate a Telnet session.
 
 The signed operation has `executor_kind: "tcp-probe"` and
 `"tcp_probe": {"timeout_seconds": 5}`. Administrators can override that typed
-setting in `operations.d` and run `sudo termctl check` then `sudo termctl apply`.
+setting in `commands/operations.d` and run `sudo termctl check` then `sudo termctl apply`.
 The supported timeout range is 1–60 seconds. No external telnet/nc package,
 additional service account, sudo grant or general stdin channel is introduced.
 

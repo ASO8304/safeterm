@@ -120,7 +120,7 @@ func catalogFixture(t *testing.T) (*catalogRuntime, *catalogFakeHost, ed25519.Pr
 		t.Fatal(err)
 	}
 	public, key, _ := ed25519.GenerateKey(rand.Reader)
-	for _, section := range []string{"trust", "ssh", "console", "config-manager"} {
+	for _, section := range []string{"trust", "access/ssh", "access/console", "config-manager"} {
 		if err = os.MkdirAll(filepath.Join(live, section), 0755); err != nil {
 			t.Fatal(err)
 		}
@@ -150,8 +150,8 @@ func catalogFixture(t *testing.T) (*catalogRuntime, *catalogFakeHost, ed25519.Pr
 			t.Fatal(err)
 		}
 	}
-	write("ssh/users.json", map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "authorized_keys": []string{string(ssh.MarshalAuthorizedKey(sshKey))}}}}, 0600)
-	write("console/users.json", map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "disabled": true}}}, 0600)
+	write("access/ssh/users.json", map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "authorized_keys": []string{string(ssh.MarshalAuthorizedKey(sshKey))}}}}, 0600)
+	write("access/console/users.json", map[string]any{"users": []any{map[string]any{"user_id": "alice", "roles": []string{"viewer"}, "disabled": true}}}, 0600)
 	registry := configmanager.Registry{Version: "test", Resources: []configmanager.Resource{{ID: "demo-options", Description: "Test", Profile: "application", Path: "/etc/safeterm-managed/application/options.json", Format: configmanager.FormatJSON, Access: configmanager.AccessReadOnly, Fields: []configmanager.FieldSchema{{Key: "enabled", Type: configmanager.FieldBoolean, Required: true}}, Permissions: configmanager.Permissions{ReadRoles: []string{"viewer"}}}}}
 	write("resources.json", registry, 0644)
 	host := &catalogFakeHost{active: map[string]bool{serviceUnits["identity"]: true, serviceUnits["logs"]: true, serviceUnits["gateway"]: true}}
@@ -200,7 +200,7 @@ func catalogHasAlias(t *testing.T, r *catalogRuntime) bool {
 func TestCatalogApplyRepairsEditedLiveAndRollbackPreservesOtherFiles(t *testing.T) {
 	r, host, _ := catalogFixture(t)
 	before := map[string][]byte{}
-	for _, name := range []string{"ssh/users.json", "console/users.json", "resources.json", "trust/catalog-ed25519.pub"} {
+	for _, name := range []string{"access/ssh/users.json", "access/console/users.json", "resources.json", "trust/catalog-ed25519.pub"} {
 		before[name], _ = os.ReadFile(filepath.Join(r.live, name))
 	}
 	catalogAddAlias(t, r.live)

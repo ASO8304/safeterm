@@ -137,7 +137,7 @@ func DecodeJSON(data []byte, out any) error {
 	return decoder.Decode(out)
 }
 func ReadPolicy(root string) (Policy, error) {
-	f, err := readTrusted(root, "etc/safeterm/network.json")
+	f, err := readTrusted(root, "etc/safeterm/network/policy.json")
 	if os.IsNotExist(err) {
 		return DefaultPolicy(), nil
 	}
@@ -146,7 +146,7 @@ func ReadPolicy(root string) (Policy, error) {
 	}
 	var p Policy
 	if err := DecodeJSON(f.Data, &p); err != nil {
-		return p, fmt.Errorf("network: network.json: %w", err)
+		return p, fmt.Errorf("network: network/policy.json: %w", err)
 	}
 	return p, p.Validate()
 }

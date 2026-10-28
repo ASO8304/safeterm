@@ -433,7 +433,7 @@ func parseUserOptions(args []string) (userOptions, error) {
 
 func listUsers(dir string, out io.Writer) error {
 	var ssh broker.SSHIdentityConfig
-	if data, err := os.ReadFile(filepath.Join(dir, "ssh", "users.json")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(dir, "access/ssh", "users.json")); err == nil {
 		if err := json.Unmarshal(data, &ssh); err != nil {
 			return err
 		}
@@ -449,7 +449,7 @@ func listUsers(dir string, out io.Writer) error {
 		}
 	}
 	var console broker.ConsoleIdentityConfig
-	if data, err := os.ReadFile(filepath.Join(dir, "console", "users.json")); err == nil {
+	if data, err := os.ReadFile(filepath.Join(dir, "access/console", "users.json")); err == nil {
 		if err := json.Unmarshal(data, &console); err != nil {
 			return err
 		}
@@ -472,7 +472,7 @@ func upsertUser(dir string, kind string, auth bool, o userOptions, cfg *config.C
 		}
 	}
 	if kind == "ssh" {
-		path := filepath.Join(dir, "ssh", "users.json")
+		path := filepath.Join(dir, "access/ssh", "users.json")
 		var data broker.SSHIdentityConfig
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -557,7 +557,7 @@ func upsertConsoleUser(dir string, auth bool, o userOptions, cfg *config.Config,
 	for _, r := range cfg.Roles {
 		known[r.Name] = true
 	}
-	path := filepath.Join(dir, "console", "users.json")
+	path := filepath.Join(dir, "access/console", "users.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -626,7 +626,7 @@ func upsertConsoleUser(dir string, auth bool, o userOptions, cfg *config.Config,
 func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writer) error {
 	_ = cfg
 	if kind == "ssh" {
-		path := filepath.Join(dir, "ssh", "users.json")
+		path := filepath.Join(dir, "access/ssh", "users.json")
 		var data broker.SSHIdentityConfig
 		raw, err := os.ReadFile(path)
 		if err != nil {
@@ -664,7 +664,7 @@ func deleteUser(dir, kind string, o userOptions, cfg *config.Config, out io.Writ
 		fmt.Fprintf(out, "SSH user %s deleted; run sudo termctl service restart ssh to load changes\n", o.id)
 		return nil
 	}
-	path := filepath.Join(dir, "console", "users.json")
+	path := filepath.Join(dir, "access/console", "users.json")
 	var data broker.ConsoleIdentityConfig
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -724,7 +724,7 @@ func setUserPassword(dir, kind string, o userOptions, out io.Writer) error {
 	if err := broker.ValidatePasswordComplexity(password); err != nil {
 		return err
 	}
-	path := filepath.Join(dir, "ssh", "users.json")
+	path := filepath.Join(dir, "access/ssh", "users.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return err

@@ -16,8 +16,8 @@ Use `sudo termctl check` first if you want validation without activation. Apply
 always performs the same checks. Give the definition a unique id, edit paths,
 fields and roles, and remove the service/config/logs sections you do not need.
 Existing roles are listed by `termctl role list`. A role mentioned here must
-exist in packaged defaults or roles.d; definitions do not create users or grant
-roles to users. roles.d, profiles.d, executables.d, operations.d and policies.d
+exist in packaged defaults or access/roles.d; definitions do not create users or grant
+roles to users. access/roles.d, commands/profiles.d, commands/executables.d, commands/operations.d and access/policies.d
 are compiled by the same check/apply workflow (ADR-033).
 
 TEMPLATE.json is ALWAYS ignored before opening/decoding its contents. Its exact,
@@ -392,7 +392,7 @@ logs section in TEMPLATE.json; service and config sections are optional and can
 be omitted for a log-only resource. Use execute logs RESOURCE_ID LOG_ID.
 The log-viewer role and isolated log-reader profile are ready to use.
 After changes run sudo termctl check, then sudo termctl apply and reconnect.
-Older explicit operations.d/log.json overrides are preserved on upgrade; remove
+Older explicit commands/operations.d/log.json overrides are preserved on upgrade; remove
 them after migrating their paths here if you no longer want the old command.
 
 Service aliases and ordered groups
@@ -478,7 +478,7 @@ Audit step identity uses operation=service-step:PARENT_OPERATION:INDEX:ACTION:UN
 with existing accepted/completed outcomes and the initiating request id. This
 keeps the V1 audit envelope readable by older package binaries during rollback.
 
-Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
 
 ### Typed comma-separated lists
 

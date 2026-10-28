@@ -115,8 +115,13 @@
 
 - name: Detect an existing SafeTerm identity map
   ansible.builtin.stat:
-    path: /etc/safeterm/ssh/users.json
+    path: /etc/safeterm/access/ssh/users.json
   register: safeterm_existing_identity_map
+
+- name: Detect v0.27 identity map for installer migration
+  ansible.builtin.stat:
+    path: /etc/safeterm/ssh/users.json
+  register: safeterm_flat_identity_map
 
 - name: Inspect bootstrap public key on the controller
   ansible.builtin.stat:
@@ -151,7 +156,7 @@
     that:
       - (safeterm_bootstrap_password_available | bool) or (safeterm_bootstrap_key_available | bool)
     fail_msg: A fresh installation requires a password hash file or optional SSH public key.
-  when: not safeterm_existing_identity_map.stat.exists
+  when: not safeterm_existing_identity_map.stat.exists and not safeterm_flat_identity_map.stat.exists
 
 - name: Transfer bootstrap password hash
   ansible.builtin.copy:

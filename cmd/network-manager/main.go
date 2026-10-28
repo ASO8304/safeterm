@@ -108,7 +108,7 @@ func run() error {
 			}
 			// Re-read roles so SSH identity removal/role revocation is effective even
 			// for an already-open SSH connection. Credentials never cross this socket.
-			data, err := networkmanager.ReadTrustedData("/", "etc/safeterm/ssh/users.json")
+			data, err := networkmanager.ReadTrustedData("/", "etc/safeterm/access/ssh/users.json")
 			if err != nil {
 				return err
 			}

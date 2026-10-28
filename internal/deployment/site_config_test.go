@@ -87,7 +87,7 @@ func TestPackageStagingCanValidatePriorSignedIdentityRolesWithoutImportingDefini
 	if err = os.WriteFile(filepath.Join(prior, "catalog.sig"), integrity.EncodeBase64(signature), 0644); err != nil {
 		t.Fatal(err)
 	}
-	writeJSON(t, filepath.Join(root, "console/users.json"), map[string]any{"users": []any{map[string]any{"user_id": "site-user", "roles": []string{"site-reader"}, "disabled": true}}}, 0600)
+	writeJSON(t, filepath.Join(root, "access/console/users.json"), map[string]any{"users": []any{map[string]any{"user_id": "site-user", "roles": []string{"site-reader"}, "disabled": true}}}, 0600)
 	writeTestManifest(t, bundle)
 	if _, err = Check(CheckOptions{Root: bundle}); err == nil {
 		t.Fatal("ordinary staging silently accepted an unknown role")

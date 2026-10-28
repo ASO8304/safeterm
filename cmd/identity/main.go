@@ -38,7 +38,7 @@ func uid(name string) (uint32, error) {
 }
 func run() error {
 	dir := flag.String("config", layout.Generated, "signed catalog")
-	users := flag.String("users", "/etc/safeterm/console/users.json", "root-managed internal Console users")
+	users := flag.String("users", "/etc/safeterm/access/console/users.json", "root-managed internal Console users")
 	socket := flag.String("socket", identity.SocketPath, "Identity Unix socket")
 	ttl := flag.Duration("session-ttl", 30*time.Minute, "absolute Console session lifetime (1m to 12h)")
 	flag.Parse()

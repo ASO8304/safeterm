@@ -127,7 +127,7 @@ func Check(options CheckOptions) (Report, error) {
 	unitDir := filepath.Join(root, "systemd")
 	adminDir := configDir
 	if options.Installed {
-		if err := layout.RejectLegacy(layout.Admin); err != nil {
+		if err := layout.CheckAdministration(layout.Admin); err != nil {
 			return Report{}, err
 		}
 		adminDir = layout.Admin
@@ -201,13 +201,13 @@ func Check(options CheckOptions) (Report, error) {
 			knownRoles[role.Name] = true
 		}
 	}
-	if _, err := broker.LoadSSHAuthenticator(filepath.Join(adminDir, "ssh", "users.json"), knownRoles); err != nil {
+	if _, err := broker.LoadSSHAuthenticator(filepath.Join(adminDir, "access/ssh", "users.json"), knownRoles); err != nil {
 		return Report{}, err
 	}
-	if _, err := broker.LoadSSHHostKey(filepath.Join(adminDir, "ssh", "ssh_host_ed25519_key")); err != nil {
+	if _, err := broker.LoadSSHHostKey(filepath.Join(adminDir, "access/ssh", "ssh_host_ed25519_key")); err != nil {
 		return Report{}, err
 	}
-	consolePath := filepath.Join(adminDir, "console", "users.json")
+	consolePath := filepath.Join(adminDir, "access/console", "users.json")
 	if options.Installed {
 		group, err := user.LookupGroup(identity.UserName)
 		if err != nil {
@@ -267,7 +267,7 @@ func Check(options CheckOptions) (Report, error) {
 }
 
 func rejectUnexpectedPrivateKeys(configDir string) error {
-	allowed := filepath.Clean(filepath.Join(configDir, "ssh", "ssh_host_ed25519_key"))
+	allowed := filepath.Clean(filepath.Join(configDir, "access/ssh", "ssh_host_ed25519_key"))
 	return filepath.WalkDir(configDir, func(path string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr

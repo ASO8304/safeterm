@@ -1,4 +1,4 @@
-# operations.d
+# commands/operations.d
 
 Administrator JSON definitions. TEMPLATE.json is ALWAYS ignored before opening
 or decoding. Copy it to another *.json name to activate a definition. Non-JSON
@@ -27,6 +27,6 @@ packaged base template, never arbitrary systemd text, root users or sockets.
 Templates and reference guides refresh on update; custom *.json files survive.
 
 Application logs belong in resources.d using its logs section. The package does
-not provide the old mapped log operation or sample sources. operations.d remains
+not provide the old mapped log operation or sample sources. commands/operations.d remains
 available for custom executable commands; no operation override is needed to
 register a resource log.

@@ -16,7 +16,7 @@
 - name: Manage complete SSH broker identity map
   ansible.builtin.template:
     src: ssh-users.json.j2
-    dest: /etc/safeterm/ssh/users.json
+    dest: /etc/safeterm/access/ssh/users.json
     owner: root
     group: safeterm-broker
     mode: '0640'
@@ -41,7 +41,7 @@
 - name: Manage complete console identity map
   ansible.builtin.template:
     src: console-users.json.j2
-    dest: /etc/safeterm/console/users.json
+    dest: /etc/safeterm/access/console/users.json
     owner: root
     group: safeterm-identity
     mode: '0640'
@@ -64,7 +64,7 @@
 - name: Validate site definition directory names
   ansible.builtin.assert:
     that:
-      - item.key in ['resources.d', 'roles.d', 'profiles.d', 'executables.d', 'operations.d', 'policies.d']
+      - item.key in ['resources.d', 'access/roles.d', 'commands/profiles.d', 'commands/executables.d', 'commands/operations.d', 'access/policies.d']
     fail_msg: Only supported JSON definition directories can be deployed.
   loop: "{{ safeterm_definition_directories | dict2items }}"
 

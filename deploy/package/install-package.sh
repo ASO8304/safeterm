@@ -120,6 +120,7 @@ if [ -z "$signed_catalog" ] && [ "$local_signing" = false ]; then
   if [ -f /usr/share/safeterm/defaults/catalog.sig ]; then signed_catalog=/usr/share/safeterm/defaults; else echo "Fresh unattended install requires --local-signing or --signed-catalog DIR and bootstrap credentials." >&2; exit 2; fi
 fi
 [ "$(id -u)" -eq 0 ] || { echo "installation requires root" >&2; exit 1; }
+"$payload/bin/safeterm-preflight" --check-administration-upgrade
 IFS= read -r init_name </proc/1/comm
 [ "$init_name" = systemd ] || { echo "SafeTerm installation requires systemd running as PID 1." >&2; exit 1; }
 [ ! -e /var/lib/safeterm-installer/catalog/pending ] || { echo "interrupted catalog transaction: run sudo termctl apply --recover first" >&2; exit 1; }
@@ -144,7 +145,9 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-if [ ! -f /etc/safeterm/ssh/users.json ]; then
+ssh_source=$(safeterm_admin_source /etc/safeterm access/ssh ssh)
+console_source=$(safeterm_admin_source /etc/safeterm access/console console)
+if [ ! -f "$ssh_source/users.json" ]; then
   safeterm_enroll
 fi
 
@@ -283,16 +286,16 @@ if [ -f /etc/safeterm/trust/catalog-ed25519.pub ]; then
   cmp -s "$work/config/trust/catalog-ed25519.pub" /etc/safeterm/trust/catalog-ed25519.pub || { echo "package updates cannot rotate installed catalog trust" >&2; exit 1; }
 fi
 
-mkdir -p "$work/config/ssh" "$work/config/console"
-if [ -f /etc/safeterm/ssh/ssh_host_ed25519_key ]; then
-  install -m 0600 /etc/safeterm/ssh/ssh_host_ed25519_key "$work/config/ssh/ssh_host_ed25519_key"
-  [ ! -f /etc/safeterm/ssh/ssh_host_ed25519_key.pub ] || install -m 0644 /etc/safeterm/ssh/ssh_host_ed25519_key.pub "$work/config/ssh/ssh_host_ed25519_key.pub"
+mkdir -p "$work/config/access/ssh" "$work/config/access/console"
+if [ -f "$ssh_source/ssh_host_ed25519_key" ]; then
+  install -m 0600 "$ssh_source/ssh_host_ed25519_key" "$work/config/access/ssh/ssh_host_ed25519_key"
+  [ ! -f "$ssh_source/ssh_host_ed25519_key.pub" ] || install -m 0644 "$ssh_source/ssh_host_ed25519_key.pub" "$work/config/access/ssh/ssh_host_ed25519_key.pub"
 else
-  ssh-keygen -q -t ed25519 -N '' -f "$work/config/ssh/ssh_host_ed25519_key"
+  ssh-keygen -q -t ed25519 -N '' -f "$work/config/access/ssh/ssh_host_ed25519_key"
 fi
 
-if [ -f /etc/safeterm/ssh/users.json ]; then
-  install -m 0600 /etc/safeterm/ssh/users.json "$work/config/ssh/users.json"
+if [ -f "$ssh_source/users.json" ]; then
+  install -m 0600 "$ssh_source/users.json" "$work/config/access/ssh/users.json"
 else
   password_hash=
   if [ -n "$ssh_password_hash_file" ]; then
@@ -311,22 +314,22 @@ else
     keys="[\"$key_type $key_data\"]"
   fi
   [ -n "$password_hash" ] || [ "$keys" != '[]' ] || { echo "--ssh-password-hash-file or --ssh-public-key is required for a fresh install" >&2; exit 1; }
-  cat >"$work/config/ssh/users.json" <<EOF
+  cat >"$work/config/access/ssh/users.json" <<EOF
 {"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator","config-approver"],"password_hash":"$password_hash","authorized_keys":$keys}]}
 EOF
-  chmod 0600 "$work/config/ssh/users.json"
+  chmod 0600 "$work/config/access/ssh/users.json"
 fi
 
-if [ -f /etc/safeterm/console/users.json ]; then
-  install -m 0600 /etc/safeterm/console/users.json "$work/config/console/users.json"
+if [ -f "$console_source/users.json" ]; then
+  install -m 0600 "$console_source/users.json" "$work/config/access/console/users.json"
 elif [ "$bootstrap_console" = true ]; then
   password_hash=$(cat "$ssh_password_hash_file")
-  cat >"$work/config/console/users.json" <<EOF
+  cat >"$work/config/access/console/users.json" <<EOF
 {"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator"],"password_hash":"$password_hash"}]}
 EOF
-  chmod 0600 "$work/config/console/users.json"
+  chmod 0600 "$work/config/access/console/users.json"
 else
-  install -m 0600 "$payload/console/users.json" "$work/config/console/users.json"
+  install -m 0600 "$payload/console/users.json" "$work/config/access/console/users.json"
 fi
 install -m 0644 "$payload/resources.json" "$work/config/resources.json"
 
@@ -336,16 +339,14 @@ for name in audit network-manager config-manager config-writer console gateway r
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
-cp "$payload/catalog-source/README.md" "$payload/catalog-source/README.txt" "$work/bundle/etc/safeterm/"
-cp "$payload/catalog-source/NETWORK.md" "$payload/catalog-source/NETWORK.txt" "$payload/catalog-source/NETWORK-DIAGNOSTICS.md" "$payload/catalog-source/NETWORK-DIAGNOSTICS.txt" "$payload/catalog-source/network.json" "$work/bundle/etc/safeterm/"
-for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
+cp "$payload/catalog-source/README.md" "$work/bundle/etc/safeterm/"
+cp -R "$payload/catalog-source/docs" "$payload/catalog-source/network" "$work/bundle/etc/safeterm/"
+for definitions in resources.d access/roles.d commands/profiles.d commands/operations.d commands/executables.d access/policies.d; do
  mkdir -p "$work/bundle/etc/safeterm/$definitions"
  cp "$payload/catalog-source/$definitions/TEMPLATE.json" "$payload/catalog-source/$definitions/README.md" "$payload/catalog-source/$definitions/README.txt" "$work/bundle/etc/safeterm/$definitions/"
 done
-cp -R "$payload/managed/." "$work/bundle/managed/"
 cp "$payload/systemd/"*.service "$work/bundle/systemd/"
 chmod 0644 "$work/bundle/systemd/"*.service
-chmod 0600 "$work/bundle/managed/"*/*
 "$work/bundle/bin/safeterm-preflight" --bundle "$work/bundle" --stage-managed-upgrade
 (cd "$work/bundle" && find bin etc managed systemd -type f -print | LC_ALL=C sort | xargs sha256sum >SHA256SUMS)
 chmod 0444 "$work/bundle/SHA256SUMS"
@@ -416,6 +417,7 @@ if [ "$start_services" = true ]; then
   systemctl restart safeterm-ssh-broker.service
   systemctl --quiet is-active safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
+safeterm_cleanup_legacy_managed /etc/safeterm-managed
 echo "SafeTerm package installation: PASS"
 # Retain one pre-install snapshot; operators never need to track IDs and
 # repeated upgrades do not accumulate snapshots indefinitely.

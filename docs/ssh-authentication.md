@@ -1,7 +1,7 @@
 # SSH authentication
 
 SafeTerm SSH accepts usernames and passwords using `password_hash` in
-`/etc/safeterm/ssh/users.json`. Passwords are independent of Linux account
+`/etc/safeterm/access/ssh/users.json`. Passwords are independent of Linux account
 passwords. Public-key login is optional: add `authorized_keys` only for users
 who need it. Either configured method authenticates the same server-owned roles;
 configuring both allows either method, not two-factor authentication.

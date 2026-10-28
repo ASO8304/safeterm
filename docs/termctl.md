@@ -102,8 +102,8 @@ Ctrl+C stops a stream; Ctrl+] exits the whole session.
 
 ## Default definitions and site overrides
 
-See [site configuration](site-configuration.md) for roles.d, operations.d,
-executables.d, profiles.d and policies.d, complete schemas, precedence and safety
+See [site configuration](site-configuration.md) for access/roles.d, commands/operations.d,
+commands/executables.d, commands/profiles.d and access/policies.d, complete schemas, precedence and safety
 bounds. `termctl defaults TYPE NAME` prints an editable packaged default.
 `termctl profile list/describe`, `termctl executable list/describe`, and
 `termctl executable hash PATH` provide discovery and digest inspection. All new
@@ -112,6 +112,6 @@ also accepts site-NAME for a provisioned Runner.
 
 ## Ubuntu Server 24.04 network management
 
-Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See [the network guide](network-configuration.md) for setup, examples and recovery.
+Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network/policy.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See [the network guide](network-configuration.md) for setup, examples and recovery.
 
 System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.

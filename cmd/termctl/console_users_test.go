@@ -13,10 +13,10 @@ import (
 
 func TestConsoleUserDoesNotRequireOrCreateAnOSAccount(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.Mkdir(filepath.Join(dir, "console"), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Join(dir, "access/console"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "console", "users.json")
+	path := filepath.Join(dir, "access/console", "users.json")
 	if err := os.WriteFile(path, []byte(`{"users":[{"os_user":"safeterm","user_id":"legacy","roles":["viewer"]}]}`), 0640); err != nil {
 		t.Fatal(err)
 	}

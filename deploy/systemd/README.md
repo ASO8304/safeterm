@@ -66,11 +66,11 @@ Generate a dedicated Ed25519 SSH host key and install the root-managed identity
 mapping before enabling the Broker:
 
 ```bash
-install -d -o root -g safeterm-broker -m 0750 /etc/safeterm/ssh
-ssh-keygen -q -t ed25519 -N '' -f /etc/safeterm/ssh/ssh_host_ed25519_key
-chown root:safeterm-broker /etc/safeterm/ssh/ssh_host_ed25519_key
-chmod 0640 /etc/safeterm/ssh/ssh_host_ed25519_key
-install -o root -g safeterm-broker -m 0640 deploy/ssh/users.example.json /etc/safeterm/ssh/users.json
+install -d -o root -g safeterm-broker -m 0750 /etc/safeterm/access/ssh
+ssh-keygen -q -t ed25519 -N '' -f /etc/safeterm/access/ssh/ssh_host_ed25519_key
+chown root:safeterm-broker /etc/safeterm/access/ssh/ssh_host_ed25519_key
+chmod 0640 /etc/safeterm/access/ssh/ssh_host_ed25519_key
+install -o root -g safeterm-broker -m 0640 deploy/ssh/users.example.json /etc/safeterm/access/ssh/users.json
 ```
 
 Replace the example password hash before startup, or configure an optional public key.
@@ -140,8 +140,9 @@ mounts and need no legacy /etc/safeterm-managed directories. Empty profiles are
 valid. File updates go exclusively through the restricted root writer, whose
 sandbox is generated from administrator definitions and preserves application
 ownership, ACLs, UTF-8 BOM and INI comments. Do not create/chown dummy directories.
-Fresh installations do not create `/etc/safeterm-managed`. Existing directories
-and files are left intact; registered files use their explicit resource paths.
+Fresh installations do not create `/etc/safeterm-managed`. Successful updates
+remove its empty legacy profile directories. Directories containing data or
+symlinks remain intact and are reported for administrator review.
 
 Use resources.d for configuration files and site JSON directories for roles,
 operations, executable approvals, policies and Runner profiles. Apply provisions

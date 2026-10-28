@@ -22,6 +22,9 @@ printf 'SmokeTest42\n' | "$package/payload/bin/safeterm-password-hash" --stdin -
 termctl user add console --id ci-admin --roles viewer,netops,log-viewer,service-viewer,service-operator,config-viewer,config-operator --password-hash-file "$work/password.hash"
 # The legacy demo root must not be manufactured on a fresh installation.
 [[ ! -e /etc/safeterm-managed ]]
+[[ -f /etc/safeterm/network/policy.json && -f /etc/safeterm/docs/network.md ]]
+[[ -f /etc/safeterm/access/ssh/users.json && -f /etc/safeterm/access/console/users.json ]]
+[[ -d /etc/safeterm/commands/operations.d && ! -e /etc/safeterm/network.json ]]
 wait_ready() {
   for attempt in {1..30}; do
     ready=true
@@ -91,19 +94,19 @@ bash "$repo/tests/systemd/service-groups.sh" "$repo"
 printf 'Systemd fresh installation, Console discovery, completion and INI save: PASS\n'
 
 # Provision independent process and service-manager profiles from declarative sources.
-cat >/etc/safeterm/roles.d/site-viewer.json <<'JSON'
+cat >/etc/safeterm/access/roles.d/site-viewer.json <<'JSON'
 {"name":"site-viewer","description":"Site read-only role"}
 JSON
-cat >/etc/safeterm/profiles.d/site-demo.json <<'JSON'
+cat >/etc/safeterm/commands/profiles.d/site-demo.json <<'JSON'
 {"name":"site-demo","base":"diagnostics","memory_limit_mib":96,"process_limit":16,"timeout_seconds":10,"max_sessions":2}
 JSON
-cat >/etc/safeterm/profiles.d/site-services.json <<'JSON'
+cat >/etc/safeterm/commands/profiles.d/site-services.json <<'JSON'
 {"name":"site-services","base":"service-manager"}
 JSON
-cat >/etc/safeterm/operations.d/site-uname.json <<'JSON'
+cat >/etc/safeterm/commands/operations.d/site-uname.json <<'JSON'
 {"operation":{"name":"site_uname","description":"Isolated site system information","runner_profile":"site-demo","executor_kind":"process","executable_ref":"uname","args_template":["-s"],"parameters":[]},"roles":["viewer","site-viewer"]}
 JSON
-cat >/etc/safeterm/operations.d/site-status.json <<'JSON'
+cat >/etc/safeterm/commands/operations.d/site-status.json <<'JSON'
 {"operation":{"name":"site_status","description":"Isolated service status","runner_profile":"site-services","executor_kind":"systemd","systemd":{"unit":"safeterm-gateway.service","action":"status"},"parameters":[]},"roles":["viewer","site-viewer"]}
 JSON
 termctl check
@@ -126,7 +129,22 @@ python3 "$repo/tests/systemd/console-smoke.py" site
 # New-format updates preserve identities that actually use a custom role.
 termctl user auth console --id ci-admin --roles viewer,netops,config-viewer,config-operator,site-viewer
 # New-format package updates preserve all source directories and re-provision Runner units.
+# Simulate a v0.27 flat administrator tree. Updating must preserve credentials,
+# the host key, explicit network policy, custom roles and Runner definitions.
+cp /etc/safeterm/network/policy.json "$work/policy-before.json"
+sha256sum /etc/safeterm/access/ssh/users.json /etc/safeterm/access/ssh/ssh_host_ed25519_key \
+  /etc/safeterm/access/console/users.json >"$work/credentials-before.sha256"
+for pair in access/ssh:ssh access/console:console access/roles.d:roles.d access/policies.d:policies.d \
+  commands/operations.d:operations.d commands/executables.d:executables.d commands/profiles.d:profiles.d \
+  network/policy.json:network.json docs/network.md:NETWORK.md docs/network.txt:NETWORK.txt \
+  docs/network-diagnostics.md:NETWORK-DIAGNOSTICS.md docs/network-diagnostics.txt:NETWORK-DIAGNOSTICS.txt; do
+  mv "/etc/safeterm/${pair%%:*}" "/etc/safeterm/${pair#*:}"
+done
+install -d -m 0755 /etc/safeterm-managed/{application,database,network}
 termctl update "$package"
+sha256sum -c "$work/credentials-before.sha256"
+cmp "$work/policy-before.json" /etc/safeterm/network/policy.json
+[[ ! -e /etc/safeterm/network.json && ! -e /etc/safeterm/roles.d && ! -e /etc/safeterm-managed ]]
 wait_ready
 python3 "$repo/tests/systemd/console-smoke.py" site
 # An unchanged generation can also update using its verified prior signature.

@@ -229,7 +229,7 @@ func TestWriterIPCAuthenticatesServerAndSeparatesProfiles(t *testing.T) {
 }
 
 func TestPrivilegedWriterRejectsUnsafeNamespacesAndLinks(t *testing.T) {
-	for _, path := range []string{"/tmp/app/options.ini", "/etc/sudoers.d/test", "/etc/passwd", "/etc/systemd/system/test.service", "/etc/safeterm/ssh/users.json", "/var/lib/safeterm-config-writer/state.json", "/etc/options.ini", "/path/../options.ini", "/path/to/%h.ini"} {
+	for _, path := range []string{"/tmp/app/options.ini", "/etc/sudoers.d/test", "/etc/passwd", "/etc/systemd/system/test.service", "/etc/safeterm/access/ssh/users.json", "/var/lib/safeterm-config-writer/state.json", "/etc/options.ini", "/path/../options.ini", "/path/to/%h.ini"} {
 		if err := ValidateWriterPath(path); err == nil {
 			t.Fatalf("unsafe path accepted: %s", path)
 		}

@@ -343,7 +343,7 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 		}
 		item.Name = actual
 		if !contains(p.Interfaces, actual) {
-			item.ReadOnly = "interface is outside administrator policy"
+			item.ReadOnly = fmt.Sprintf("interface is outside administrator policy; a Linux administrator must add %q to interfaces in %s, then reopen config network interface", actual, PolicyPath)
 		}
 		if _, exists := names[actual]; !exists {
 			item.ReadOnly = "physical interface is not present"

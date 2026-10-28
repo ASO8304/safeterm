@@ -119,7 +119,7 @@ typed operations, validates it with `visudo`, and grants no wildcard command.
 Assign status operations to `service-viewer`. Assign mutating operations only
 to `service-operator`; that role is not included in fresh default identities.
 To grant it to an existing SSH identity, edit the root-owned
-`/etc/safeterm/ssh/users.json`, add `service-operator`, and restart the Broker
+`/etc/safeterm/access/ssh/users.json`, add `service-operator`, and restart the Broker
 from the host administration console.
 
 ## Publish catalog changes

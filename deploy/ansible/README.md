@@ -148,11 +148,11 @@ a dictionary mapping supported directory names to controller paths, for example:
 
 ```yaml
 safeterm_definition_directories:
-  roles.d: /srv/safeterm/roles.d
-  operations.d: /srv/safeterm/operations.d
-  profiles.d: /srv/safeterm/profiles.d
-  executables.d: /srv/safeterm/executables.d
-  policies.d: /srv/safeterm/policies.d
+  access/roles.d: /srv/safeterm/access/roles.d
+  commands/operations.d: /srv/safeterm/commands/operations.d
+  commands/profiles.d: /srv/safeterm/commands/profiles.d
+  commands/executables.d: /srv/safeterm/commands/executables.d
+  access/policies.d: /srv/safeterm/access/policies.d
 ```
 
 Only supported JSON definition directory names are accepted; changed files trigger

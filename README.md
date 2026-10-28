@@ -290,10 +290,12 @@ SafeTerm Verification: PASS
 
 ## Install from a downloaded GitHub Release
 
-This source includes a breaking configuration layout change (ADR-032). Use a
-Release that explicitly contains it. Old-layout installations are refused before
-deployment; preserve a backup and provision a clean installation with new JSON
-resource definitions. Do not copy the old configuration tree over the new one.
+This source groups administrator settings by purpose (ADR-044). The installer
+automatically migrates v0.27 source directories, credentials and network policy
+after taking a rollback snapshot. Use a release that explicitly contains this
+change. Older installations with compiled catalog directories directly under
+`/etc/safeterm` remain unsupported (ADR-032); preserve a backup and provision a
+clean installation with new JSON resource definitions.
 
 Download the AMD64 or ARM64 offline archive and its checksum from
 [GitHub Releases](https://github.com/ASO8304/safeterm/releases), verify the published
@@ -360,10 +362,9 @@ See [terminal](docs/restricted-terminal.md) and [termctl](docs/termctl.md).
 
 ## Project Structure
 
-The [catalog administration guide](configs/README.md) explains all catalog
-sections in detail. A plain-text edition is in `configs/README.txt`; both
-editions are installed at `/etc/safeterm/README.md` and
-`/etc/safeterm/README.txt`.
+The [layout guide](configs/README.md) explains the grouped administrator tree.
+Detailed guides live under `/etc/safeterm/docs/`; see the
+[administration guide](configs/docs/administration.md).
 
 ```text
 safeterm/
@@ -420,10 +421,10 @@ then starts forward, with exact signed grants and per-step Audit records. See
 
 ## Ubuntu Server 24.04 network management
 
-Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See [the network guide](docs/network-configuration.md) for setup, examples and recovery.
+Use `config network interface` and `config network route` to save candidates, then `execute network apply` and `execute network confirm` for a timed Netplan trial. The root-owned `/etc/safeterm/network/policy.json` policy starts with no editable interfaces. The `netops` role permits network work by default within the administrator interface allowlist. Existing filenames are discovered automatically. See [the network guide](docs/network-configuration.md) for setup, examples and recovery.
 
 System diagnostics use `execute system_info host`, `execute system_info memory` and `execute system_info disk`.
 
-Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
 
 Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See [network diagnostics](docs/network-diagnostics.md).

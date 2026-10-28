@@ -43,12 +43,12 @@ for entry in audit network-manager config-manager config-writer console gateway 
 done
 
 cp -R "$repo_dir/internal/defaults/catalog/." "$staging/payload/catalog-source/"
-cp "$repo_dir/configs/README.md" "$repo_dir/configs/README.txt" "$staging/payload/catalog-source/"
-cp "$repo_dir/configs/NETWORK.md" "$repo_dir/configs/NETWORK.txt" "$repo_dir/configs/NETWORK-DIAGNOSTICS.md" "$repo_dir/configs/NETWORK-DIAGNOSTICS.txt" "$repo_dir/configs/network.json" "$staging/payload/catalog-source/"
-for definitions in resources.d roles.d profiles.d operations.d executables.d policies.d; do
-  cp -R "$repo_dir/configs/$definitions" "$staging/payload/catalog-source/"
+cp "$repo_dir/configs/README.md" "$staging/payload/catalog-source/"
+cp -R "$repo_dir/configs/docs" "$repo_dir/configs/network" "$staging/payload/catalog-source/"
+for definitions in resources.d access/roles.d commands/profiles.d commands/operations.d commands/executables.d access/policies.d; do
+  mkdir -p "$staging/payload/catalog-source/$definitions"
+  cp -R "$repo_dir/configs/$definitions/." "$staging/payload/catalog-source/$definitions/"
 done
-cp -R "$repo_dir/deploy/demo/managed/." "$staging/payload/managed/"
 cp "$repo_dir/deploy/runtime/resources.json" "$staging/payload/resources.json"
 cp "$repo_dir/deploy/console/users.example.json" "$staging/payload/console/users.json"
 cp "$repo_dir/deploy/console/users.template.jsonc" "$staging/payload/templates/console-users.template.jsonc"

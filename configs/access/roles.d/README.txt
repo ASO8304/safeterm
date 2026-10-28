@@ -1,4 +1,4 @@
-# executables.d
+# access/roles.d
 
 Administrator JSON definitions. TEMPLATE.json is ALWAYS ignored before opening
 or decoding. Copy it to another *.json name to activate a definition. Non-JSON

@@ -154,8 +154,8 @@ func TestOfflinePackageIsCompleteAndPreservesUpgradeState(t *testing.T) {
 	for _, marker := range []string{
 		"sha256sum -c PACKAGE-SHA256SUMS", "--prepare-catalog", "--signed-catalog",
 		"--local-signing", "--ssh-public-key", "--dry-run",
-		"/etc/safeterm/ssh/ssh_host_ed25519_key", "/etc/safeterm/ssh/users.json",
-		"/etc/safeterm/console/users.json", "$payload/resources.json",
+		`"$ssh_source/ssh_host_ed25519_key"`, `"$ssh_source/users.json"`,
+		`"$console_source/users.json"`, "$payload/resources.json",
 		"--stage-managed-upgrade", "--keep-hashes", "/usr/share/safeterm/defaults", "safeterm-preflight", "--no-start",
 		"safeterm-runner-log-reader.service", "/usr/bin/tail", "/usr/bin/sudo",
 		"stop_units_if_present()", `systemctl cat "$unit"`,
@@ -250,7 +250,7 @@ func TestInstallerVerifiesBeforeMutationAndStartsDependenciesInOrder(t *testing.
 	if !strings.Contains(installer, "--dry-run") || !strings.Contains(installer, "sha256sum -c") || !strings.Contains(installer, "safeterm-preflight --installed") {
 		t.Fatal("installer is missing dry-run, checksum, or installed-preflight enforcement")
 	}
-	for _, marker := range []string{"safeterm-console", "useradd --create-home", "usermod --shell", "/etc/safeterm/console/users.json"} {
+	for _, marker := range []string{"safeterm-console", "useradd --create-home", "usermod --shell", "/etc/safeterm/access/console/users.json"} {
 		if !strings.Contains(installer, marker) {
 			t.Errorf("installer is missing console-login marker %q", marker)
 		}

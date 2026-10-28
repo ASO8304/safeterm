@@ -43,7 +43,7 @@ through execute service. Existing config.fields definitions remain supported.
 ## Logs have one registration path
 
 Packaged defaults do not register any log sources. Define application logs in
-resources.d; no operations.d override is needed. The log-viewer role, tail
+resources.d; no commands/operations.d override is needed. The log-viewer role, tail
 executable binding and isolated log-reader profile remain available.
 
 For example, create /etc/safeterm/resources.d/product.json:
@@ -69,7 +69,7 @@ execute logs product main. Tab and contextual help list only authorized logs.
 The filename above is an example: the log file must already exist on the host.
 
 Upgrades preserve administrator inputs. If an older installation has an explicit
-operations.d override defining the old log operation (often log.json), migrate
+commands/operations.d override defining the old log operation (often log.json), migrate
 its paths into resources.d and remove that override before applying. Merely
 renaming that file to .json.disabled is also sufficient to exclude it. The new
 package does not restore the old built-in operation. Other registered logs and
@@ -87,4 +87,4 @@ See [the installed resource guide](../configs/resources.d/README.md#service-alia
 for the complete JSON example, timeouts, partial-failure behavior, exact grants,
 Audit records and concurrency limits. Single-unit definitions remain supported.
 
-Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `operations.d`/`policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
+Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.

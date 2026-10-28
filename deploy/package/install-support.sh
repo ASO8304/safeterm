@@ -4,6 +4,59 @@
 
 safeterm_has_terminal() { [ -t 0 ]; }
 
+# Staging must preserve v0.27 credentials before installation migrates them.
+# The runtime accepts only grouped paths; this is an installer-only resolver.
+safeterm_admin_source() {
+  source_admin=$1
+  source_grouped=$source_admin/$2
+  source_flat=$source_admin/$3
+  if [ -e "$source_grouped" ] || [ -L "$source_grouped" ]; then
+    [ ! -e "$source_flat" ] && [ ! -L "$source_flat" ] || {
+      echo "Administrator layout conflict: both $source_grouped and $source_flat exist." >&2
+      return 1
+    }
+    printf '%s\n' "$source_grouped"
+  elif [ -e "$source_flat" ] || [ -L "$source_flat" ]; then
+    printf '%s\n' "$source_flat"
+  else
+    printf '%s\n' "$source_grouped"
+  fi
+}
+
+# Remove only the obsolete empty demo directories, never application data or
+# symlinks. Validate the entire tree before removing any directory. rmdir also
+# refuses data created between inspection and removal. The argument permits
+# isolated tests; the installer always passes /etc/safeterm-managed.
+safeterm_cleanup_legacy_managed() {
+  legacy_managed=$1
+  [ -e "$legacy_managed" ] || [ -L "$legacy_managed" ] || return 0
+  if [ -L "$legacy_managed" ] || [ ! -d "$legacy_managed" ]; then
+    echo "Retained $legacy_managed: not an ordinary empty legacy directory. Administrator configuration belongs in /etc/safeterm."
+    return 0
+  fi
+  for legacy_child in "$legacy_managed"/* "$legacy_managed"/.[!.]* "$legacy_managed"/..?*; do
+    [ -e "$legacy_child" ] || [ -L "$legacy_child" ] || continue
+    case "$legacy_child" in
+      "$legacy_managed/application"|"$legacy_managed/database"|"$legacy_managed/network") ;;
+      *) echo "Retained $legacy_managed: contains site files; review resource paths before relocating them."; return 0 ;;
+    esac
+    if [ -L "$legacy_child" ] || [ ! -d "$legacy_child" ]; then
+      echo "Retained $legacy_managed: contains a non-directory or symlink; no cleanup performed."
+      return 0
+    fi
+    legacy_entries=$(find "$legacy_child" -mindepth 1 -maxdepth 1 -print -quit) || return 1
+    if [ -n "$legacy_entries" ]; then
+      echo "Retained $legacy_managed: contains site files; review resource paths before relocating them."
+      return 0
+    fi
+  done
+  for legacy_profile in application database network; do
+    [ ! -d "$legacy_managed/$legacy_profile" ] || rmdir -- "$legacy_managed/$legacy_profile" || return 1
+  done
+  rmdir -- "$legacy_managed" || return 1
+  echo "Removed empty legacy directory $legacy_managed; administrator configuration is in /etc/safeterm."
+}
+
 safeterm_find_missing() {
   missing=
   for tool in stty install find awk grep sed tar date realpath cmp flock useradd usermod groupadd getent systemctl ssh-keygen visudo; do

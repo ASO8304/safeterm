@@ -11,7 +11,7 @@ import (
 )
 
 const Socket = "/run/safeterm-network-manager/manager.sock"
-const PolicyPath = "/etc/safeterm/network.json"
+const PolicyPath = "/etc/safeterm/network/policy.json"
 const StatePath = "/var/lib/safeterm/network"
 const maxFiles = 64
 const maxBytes = 4 << 20

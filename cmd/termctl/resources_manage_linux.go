@@ -96,7 +96,7 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 		return err
 	}
 	defer unlock()
-	if err = layout.RejectLegacy(dir); err != nil {
+	if err = layout.CheckAdministration(dir); err != nil {
 		return err
 	}
 	for _, path := range []string{dir, filepath.Join(dir, "resources.d"), layout.Generated, layout.Defaults, filepath.Dir(writerDropIn), filepath.Dir("/etc/sudoers.d/safeterm-service-manager")} {
@@ -137,7 +137,7 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 		return err
 	}
 	if _, err := networkmanager.ReadPolicy("/"); err != nil {
-		return fmt.Errorf("network.json: %w", err)
+		return fmt.Errorf("network/policy.json: %w", err)
 	}
 	if action == "initialize" {
 		// The installer has staged verified package defaults; identities may already

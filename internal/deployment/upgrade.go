@@ -126,7 +126,7 @@ func InstallGenerated(source, target string) error {
 		}
 		defer os.Remove(file.Name())
 		mode := os.FileMode(0600)
-		if name == "resources.json" || name == "ssh/ssh_host_ed25519_key.pub" {
+		if name == "resources.json" || name == "access/ssh/ssh_host_ed25519_key.pub" {
 			mode = 0644
 		}
 		if _, err = file.Write(data); err == nil {
@@ -168,7 +168,7 @@ func InstallGenerated(source, target string) error {
 			}
 		}
 	}
-	for _, name := range []string{"catalog.json", "catalog.sig", "trust/catalog-ed25519.pub", "README.md", "README.txt"} {
+	for _, name := range []string{"catalog.json", "catalog.sig", "trust/catalog-ed25519.pub", "README.md"} {
 		if err := copyFile(name, false); err != nil {
 			return err
 		}
@@ -201,10 +201,10 @@ func InstallGenerated(source, target string) error {
 // InstallAdministration publishes only human-owned definitions, credentials and
 // trust. It refuses legacy layouts and never imports registry/catalog fragments.
 func InstallAdministration(source, target string) error {
-	if err := layout.RejectLegacy(target); err != nil {
+	if err := layout.MigrateAdministration(target); err != nil {
 		return err
 	}
-	for _, dir := range append([]string{"", "ssh", "console", "trust", "resources.d"}, siteconfig.Directories...) {
+	for _, dir := range append([]string{"", "access/ssh", "access/console", "trust", "resources.d", "network", "docs"}, siteconfig.Directories...) {
 		path := filepath.Join(target, dir)
 		if err := os.MkdirAll(path, 0755); err != nil {
 			return err
@@ -214,9 +214,9 @@ func InstallAdministration(source, target string) error {
 			return fmt.Errorf("unsafe administrator directory %s", path)
 		}
 	}
-	policyPath := filepath.Join(target, "network.json")
+	policyPath := filepath.Join(target, "network/policy.json")
 	if _, err := os.Lstat(policyPath); os.IsNotExist(err) {
-		data, readErr := os.ReadFile(filepath.Join(source, "network.json"))
+		data, readErr := os.ReadFile(filepath.Join(source, "network/policy.json"))
 		if os.IsNotExist(readErr) {
 			data, _ = json.MarshalIndent(networkmanager.DefaultPolicy(), "", "  ")
 		} else if readErr != nil {
@@ -224,7 +224,7 @@ func InstallAdministration(source, target string) error {
 		}
 		var policy networkmanager.Policy
 		if err := networkmanager.DecodeJSON(data, &policy); err != nil {
-			return fmt.Errorf("network.json: %w", err)
+			return fmt.Errorf("network/policy.json: %w", err)
 		}
 		if err := policy.Validate(); err != nil {
 			return err
@@ -235,7 +235,7 @@ func InstallAdministration(source, target string) error {
 	} else if err != nil {
 		return err
 	} else if info, err := os.Lstat(policyPath); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0022 != 0 {
-		return fmt.Errorf("unsafe network.json")
+		return fmt.Errorf("unsafe network/policy.json")
 	}
 	copyOne := func(name string, preserve bool, mode os.FileMode) error {
 		dst := filepath.Join(target, name)
@@ -273,7 +273,7 @@ func InstallAdministration(source, target string) error {
 		}
 		return os.Rename(f.Name(), dst)
 	}
-	for _, name := range []string{"ssh/users.json", "ssh/ssh_host_ed25519_key", "ssh/ssh_host_ed25519_key.pub", "console/users.json"} {
+	for _, name := range []string{"access/ssh/users.json", "access/ssh/ssh_host_ed25519_key", "access/ssh/ssh_host_ed25519_key.pub", "access/console/users.json"} {
 		if _, err := os.Stat(filepath.Join(source, name)); os.IsNotExist(err) {
 			continue
 		}
@@ -290,7 +290,7 @@ func InstallAdministration(source, target string) error {
 	if err := copyOne("trust/catalog-ed25519.pub", false, 0644); err != nil {
 		return err
 	}
-	for _, name := range []string{"NETWORK.md", "NETWORK.txt", "NETWORK-DIAGNOSTICS.md", "NETWORK-DIAGNOSTICS.txt"} {
+	for _, name := range []string{"docs/administration.md", "docs/administration.txt", "docs/network.md", "docs/network.txt", "docs/network-diagnostics.md", "docs/network-diagnostics.txt"} {
 		if _, err := os.Stat(filepath.Join(source, name)); err == nil {
 			if err = copyOne(name, false, 0644); err != nil {
 				return err
@@ -299,7 +299,7 @@ func InstallAdministration(source, target string) error {
 			return err
 		}
 	}
-	for _, name := range []string{"README.md", "README.txt"} {
+	for _, name := range []string{"README.md"} {
 		if err := copyOne(name, false, 0644); err != nil {
 			return err
 		}

@@ -168,7 +168,7 @@ resources/logs; users cannot provide arbitrary filesystem paths. The inactive
 `resources.d/TEMPLATE.json` shows the `logs` structure. See
 [resource definitions](resource-definitions.md) for setup and file permissions.
 
-Older installations may have an explicit `operations.d` override for the old
+Older installations may have an explicit `commands/operations.d` override for the old
 `log` operation. Remove that override and apply after migrating its paths to
 resources.d; upgrades preserve administrator files. The built-in `log-viewer`
 role and isolated log-reader profile remain available for resource-defined logs.

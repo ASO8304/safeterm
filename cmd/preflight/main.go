@@ -22,7 +22,19 @@ func main() {
 	stageManaged := flag.Bool("stage-managed-upgrade", false, "stage existing registered files into a private installer bundle")
 	installConfig := flag.Bool("install-configuration", false, "install validated configuration preserving host files")
 	writerPlan := flag.Bool("writer-plan", false, "print privileged writer sandbox drop-in")
+	checkAdminUpgrade := flag.Bool("check-administration-upgrade", false, "check administrator layout migration without changing the host")
 	flag.Parse()
+	if *checkAdminUpgrade {
+		if os.Geteuid() != 0 || *root != "" || *installed {
+			fmt.Fprintln(os.Stderr, "administrator upgrade check requires root and no bundle/installed mode")
+			os.Exit(2)
+		}
+		if err := layout.CheckAdministrationMigration(layout.Admin); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *stageManaged || *installConfig {
 		if os.Geteuid() != 0 || *root == "" || *installed || (*stageManaged && *installConfig) {
 			fmt.Fprintln(os.Stderr, "installer helper requires root and one --bundle mode")

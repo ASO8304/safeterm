@@ -8,11 +8,11 @@ not supported. This extends ADR-032 without restoring legacy source loading.
 | Directory | Object in each active JSON file |
 |---|---|
 | resources.d | Independent service/config/log resources |
-| roles.d | Role name and description |
-| operations.d | Operation definition, optional role assignment or disabled flag |
-| executables.d | Executable ID, exact path, approved SHA-256 and allowed profiles |
-| profiles.d | Runner template and bounded isolation/runtime limits |
-| policies.d | One role's exact list of authorized operations |
+| access/roles.d | Role name and description |
+| commands/operations.d | Operation definition, optional role assignment or disabled flag |
+| commands/executables.d | Executable ID, exact path, approved SHA-256 and allowed profiles |
+| commands/profiles.d | Runner template and bounded isolation/runtime limits |
+| access/policies.d | One role's exact list of authorized operations |
 
 Every directory has an inactive TEMPLATE.json and English README.md/README.txt.
 The exact TEMPLATE.json is skipped before opening, even if invalid or a symlink.
@@ -25,13 +25,22 @@ must each fit 1 MiB. Source filenames are arbitrary; object names/IDs determine
 replacement. Removing a built-in override restores the packaged default. Removing
 an added definition removes it, but still-referenced definitions fail closed.
 
+## Administrator layout
+
+Settings are grouped under `/etc/safeterm/access/`, `commands/`, `resources.d/`,
+`network/` and `trust/`. Guides live in `docs/`; the root README explains the tree.
+The network policy is `network/policy.json`. Package updates migrate v0.27 flat
+source directories and credentials automatically after taking the installation
+snapshot. Contents, ownership and ACLs are preserved; conflicts stop the update
+before host changes. Runtime services read only the grouped paths.
+
 ## Edit an existing default
 
 From a normal Linux administrator shell:
 
 ```sh
-sudo termctl defaults operation ping | sudo tee /etc/safeterm/operations.d/ping.json >/dev/null
-sudo nano /etc/safeterm/operations.d/ping.json
+sudo termctl defaults operation ping | sudo tee /etc/safeterm/commands/operations.d/ping.json >/dev/null
+sudo nano /etc/safeterm/commands/operations.d/ping.json
 sudo termctl check
 sudo termctl apply
 ```
@@ -52,13 +61,13 @@ list/describe` and `termctl executable list/describe` inspect compiled definitio
 
 ## Add a role and operation
 
-roles.d/site-reader.json:
+access/roles.d/site-reader.json:
 
 ```json
 {"name":"site-reader","description":"Read site system information"}
 ```
 
-operations.d/site-system.json:
+commands/operations.d/site-system.json:
 
 ```json
 {
@@ -89,7 +98,7 @@ to normal typed validation, authorization and executable approval.
 
 ## Policies
 
-policies.d/site-reader.json can explicitly replace a role's entire operation list:
+access/policies.d/site-reader.json can explicitly replace a role's entire operation list:
 
 ```json
 {"role":"site-reader","operations":["system_info","site_system"]}
@@ -99,20 +108,20 @@ There are no wildcard grants or role inheritance. An empty operation list is
 valid. Resource config read/edit permissions remain in resources.d and are
 independent of operation policies. Compilation order is defaults, role/profile/
 executable/operation overrides, generated resources, then exact policy replacements.
-Thus a policies.d entry is authoritative over operation-level/generated grants
+Thus a access/policies.d entry is authoritative over operation-level/generated grants
 for that role; list every operation it should retain. The final model must pass
 all cross-reference, translation, integrity and identity validation.
 
 ## Executables
 
-operations select executable IDs. executables.d defines their actual paths,
+operations select executable IDs. commands/executables.d defines their actual paths,
 SHA-256 approvals and allowed profiles. Use:
 
 ```sh
 termctl executable hash /usr/bin/uptime
 ```
 
-Put that digest into a definition based on executables.d/TEMPLATE.json. Its zero
+Put that digest into a definition based on commands/executables.d/TEMPLATE.json. Its zero
 digest is only an inactive placeholder. Hashing does not activate anything or
 refresh stored approvals. Changed executable bytes require explicit source hash
 updates and check/apply. Scripts and non-native/writable executables remain
@@ -121,7 +130,7 @@ never silently rewrite administrator-approved executable hashes.
 
 ## Independent Runner profiles
 
-profiles.d/site-diagnostics.json:
+commands/profiles.d/site-diagnostics.json:
 
 ```json
 {
@@ -163,7 +172,7 @@ Omitted/zero numeric overrides inherit the default. Built-in profile names may
 also be overridden, with their own base and immutable identities/sockets.
 
 Custom profiles initially inherit the base's hashed executable allowlist. An
-executables.d replacement is exact and must retain all intended profile members.
+commands/executables.d replacement is exact and must retain all intended profile members.
 
 ## Activation, rollback, update and signing
 

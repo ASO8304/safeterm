@@ -53,18 +53,18 @@ func loadSiteDirectory[T any](root, dir string) ([]siteconfig.Named[T], error) {
 func loadSiteInputs(root string) (siteconfig.Inputs, error) {
 	var input siteconfig.Inputs
 	var err error
-	if input.Roles, err = loadSiteDirectory[siteconfig.Role](root, "roles.d"); err != nil {
+	if input.Roles, err = loadSiteDirectory[siteconfig.Role](root, "access/roles.d"); err != nil {
 		return input, err
 	}
-	if input.Profiles, err = loadSiteDirectory[siteconfig.Profile](root, "profiles.d"); err != nil {
+	if input.Profiles, err = loadSiteDirectory[siteconfig.Profile](root, "commands/profiles.d"); err != nil {
 		return input, err
 	}
-	if input.Executables, err = loadSiteDirectory[config.ExecutableDefinition](root, "executables.d"); err != nil {
+	if input.Executables, err = loadSiteDirectory[config.ExecutableDefinition](root, "commands/executables.d"); err != nil {
 		return input, err
 	}
-	if input.Operations, err = loadSiteDirectory[siteconfig.Operation](root, "operations.d"); err != nil {
+	if input.Operations, err = loadSiteDirectory[siteconfig.Operation](root, "commands/operations.d"); err != nil {
 		return input, err
 	}
-	input.Policies, err = loadSiteDirectory[config.PolicyDefinition](root, "policies.d")
+	input.Policies, err = loadSiteDirectory[config.PolicyDefinition](root, "access/policies.d")
 	return input, err
 }

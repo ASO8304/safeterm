@@ -57,8 +57,8 @@ func TestSiteLoaderIgnoresTemplateBeforeOpeningAndRejectsSourceLinks(t *testing.
 	if err = os.Chmod(root, 0755); err != nil {
 		t.Fatal(err)
 	}
-	dir := filepath.Join(root, "roles.d")
-	if err := os.Mkdir(dir, 0755); err != nil {
+	dir := filepath.Join(root, "access/roles.d")
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink("/missing/template", filepath.Join(dir, "TEMPLATE.json")); err != nil {
