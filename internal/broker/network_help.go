@@ -23,6 +23,7 @@ var networkEditorDescriptions = map[string]string{
 	"unselect": "Remove specific values from a list",
 	"unset":    "Clear a list, or remove the explicit MTU setting",
 	"next":     "Leave the selected item; keep staged edits in the editor",
+	"back":     "Discard unsaved edits to the selected item and return to its item list; from the list, discard this editor and return to the network menu",
 	"end":      "Validate and save the candidate, then exit; does not apply networking",
 	"abort":    "Exit and discard unsaved editor changes; keep any previously saved candidate",
 	"delete":   "Remove a named route from the candidate",
@@ -60,7 +61,7 @@ func (s *Shell) networkActionHelp(fields []string) error {
 	return fmt.Errorf("usage: execute network ? or execute network ACTION ?")
 }
 func (s *Shell) networkContextHelp(kind string, selected bool) {
-	values := []string{"edit", "show", "diff", "next", "end", "abort"}
+	values := []string{"?", "back", "edit", "show", "diff", "next", "end", "abort"}
 	if kind == "route" {
 		values = append(values, "delete")
 	}
@@ -73,6 +74,9 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 	sort.Strings(values)
 	for _, name := range values {
 		desc := networkEditorDescriptions[name]
+		if name == "?" {
+			desc = "Show available commands; command ? keeps your input"
+		}
 		if name == "edit" {
 			if kind == "interface" {
 				desc = "Select an existing network interface"

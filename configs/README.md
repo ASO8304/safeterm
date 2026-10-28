@@ -20,7 +20,10 @@ All SafeTerm administrator settings live under `/etc/safeterm`:
 ```
 
 Copy a directory's inactive `TEMPLATE.json` to a new JSON filename, edit it,
-then run `sudo termctl check` and `sudo termctl apply`. Manage credentials with
+then run `sudo termctl check` and `sudo termctl apply`. Inside SafeTerm, login
+shows the command menu, `?` help keeps your input, and `back` discards the item
+you are leaving and shows its parent menu. `next` keeps staged item edits.
+Manage credentials with
 `sudo termctl user`; preserve their existing roles when changing them.
 
 Network policy starts with no editable interfaces. Add exact device names to

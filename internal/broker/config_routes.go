@@ -18,7 +18,7 @@ type configRoute struct {
 
 func (s *Shell) configRoutes(ctx context.Context) ([]configRoute, error) {
 	if s.configs == nil {
-		return nil, fmt.Errorf("configuration management is unavailable")
+		return nil, nil
 	}
 	items, err := s.configs.List(ctx, s.principal)
 	if err != nil {
@@ -47,7 +47,7 @@ func (s *Shell) configRoutes(ctx context.Context) ([]configRoute, error) {
 
 func (s *Shell) configPath(ctx context.Context, path []string, help bool) error {
 	routes, err := s.configRoutes(ctx)
-	if s.network != nil && len(path) == 0 {
+	if s.network != nil && len(path) == 0 && help {
 		s.writeTerminalData([]byte("network                  Interfaces and routes; use config network ?\n"))
 	}
 	if err != nil {
@@ -74,6 +74,7 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 		if err := s.enterConfig(ctx, r.resource); err != nil {
 			return err
 		}
+		s.configMenu = nil
 		if r.view != nil {
 			e := s.editing
 			e.logical = true
@@ -85,11 +86,11 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 			}
 			e.description.Fields = aliasDescriptions(e.description.Fields, *r.view)
 			e.base = e.aliasRead(e.base)
-			fmt.Fprint(s.output, "Use set NAME VALUE, show, diff; end saves only the file; abort discards.\r\n")
+			fmt.Fprint(s.output, "Use set NAME VALUE, show, diff; end saves; back discards this context and returns to its parent.\r\n")
 		} else {
 			fmt.Fprint(s.output, "Use edit SECTION, show, ?; end saves, cancel discards.\r\n")
 		}
-		return nil
+		return s.editorHelp(nil)
 	}
 	found := false
 	seen := map[string]bool{}
@@ -101,11 +102,17 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 			}
 			seen[name] = true
 			found = true
-			s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, r.description)))
+			if help {
+				s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, r.description)))
+			}
 		}
 	}
 	if !found && len(path) > 0 {
 		return fmt.Errorf("configuration path is unknown or unauthorized; use config ?")
+	}
+	if !help {
+		s.configMenu = append([]string{}, path...)
+		return s.showConfigurationMenu(ctx)
 	}
 	return nil
 }

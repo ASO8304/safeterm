@@ -62,6 +62,31 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 	}
 	command := fields[0]
 	switch command {
+	case "back":
+		if len(fields) != 1 {
+			return false, fmt.Errorf("usage: back")
+		}
+		if !e.logical && e.inSection {
+			remaining := make([]configmanager.FieldChange, 0, len(e.changes))
+			for _, change := range e.changes {
+				if change.Section != e.section {
+					remaining = append(remaining, change)
+				}
+			}
+			e.changes, e.section, e.inSection = remaining, "", false
+			fmt.Fprint(s.output, "Unsaved edits to this section discarded. Nothing saved.\r\n")
+			if err := s.editorHelp(nil); err != nil {
+				return false, err
+			}
+			return false, s.editorHelp([]string{"edit"})
+		}
+		parent := []string{}
+		if e.logical {
+			parent = append(parent, e.path[:len(e.path)-1]...)
+		}
+		s.editing = nil
+		fmt.Fprint(s.output, "Unsaved edits in this context discarded. Nothing saved.\r\n")
+		return false, s.openConfigurationPath(ctx, parent, false)
 	case "cancel", "abort":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: cancel")
@@ -91,7 +116,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 			if f.Section == section {
 				e.section = section
 				e.inSection = true
-				return false, nil
+				return false, s.editorHelp(nil)
 			}
 		}
 		return false, fmt.Errorf("section is unknown or unauthorized; use edit ?")
@@ -105,6 +130,8 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 		// Keep one resource transaction across sections; only end writes the file.
 		e.section = ""
 		e.inSection = false
+		fmt.Fprint(s.output, "Edits kept in this editor; nothing saved.\r\n")
+		return false, s.editorHelp([]string{"edit"})
 	case "show":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: show")
@@ -277,6 +304,8 @@ func (s *Shell) editorHelp(fields []string) error {
 		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, description)))
 	}
 	if len(fields) == 0 {
+		row("?", "Show available commands; command ? keeps your input")
+		row("back", "Discard unsaved edits to this section/context and return to the previous menu")
 		for _, r := range [][2]string{{"show", "Show values including staged changes; secrets are hidden"}, {"edit SECTION", "Select a registered section"}, {"set KEY VALUE", "Stage a value; omit VALUE for a secret"}, {"diff", "Show unsaved changes"}, {"next", "Return to the resource; keep staged changes"}, {"end", "Validate and save all changes, then leave configuration"}, {"rollback", "Restore the latest file backup; asks for confirmation"}, {"cancel", "Discard unsaved changes and leave configuration"}, {"exit", "Close session and discard unsaved changes"}} {
 			if e.logical && (r[0] == "edit SECTION" || r[0] == "next") {
 				continue
@@ -286,6 +315,10 @@ func (s *Shell) editorHelp(fields []string) error {
 		if e.logical {
 			row("abort", "Discard unsaved changes and leave configuration")
 		}
+		return nil
+	}
+	if len(fields) == 1 && fields[0] == "back" {
+		row("<cr>", "Discard unsaved edits to this section/context and return to the previous menu without saving")
 		return nil
 	}
 	if fields[0] == "edit" && len(fields) == 1 {
@@ -343,7 +376,7 @@ func (s *Shell) editorCompletion(before, prefix string) []string {
 		index++
 	}
 	if index <= 0 {
-		commands := []string{"show", "set", "diff", "end", "cancel", "abort", "rollback", "exit"}
+		commands := []string{"?", "back", "show", "set", "diff", "end", "cancel", "abort", "rollback", "exit"}
 		if !s.editing.logical {
 			commands = append(commands, "edit", "next")
 		}

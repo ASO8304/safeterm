@@ -51,7 +51,11 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 		}
 		return true, err
 	}
-	if len(f) == 2 || (len(f) == 3 && f[2] == "?") {
+	if len(f) == 2 {
+		s.configMenu = []string{"network"}
+		return true, s.showConfigurationMenu(ctx)
+	}
+	if len(f) == 3 && f[2] == "?" {
 		s.writeTerminalData([]byte("interface    Addresses, DHCP, DNS and MTU\nroute        Static routes\n"))
 		return true, nil
 	}
@@ -70,8 +74,15 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 		return true, fmt.Errorf("network trial pending; use execute network confirm|rollback")
 	}
 	s.networkEdit = &networkEditSession{kind: f[2], base: *r.View, view: *r.View}
-	s.writeTerminalData([]byte("Use edit NAME, set FIELD VALUE, show, diff, next; end saves the candidate only. execute network apply starts a timed trial.\n"))
-	return true, nil
+	s.configMenu = nil
+	s.writeTerminalData([]byte("back discards edits to the item you leave; next keeps them staged. Only end saves a candidate. execute network apply starts a timed trial.\n"))
+	return true, s.networkSelectionMenu()
+}
+
+func (s *Shell) networkSelectionMenu() error {
+	s.networkContextHelp(s.networkEdit.kind, false)
+	s.writeTerminalData([]byte("Available items (use edit NAME):\n"))
+	return s.networkEditorHelp([]string{"edit"})
 }
 func (s *Shell) networkEditor(ctx context.Context, line string) error {
 	e := s.networkEdit
@@ -84,12 +95,35 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 	}
 
 	switch f[0] {
+	case "back":
+		if len(f) != 1 {
+			return fmt.Errorf("usage: back")
+		}
+		if e.item == "" {
+			s.networkEdit = nil
+			s.writeTerminalData([]byte("Unsaved edits in this network context discarded. Nothing saved.\n"))
+			return s.openConfigurationPath(ctx, []string{"network"}, false)
+		}
+		remaining := make([]networkmanager.Change, 0, len(e.changes))
+		for _, change := range e.changes {
+			if change.Kind != e.kind || change.Name != e.item {
+				remaining = append(remaining, change)
+			}
+		}
+		view, err := networkmanager.Modify(e.base, remaining)
+		if err != nil {
+			return err
+		}
+		s.writeTerminalData([]byte(fmt.Sprintf("Unsaved edits to %s discarded. Nothing saved.\n", e.item)))
+		e.changes, e.view, e.item = remaining, view, ""
+		return s.networkSelectionMenu()
 	case "abort", "cancel":
 		if len(f) != 1 {
 			break
 		}
 		s.networkEdit = nil
-		return nil
+		s.writeTerminalData([]byte("Unsaved editor changes discarded; any previously saved candidate is kept.\n"))
+		return s.questionHelp(ctx, nil)
 	case "edit":
 		if len(f) != 2 {
 			break
@@ -100,13 +134,15 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 			}
 		}
 		e.item = f[1]
+		s.networkContextHelp(e.kind, true)
 		return nil
 	case "next":
 		if len(f) != 1 {
 			break
 		}
 		e.item = ""
-		return nil
+		s.writeTerminalData([]byte("Edits kept in this editor; nothing saved.\n"))
+		return s.networkSelectionMenu()
 	case "show":
 		if len(f) != 1 {
 			break
@@ -180,7 +216,7 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 		f = f[:len(f)-1]
 	}
 	if e := s.networkEdit; e != nil {
-		values := []string{"edit", "show", "diff", "next", "end", "abort"}
+		values := []string{"?", "back", "edit", "show", "diff", "next", "end", "abort"}
 		if e.kind == "route" {
 			values = append(values, "delete")
 		}

@@ -19,7 +19,7 @@ func (editorAudit) Record(_ context.Context, e audit.Event) error { return e.Val
 func editorFixture(t *testing.T) (*Shell, string, *bytes.Buffer) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "options.ini")
-	data := "; preserve this comment\r\n[Server] ; server settings\r\nPort = 8080 ; port comment\r\nPassword = \"secret\"\r\n[Logging]\r\nLevel = info\r\n"
+	data := "; preserve this comment\r\n[Server] ; server settings\r\nPort = 8080 ; port comment\r\nPassword = \"secret-sentinel-editor\"\r\n[Logging]\r\nLevel = info\r\n"
 	if err := os.WriteFile(path, []byte(data), 0640); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestConfigEditorStagesAcrossSectionsAndCommitsOnce(t *testing.T) {
 	if !strings.Contains(s.prompt(), "(options/Logging)") {
 		t.Fatal(s.prompt())
 	}
-	if !strings.Contains(out.String(), "9091") || strings.Contains(out.String(), "secret") {
+	if !strings.Contains(out.String(), "9091") || strings.Contains(out.String(), "secret-sentinel-editor") {
 		t.Fatal("incorrect or secret output")
 	}
 	editorCommands(t, s, "end")

@@ -49,7 +49,7 @@ def expect(marker, timeout=20):
 
 
 def command(text, prompt=b'\nsafeterm::ci-admin> '):
-    os.write(fd, text.encode('ascii') + b'\r')
+    os.write(fd, b'\x15' + text.encode('ascii') + b'\r')
     result = expect(prompt)
     if b'error:' in result or b'Permission denied' in result:
         raise RuntimeError('command failed: ' + text)
@@ -61,7 +61,9 @@ try:
     os.write(fd, b'ci-admin\r')
     expect(b'Password: ')
     os.write(fd, b'SmokeTest42\r')
-    expect(b'\nsafeterm::ci-admin> ')
+    login_menu = expect(b'\nsafeterm::ci-admin> ')
+    if b'Show available commands' not in login_menu or b'Show your identity and roles' not in login_menu:
+        raise RuntimeError('login did not show the command menu')
     if mode == 'empty':
         with socket.socket() as listener:
             listener.bind(('127.0.0.1', 0))
@@ -102,8 +104,12 @@ try:
         result = command('execute ?')
         if b'Authorized service commands' in result or b'execute service ' in result:
             raise RuntimeError('package registered implicit service commands')
+        os.write(fd, b'system_info host\r')
+        if b'result: success' not in expect(b'\nsafeterm::ci-admin> '):
+            raise RuntimeError('help lost the execute prefix')
     command('config ?')
-    command('config')
+    command('config', b'\nsafeterm::ci-admin(config)> ')
+    command('back')
     result = command('execute system_info disk')
     if b'result: success' not in result:
         raise RuntimeError('Gateway/Runner execution failed')
@@ -142,6 +148,13 @@ try:
         if b'8080' not in result:
             raise RuntimeError('registered INI value not read')
         command('set Po\t9090', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
+        command('back', b'\nsafeterm::ci-admin(fresh-options)> ')
+        if 'Port = 8080' not in open('/etc/safeterm-ci/options.ini', encoding='utf-8-sig').read():
+            raise RuntimeError('back saved the section')
+        command('edit Server', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
+        if b'8080' not in command('show', b'\nsafeterm::ci-admin(fresh-options/Server)> '):
+            raise RuntimeError('back retained the discarded section edit')
+        command('set Port 9090', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
         result = command('diff', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
         if b'8080 -> 9090' not in result:
             raise RuntimeError('completed set command did not stage expected edit')

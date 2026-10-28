@@ -100,6 +100,20 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 				}
 				fmt.Fprint(s.output, "\r\n")
 				value := string(line)
+				fields := strings.Fields(value)
+				if !secret && useHistory && len(fields) > 0 && fields[len(fields)-1] == "?" {
+					// Help is handled without submitting the input buffer. Retain
+					// the exact command prefix so typing can continue after Enter.
+					if _, err := s.executeLine(ctx, strings.TrimSpace(value), nil); err != nil {
+						fmt.Fprintf(s.output, "error: %v\r\n", err)
+					}
+					prefix := strings.TrimRight(value, " \t")
+					line = []byte(prefix[:len(prefix)-1])
+					cursor = len(line)
+					historyIndex, draft = len(s.history), ""
+					fmt.Fprint(s.output, prompt, string(line))
+					continue
+				}
 				if useHistory && value != "" && len(strings.Fields(value)) > 0 && strings.Fields(value)[0] != "set" && strings.Fields(value)[0] != "append" && strings.Fields(value)[0] != "unselect" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
 					s.history = append(s.history, value)
 					if len(s.history) > maxShellHistory {
@@ -241,6 +255,9 @@ func matching(values []string, prefix string) []string {
 }
 
 func (s *Shell) completionCandidates(ctx context.Context, before, prefix string) []string {
+	if values, ok := s.configurationMenuCompletion(before, prefix); ok {
+		return values
+	}
 	if values, ok := s.networkCompletion(before, prefix); ok {
 		return values
 	}
@@ -252,7 +269,7 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 	}
 	fields := strings.Fields(before)
 	if len(fields) == 0 || (len(fields) == 1 && !strings.HasSuffix(before, " ")) {
-		return matching([]string{"clear", "config", "execute", "whoami", "exit"}, prefix)
+		return matching([]string{"?", "clear", "config", "execute", "whoami", "exit"}, prefix)
 	}
 	if fields[0] == "config" {
 		return s.configCompletion(ctx, before, prefix)

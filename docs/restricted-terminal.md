@@ -200,3 +200,35 @@ automatic recovery; consult the administrator and protected Audit record for
 physical-unit diagnostics. See the resource guide for group definitions.
 
 Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See [network diagnostics](network-diagnostics.md).
+
+## Help and back navigation
+
+After login, SafeTerm displays the main command menu automatically. Type `?`
+and press Enter for commands at the current level. Contextual help keeps your
+input: after `execute ?` and Enter, the prompt still contains `execute `, so you
+can continue with a command name. The same applies to `config ?`, `edit ?` and
+`set FIELD ?`. Help never executes a command, stages a change or saves anything.
+Use Ctrl+U to clear the retained line and start another command. Password and
+confirmation prompts keep their normal input behavior.
+
+`config` opens a menu. Choose an entry by typing its name or `edit NAME`;
+`config network` opens the interface/route menu. Tab completes menu entries and
+editor commands. Every `back` displays the parent menu or available items.
+
+| Command | Effect |
+|---|---|
+| `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
+| `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
+| `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
+| `next` inside a network item or file section | Return to the item list, keeping staged edits |
+| `end` inside an editor | Validate and save the editor draft |
+| `abort` / `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+
+`back` never writes a file, saves a network candidate or applies networking.
+Previously saved network candidates are kept. In navigation menus, `end` returns
+to the main prompt without saving anything. Only explicit save/apply commands
+change configuration.
+
+For example, from `network/interface/ip0`, `back` discards unsaved changes to
+`ip0` and shows the interface list. Another `back` leaves the interface editor
+and shows `interface` and `route`; another returns to the configuration menu.

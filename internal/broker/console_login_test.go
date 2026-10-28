@@ -30,6 +30,9 @@ func TestConsoleLoginUsesInternalIdentityAndNeverEchoesPassword(t *testing.T) {
 	if logins != 1 || logouts != 1 || !strings.Contains(out.String(), "Authenticated as alice") || !strings.Contains(out.String(), "user: alice") {
 		t.Fatalf("logins=%d logouts=%d output=%q", logins, logouts, out.String())
 	}
+	if !strings.Contains(out.String(), "?                        Show available commands") {
+		t.Fatal("Console login did not show the command menu")
+	}
 	if strings.Contains(out.String(), "GoodPassword42") || strings.Contains(out.String(), strings.Repeat("a", 64)) {
 		t.Fatal("credential or session token echoed")
 	}
@@ -51,7 +54,7 @@ func TestConsoleNeverDispatchesBeforeSuccessfulLogin(t *testing.T) {
 	if err := shell.Run(context.Background()); err == nil {
 		t.Fatal("failed login accepted")
 	}
-	if attempts != 3 || len(gateway.requests) != 0 || strings.Contains(out.String(), "Authenticated as") {
+	if attempts != 3 || len(gateway.requests) != 0 || strings.Contains(out.String(), "Authenticated as") || strings.Contains(out.String(), "Show available commands") {
 		t.Fatal("unauthenticated command executed")
 	}
 }

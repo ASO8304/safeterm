@@ -29,6 +29,7 @@ type Shell struct {
 	network       networkmanager.API
 	networkEdit   *networkEditSession
 	editing       *configEditSession
+	configMenu    []string
 	consoleLogin  func(context.Context, string, []byte) (Principal, time.Time, error)
 	consoleLogout func(context.Context, Principal) error
 	client        GatewayClient
@@ -73,7 +74,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	defer func() { s.editing = nil }()
+	defer func() { s.editing, s.networkEdit, s.configMenu = nil, nil, nil }()
 	defer func() {
 		if errors.Is(context.Cause(ctx), errShellEscape) {
 			fmt.Fprint(s.output, "\r\nsession closed (Ctrl+])\r\n")
@@ -124,6 +125,9 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 		}
 	}
 	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: '?' lists commands; 'execute ?' lists operations; 'config ?' lists files. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
+	if err := s.questionHelp(ctx, nil); err != nil {
+		return err
+	}
 	for {
 		line, err := s.readLine(ctx, input, s.prompt(), false, true)
 		if err != nil {
@@ -180,13 +184,18 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	if s.networkEdit != nil {
 		return false, s.networkEditor(ctx, line)
 	}
-	if handled, err := s.networkCommand(ctx, strings.Fields(line)); handled {
-		return false, err
-	}
 	if s.editing != nil {
 		return s.configEditor(ctx, line, input)
 	}
 	fields := strings.Fields(line)
+	if s.configMenu != nil {
+		if handled, exit, err := s.configurationMenuCommand(ctx, fields); handled {
+			return exit, err
+		}
+	}
+	if handled, err := s.networkCommand(ctx, fields); handled {
+		return false, err
+	}
 	if fields[len(fields)-1] == "?" {
 		return false, s.questionHelp(ctx, fields[:len(fields)-1])
 	}
@@ -241,6 +250,7 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	}
 	if len(fields) == 0 {
 		for _, item := range [][2]string{
+			{"?", "Show available commands; command ? shows contextual help and keeps your input"},
 			{"execute", "Execute an authorized command; use execute ?"},
 			{"config", "Select a configuration file; use config ?"},
 			{"whoami", "Show your identity and roles"},
@@ -490,7 +500,11 @@ func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 func (s *Shell) prompt() string {
 	context := ""
 	if e := s.networkEdit; e != nil {
-		return fmt.Sprintf("safeterm::%s(network/%s/%s)> ", s.principal.UserID, e.kind, e.item)
+		path := "network/" + e.kind
+		if e.item != "" {
+			path += "/" + e.item
+		}
+		return fmt.Sprintf("safeterm::%s(%s)> ", s.principal.UserID, path)
 	}
 	if e := s.editing; e != nil {
 		if e.logical {
@@ -505,6 +519,13 @@ func (s *Shell) prompt() string {
 			context += "/" + section
 		}
 		context += ")"
+	}
+	if s.configMenu != nil {
+		path := strings.Join(s.configMenu, "/")
+		if path == "" {
+			path = "config"
+		}
+		context = "(" + path + ")"
 	}
 	return fmt.Sprintf("safeterm::%s%s> ", s.principal.UserID, context)
 }
