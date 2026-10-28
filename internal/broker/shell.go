@@ -29,6 +29,7 @@ type Shell struct {
 	network       networkmanager.API
 	networkEdit   *networkEditSession
 	editing       *configEditSession
+	stagedLogical map[string]*configEditSession
 	configMenu    []string
 	consoleLogin  func(context.Context, string, []byte) (Principal, time.Time, error)
 	consoleLogout func(context.Context, Principal) error
@@ -74,7 +75,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	}
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil)
-	defer func() { s.editing, s.networkEdit, s.configMenu = nil, nil, nil }()
+	defer func() { s.editing, s.networkEdit, s.configMenu, s.stagedLogical = nil, nil, nil, nil }()
 	defer func() {
 		if errors.Is(context.Cause(ctx), errShellEscape) {
 			fmt.Fprint(s.output, "\r\nsession closed (Ctrl+])\r\n")
@@ -142,7 +143,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			return ctx.Err()
 		}
 		if err != nil {
-			fmt.Fprintf(s.output, "error: %v\r\n", err)
+			s.writeTerminalData([]byte(fmt.Sprintf("Error: %v\n", err)))
 		}
 		if exit {
 			fmt.Fprint(s.output, "bye\r\n")
@@ -181,13 +182,19 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	if line == "" {
 		return false, nil
 	}
+	fields := strings.Fields(line)
+	if len(fields) == 0 {
+		return false, nil
+	}
+	if handled, exit, err := s.globalCommand(fields); handled {
+		return exit, err
+	}
 	if s.networkEdit != nil {
 		return false, s.networkEditor(ctx, line)
 	}
 	if s.editing != nil {
 		return s.configEditor(ctx, line, input)
 	}
-	fields := strings.Fields(line)
 	if s.configMenu != nil {
 		if handled, exit, err := s.configurationMenuCommand(ctx, fields); handled {
 			return exit, err
@@ -214,6 +221,9 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		if !ok {
 			return false, s.operationTreeHelp(fields[1:])
 		}
+		if fields[1] == "telnet" {
+			s.writeTerminalData([]byte("Use 'execute tcp-test' for port probing\n"))
+		}
 		arguments, err := parseOperationArguments(operation, args)
 		if err != nil {
 			return false, err
@@ -221,25 +231,9 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		return false, s.runOperation(ctx, operation, arguments, input)
 	case "config":
 		return false, s.configPath(ctx, fields[1:], false)
-	case "whoami":
-		if len(fields) != 1 {
-			return false, fmt.Errorf("usage: whoami")
-		}
-		fmt.Fprintf(s.output, "user: %s\r\nroles: %s\r\n", s.principal.UserID, strings.Join(s.principal.Roles, ", "))
-	case "clear":
-		if len(fields) != 1 {
-			return false, fmt.Errorf("usage: clear")
-		}
-		fmt.Fprint(s.output, "\x1b[2J\x1b[H")
-	case "exit", "logout", "quit":
-		if len(fields) != 1 {
-			return false, fmt.Errorf("usage: exit")
-		}
-		return true, nil
 	default:
 		return false, fmt.Errorf("unknown shell command %q; use 'help'", fields[0])
 	}
-	return false, nil
 }
 
 // questionHelp is read-only and never dispatches an execution or mutation.
@@ -389,7 +383,7 @@ func (s *Shell) writeHelp(topic string) error {
 	case "":
 		fmt.Fprint(s.output, "Commands\r\n  execute ?       List authorized operations\r\n  config ?        List registered configuration files\r\n  config RESOURCE Enter the configuration editor\r\n  whoami          Show identity and roles\r\n  exit            Close session\r\n\r\nTab completes; ? then Enter explains the current choices. Ctrl+C stops an operation; Ctrl+] closes the session.\r\n")
 	case "config":
-		fmt.Fprint(s.output, "config RESOURCE -> edit SECTION -> set KEY VALUE -> diff -> end\r\nUse next to select another section, cancel to discard. Only end saves.\r\nFor secrets: set KEY prompts privately. Use - for the root section.\r\n")
+		fmt.Fprint(s.output, "config RESOURCE -> edit SECTION -> set KEY VALUE -> diff -> save\r\nUse next to select another section, cancel to discard. Only save commits changes.\r\nFor secrets: set KEY prompts privately. Use - for the root section.\r\n")
 	case "execute":
 		return s.operationTreeHelp(nil)
 	case "keys":
@@ -409,7 +403,7 @@ func operationExample(operation config.OperationDefinition) string {
 		return "execute ping 192.0.2.1 -c 5"
 	}
 	if operation.Name == "telnet" {
-		return "execute telnet 192.0.2.1 443"
+		return "execute tcp-test 192.0.2.1 443"
 	}
 	parts := append([]string{"execute"}, operationWords(operation.Name)...)
 	for _, parameter := range operation.Parameters {
@@ -499,16 +493,20 @@ func (s *Shell) terminate(sessionID string) (contract.ControlResult, error) {
 
 func (s *Shell) prompt() string {
 	context := ""
+	dirty := ""
+	if s.editorDirty() {
+		dirty = "*"
+	}
 	if e := s.networkEdit; e != nil {
 		path := "network/" + e.kind
 		if e.item != "" {
 			path += "/" + e.item
 		}
-		return fmt.Sprintf("safeterm::%s(%s)> ", s.principal.UserID, path)
+		return fmt.Sprintf("safeterm::%s(%s)%s> ", s.principal.UserID, path, dirty)
 	}
 	if e := s.editing; e != nil {
 		if e.logical {
-			return fmt.Sprintf("safeterm::%s(%s)> ", s.principal.UserID, strings.Join(e.path, "/"))
+			return fmt.Sprintf("safeterm::%s(%s)%s> ", s.principal.UserID, strings.Join(e.path, "/"), dirty)
 		}
 		context = "(" + e.resource
 		if e.inSection {
@@ -527,7 +525,7 @@ func (s *Shell) prompt() string {
 		}
 		context = "(" + path + ")"
 	}
-	return fmt.Sprintf("safeterm::%s%s> ", s.principal.UserID, context)
+	return fmt.Sprintf("safeterm::%s%s%s> ", s.principal.UserID, context, dirty)
 }
 
 func (s *Shell) writeResponse(response *contract.ExecutionResponse) {

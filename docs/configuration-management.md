@@ -18,10 +18,10 @@ diff
 next
 edit ANOTHER_SECTION
 set KEY VALUE
-end
+save
 ```
 
-`set` stages values; `next` navigates without saving; `end` validates and commits
+`set` stages values; `next` navigates without saving; `save` validates and commits
 all changes once. `cancel` discards the draft. Use `edit -` for root-level fields.
 Secret fields use `set KEY` with a hidden prompt. Reads/diffs redact secrets and
 set command lines are excluded from history. Concurrent file edits cause a
@@ -123,12 +123,13 @@ editor commands. Every `back` displays the parent menu or available items.
 | `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
 | `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
 | `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
-| `next` inside a network item or file section | Return to the item list, keeping staged edits |
-| `end` inside an editor | Validate and save the editor draft |
-| `abort` / `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+| `next` inside a network item or file section | Move up (keeps unsaved edits staged) |
+| `next` inside a logical context | Return to the parent menu; reopen the context to continue the draft |
+| `save` inside an editor | Validate and save the editor draft |
+| `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
 
 `back` never writes a file, saves a network candidate or applies networking.
-Previously saved network candidates are kept. In navigation menus, `end` returns
+Previously saved network candidates are kept. In navigation menus, `cancel` returns
 to the main prompt without saving anything. Only explicit save/apply commands
 change configuration.
 

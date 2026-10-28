@@ -326,7 +326,7 @@ System diagnostics use `execute system_info host`, `execute system_info memory` 
 
 Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
 
-Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See `docs/network-diagnostics.txt` for full details.
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. The TCP probe sends no application data and does not provide an interactive login. See `docs/network-diagnostics.txt` for full details.
 
 ## Help and back navigation
 
@@ -347,15 +347,33 @@ editor commands. Every `back` displays the parent menu or available items.
 | `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
 | `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
 | `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
-| `next` inside a network item or file section | Return to the item list, keeping staged edits |
-| `end` inside an editor | Validate and save the editor draft |
-| `abort` / `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+| `next` inside a network item or file section | Move up (keeps unsaved edits staged) |
+| `next` inside a logical context | Return to the parent menu; reopen the context to continue the draft |
+| `save` inside an editor | Validate and save the editor draft |
+| `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
 
 `back` never writes a file, saves a network candidate or applies networking.
-Previously saved network candidates are kept. In navigation menus, `end` returns
+Previously saved network candidates are kept. In navigation menus, `cancel` returns
 to the main prompt without saving anything. Only explicit save/apply commands
 change configuration.
 
 For example, from `network/interface/ip0`, `back` discards unsaved changes to
 `ip0` and shows the interface list. Another `back` leaves the interface editor
 and shows `interface` and `route`; another returns to the configuration menu.
+
+## Visible drafts and editor commands
+
+Use save to validate and commit the current editor and cancel to discard it.
+These replace end and abort. Network save stores a candidate; execute network
+apply starts the separately confirmed trial. A * after the prompt context marks
+unsaved edits. Local diff uses - and + lines and hides secrets. Interface show
+includes STATE at editor entry, clear editing permissions and staged values.
+
+back moves up and discards edits to the item; next moves up and keeps them.
+Logical contexts retain drafts in their parent menu; reopen the context to
+continue or save. Parent-menu back discards drafts under that menu. Each logical
+context saves independently with its original version check.
+
+exit, clear and whoami work inside editors. Dirty exit warns and discards all
+unsaved session drafts before closing. execute tcp-test IP [PORT] is the port
+probe; execute telnet remains an alias and prints a migration notice.

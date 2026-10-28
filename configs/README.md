@@ -32,7 +32,7 @@ state.
 
 Network policy starts with no editable interfaces. Add exact device names to
 `network/policy.json` as root. Reopen the SafeTerm network editor after changing
-policy. `end` saves a network candidate; `execute network apply` starts a timed
+policy. `save` saves a network candidate; `execute network apply` starts a timed
 trial, and `execute network confirm` makes it persistent. See `docs/network.md`.
 
 Generated runtime data lives under `/var/lib/safeterm/generated`; verified package

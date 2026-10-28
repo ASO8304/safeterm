@@ -49,7 +49,7 @@ func TestConfigEditorThroughAuthenticatedIPCForSSHAndConsole(t *testing.T) {
 			if brokerType == "console" {
 				s.principal.ConsoleSession = "authenticated-login"
 			}
-			s.input = strings.NewReader("config options\redit Server\rset Port 9001\rnext\redit Logging\rset Level debug\rdiff\rend\rexit\r")
+			s.input = strings.NewReader("config options\redit Server\rset Port 9001\rnext\redit Logging\rset Level debug\rdiff\rsave\rexit\r")
 			if err = s.Run(ctx); err != nil {
 				t.Fatal(err)
 			}
@@ -106,7 +106,7 @@ func TestLogicalConfigMappingThroughAuthenticatedIPC(t *testing.T) {
 			if brokerType == "console" {
 				s.principal.ConsoleSession = "authenticated-login"
 			}
-			s.input = strings.NewReader("config tunnel\rset Value_1 1400\rset Value_2 443\rshow\rdiff\rend\rconfig application cat\rset enabled false\rend\rexit\r")
+			s.input = strings.NewReader("config tunnel\rset Value_1 1400\rset Value_2 443\rshow\rdiff\rsave\rconfig application cat\rset enabled false\rsave\rexit\r")
 			if err := s.Run(ctx); err != nil {
 				t.Fatal(err)
 			}

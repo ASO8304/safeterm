@@ -25,10 +25,10 @@ func TestNetworkBackDiscardsOnlySelectedItemAndShowsParentChoices(t *testing.T) 
 	}
 	editorCommands(t, s, "back")
 	e := s.networkEdit
-	if s.prompt() != "safeterm::alice(network/interface)> " || e.item != "" || len(e.changes) != 1 || e.view.Interfaces["ip1"].MTU == nil || len(e.view.Interfaces["ip0"].Addresses) != 1 {
+	if s.prompt() != "safeterm::alice(network/interface)*> " || e.item != "" || len(e.changes) != 1 || e.view.Interfaces["ip1"].MTU == nil || len(e.view.Interfaces["ip0"].Addresses) != 1 {
 		t.Fatalf("back discarded the wrong edits: %+v", e)
 	}
-	for _, want := range []string{"ip0", "ip1", "edit", "back", "Nothing saved"} {
+	for _, want := range []string{"ip0", "ip1", "edit", "back", "Discarded unsaved edits for 'ip0'."} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("parent choice missing %q: %s", want, out)
 		}
@@ -78,7 +78,7 @@ func TestSectionBackDiscardsCurrentSectionAndPreservesOtherDrafts(t *testing.T) 
 	if string(current) != string(before) {
 		t.Fatal("back wrote to disk")
 	}
-	editorCommands(t, s, "end")
+	editorCommands(t, s, "save")
 	current, _ = os.ReadFile(path)
 	if string(current) != strings.Replace(string(before), "Level = info", "Level = debug", 1) {
 		t.Fatal("discarded section was saved or other draft was lost")

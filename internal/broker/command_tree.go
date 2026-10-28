@@ -21,6 +21,8 @@ func operationWords(name string) []string {
 		}
 	}
 	switch name {
+	case "telnet":
+		return []string{"tcp-test"}
 	case "log":
 		return []string{"logs"}
 	case "memory_info":
@@ -47,6 +49,9 @@ func wordsStart(words, prefix []string) bool {
 }
 
 func (s *Shell) resolveOperation(fields []string) (config.OperationDefinition, []string, bool) {
+	if len(fields) > 0 && fields[0] == "telnet" {
+		fields = append([]string{"tcp-test"}, fields[1:]...)
+	}
 	var selected config.OperationDefinition
 	best := 0
 	ambiguous := false

@@ -10,7 +10,7 @@ import (
 
 func TestInterfaceShowIsScopedSortedAndReadable(t *testing.T) {
 	s, _, out := editorFixture(t)
-	api := &networkFixtureAPI{view: networkmanager.View{Version: "internal-version-hash", Owner: "private-owner", Interfaces: map[string]networkmanager.Interface{
+	api := &networkFixtureAPI{view: networkmanager.View{Version: "internal-version-hash", States: map[string]string{"ip0": "up", "ip1": "down"}, Owner: "private-owner", Interfaces: map[string]networkmanager.Interface{
 		"ip1": {Name: "ip1", DHCP4: true},
 		"ip0": {Name: "ip0", ID: "ip0", Addresses: []string{"192.168.222.10/24", "2001:db8::10/64"}, DNS: []string{"9.9.9.9"}, Files: []string{"etc/netplan/private-source.yaml"}, ReadOnly: "interface is outside administrator policy; a Linux administrator must add ip0"},
 	}, Routes: map[string]networkmanager.Route{"private-route": {Name: "private-route", Interface: "ip0", Gateway: "203.0.113.254"}}}}
@@ -20,7 +20,7 @@ func TestInterfaceShowIsScopedSortedAndReadable(t *testing.T) {
 	out.Reset()
 	editorCommands(t, s, "show")
 	text := out.String()
-	for _, want := range []string{"Interfaces (configuration draft)", "NAME", "DHCP4", "ADDRESSES", "EDITING", "ip0", "ip1", "192.168.222.10/24", "2001:db8::10/64", "Read-only", "Allowed", "Not allowed by administrator policy.", networkmanager.PolicyPath, "No unsaved interface edits.", "edit NAME"} {
+	for _, want := range []string{"Interfaces (configuration draft)", "NAME", "STATE", "up", "down", "DHCP4", "ADDRESSES", "EDITING", "ip0", "ip1", "192.168.222.10/24", "2001:db8::10/64", "Read-only", "Allowed", "Not allowed by administrator policy.", networkmanager.PolicyPath, "No unsaved interface edits.", "edit NAME"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q: %s", want, text)
 		}
@@ -57,7 +57,7 @@ func TestSelectedInterfaceShowIncludesOnlyItsDetailsAndStagedValues(t *testing.T
 	beforeChanges := append([]networkmanager.Change{}, s.networkEdit.changes...)
 	out.Reset()
 	editorCommands(t, s, "show")
-	for _, want := range []string{"Interface ip0 (configuration draft)", "Editing", "Allowed", "IPv4 DHCP", "disabled", "192.168.222.10/24", "192.168.222.100/24", "DNS servers", "1.1.1.1", "9.9.9.9", "Search domains", "example.test", "MTU", "1400", "Netplan ID", "uplink", "/etc/netplan/uplink.yaml", "unsaved; use diff"} {
+	for _, want := range []string{"Interface: ip0 (Editing Allowed)", "Editing", "Allowed", "DHCP4", "off", "192.168.222.10/24", "192.168.222.100/24", "DNS Servers", "1.1.1.1", "9.9.9.9", "Search Domains", "example.test", "MTU", "1400", "Netplan ID", "uplink", "/etc/netplan/uplink.yaml", "* Unsaved edits staged"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, out)
 		}
@@ -87,10 +87,10 @@ func TestInterfaceShowExplainsEmptyValuesAndReadOnlyReasons(t *testing.T) {
 			editorCommands(t, s, "config network interface", "edit ip0")
 			out.Reset()
 			editorCommands(t, s, "show")
-			if !strings.Contains(out.String(), "not configured") || !strings.Contains(out.String(), "automatic") || strings.Contains(out.String(), "null") {
+			if !strings.Contains(out.String(), "System default") || !strings.Contains(out.String(), "Automatic") || strings.Contains(out.String(), "null") {
 				t.Fatal(out.String())
 			}
-			if reason != "" && (!strings.Contains(out.String(), "Read-only") || !strings.Contains(out.String(), "Reason:")) {
+			if reason != "" && (!strings.Contains(out.String(), "Read-only") || !strings.Contains(out.String(), "Read-only:")) {
 				t.Fatal("read-only reason hidden", out)
 			}
 			if reason != "" && strings.Contains(out.String(), "set FIELD VALUE") {

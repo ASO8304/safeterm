@@ -74,6 +74,14 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 		if err := s.enterConfig(ctx, r.resource); err != nil {
 			return err
 		}
+		key := strings.Join(r.path, "/")
+		if draft := s.stagedLogical[key]; draft != nil && draft.resource == r.resource {
+			s.editing = draft
+			delete(s.stagedLogical, key)
+			s.configMenu = nil
+			s.writeTerminalData([]byte("Resumed unsaved edits.\n"))
+			return s.editorHelp(nil)
+		}
 		s.configMenu = nil
 		if r.view != nil {
 			e := s.editing
@@ -86,9 +94,9 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 			}
 			e.description.Fields = aliasDescriptions(e.description.Fields, *r.view)
 			e.base = e.aliasRead(e.base)
-			fmt.Fprint(s.output, "Use set NAME VALUE, show, diff; end saves; back discards this context and returns to its parent.\r\n")
+			fmt.Fprint(s.output, "Use set NAME VALUE, show, diff; save validates and commits; next keeps edits; back discards this context and returns to its parent.\r\n")
 		} else {
-			fmt.Fprint(s.output, "Use edit SECTION, show, ?; end saves, cancel discards.\r\n")
+			fmt.Fprint(s.output, "Use edit SECTION, show, ?; save validates and commits, cancel discards.\r\n")
 		}
 		return s.editorHelp(nil)
 	}

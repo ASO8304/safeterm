@@ -24,6 +24,7 @@ type Options struct {
 	Root, State string
 	Policy      func() (Policy, error)
 	Interfaces  func() map[string]string
+	LinkStates  func() map[string]string
 	Backend     Backend
 	Audit       audit.Sink
 	TrialLock   func() (io.Closer, error)
@@ -210,6 +211,14 @@ func (m *Manager) snapshot(p Policy) (*Snapshot, error) {
 	if err != nil {
 		return nil, err
 	}
+	if m.opts.LinkStates != nil {
+		s.View.States = map[string]string{}
+		for name, state := range m.opts.LinkStates() {
+			if _, ok := s.View.Interfaces[name]; ok {
+				s.View.States[name] = state
+			}
+		}
+	}
 	names := map[string]string{}
 	if err := m.load("route-names.json", &names); err != nil && !os.IsNotExist(err) {
 		return nil, err
@@ -329,6 +338,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		view = cloneView(c.View)
 		view.Version = c.Revision
+		view.States = s.View.States
 	}
 	switch r.Action {
 	case "read":
@@ -372,6 +382,9 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		revision := randomID()
 		modified.Version = revision
 		c = candidate{Owner: owner(req), Base: s.View.Version, Revision: revision, View: modified}
+		// Display metadata must not change the persisted candidate format. This
+		// also lets an older manager read the candidate after package rollback.
+		c.View.States = nil
 		if err = m.save("candidate.json", c); err != nil {
 			return Reply{}, err
 		}

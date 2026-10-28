@@ -4,6 +4,7 @@ package networkmanager
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
 	"regexp"
 	"slices"
@@ -73,7 +74,9 @@ type Route struct {
 	ReadOnly    string  `json:"read_only,omitempty"`
 }
 type View struct {
-	Version    string               `json:"version"`
+	Version string `json:"version"`
+	// Link states are display metadata, excluded from configuration identity.
+	States     map[string]string    `json:"states,omitempty"`
 	Interfaces map[string]Interface `json:"interfaces"`
 	Routes     map[string]Route     `json:"routes"`
 	Pending    bool                 `json:"pending"`
@@ -121,6 +124,11 @@ func Modify(v View, changes []Change) (View, error) {
 			var target *[]string
 			switch c.Field {
 			case "addresses":
+				for _, value := range c.Values {
+					if err := validateAddress(value); err != nil {
+						return v, err
+					}
+				}
 				target = &item.Addresses
 			case "dns":
 				target = &item.DNS
@@ -223,8 +231,10 @@ func ValidateView(v View) error {
 		}
 		seen := map[string]bool{}
 		for _, a := range i.Addresses {
-			p, err := netip.ParsePrefix(a)
-			if err != nil || p.Addr().IsUnspecified() || p.Addr().IsMulticast() || p.Addr().Zone() != "" || seen[a] {
+			if err := validateAddress(a); err != nil {
+				return err
+			}
+			if seen[a] {
 				return fmt.Errorf("network: interface %s invalid or duplicate address %q", i.Name, a)
 			}
 			seen[a] = true
@@ -268,6 +278,17 @@ func ValidateView(v View) error {
 	}
 	return nil
 }
+
+func validateAddress(value string) error {
+	if !strings.Contains(value, "/") {
+		return fmt.Errorf("'%s' is missing a CIDR prefix. Format as Address/Prefix (e.g., 10.50.0.0/16).", value)
+	}
+	p, err := netip.ParsePrefix(value)
+	if err != nil || p.Addr().IsUnspecified() || p.Addr().IsMulticast() || p.Addr().Zone() != "" {
+		return fmt.Errorf("invalid interface address %q; use Address/Prefix (e.g., 10.0.0.1/24)", value)
+	}
+	return nil
+}
 func metricValue(p *uint32) string {
 	if p == nil {
 		return "auto"
@@ -276,6 +297,7 @@ func metricValue(p *uint32) string {
 }
 func cloneView(v View) View {
 	result := v
+	result.States = maps.Clone(v.States)
 	result.Interfaces = map[string]Interface{}
 	result.Routes = map[string]Route{}
 	for k, i := range v.Interfaces {

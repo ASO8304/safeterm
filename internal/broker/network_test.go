@@ -56,11 +56,11 @@ func TestNetworkCandidateCLIAndCompletion(t *testing.T) {
 	if !strings.Contains(s.prompt(), "network/interface/ens19") {
 		t.Fatal(s.prompt())
 	}
-	editorCommands(t, s, "next", "end")
+	editorCommands(t, s, "next", "save")
 	if api.requests[len(api.requests)-1].Action != "save" || len(api.view.Interfaces["ens19"].Addresses) != 2 {
 		t.Fatal(api.requests)
 	}
-	editorCommands(t, s, "config network route", "edit office", "set interface ens19", "set destination 198.51.100.0/24", "set gateway 192.0.2.254", "set metric 100", "end")
+	editorCommands(t, s, "config network route", "edit office", "set interface ens19", "set destination 198.51.100.0/24", "set gateway 192.0.2.254", "set metric 100", "save")
 	if api.view.Routes["office"].Gateway != "192.0.2.254" {
 		t.Fatal(api.view.Routes)
 	}
@@ -78,7 +78,7 @@ func TestNetworkAbortNeverSaves(t *testing.T) {
 	s, _, _ := editorFixture(t)
 	api := &networkFixtureAPI{view: networkmanager.View{Version: "base", Interfaces: map[string]networkmanager.Interface{"ens19": {Name: "ens19"}}, Routes: map[string]networkmanager.Route{}}}
 	s.SetNetworkClient(api)
-	editorCommands(t, s, "config network interface", "edit ens19", "set mtu 1450", "abort")
+	editorCommands(t, s, "config network interface", "edit ens19", "set mtu 1450", "cancel")
 	if len(api.requests) != 1 || s.networkEdit != nil {
 		t.Fatal("abort saved candidate")
 	}
@@ -137,15 +137,15 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 	for _, tc := range []struct{ line, want string }{
 		{"?", "Add values to a list"},
 		{"edit ?", "ens20                   Select network interface; read-only: interface is outside administrator policy"},
-		{"set ?", "Static interface addresses in CIDR form"},
-		{"set addresses ?", "<IP/CIDR> [...]"},
+		{"set ?", "Replace all IP addresses"},
+		{"set addresses ?", "<cidr>..."},
 		{"set dhcp4 ?", "Enable IPv4 DHCP"},
 		{"append ?", "DNS search domains"},
 		{"unselect ?", "DNS server IP addresses"},
 		{"unset mtu ?", "Clear this field in the editor"},
-		{"end ?", "does not apply networking"},
-		{"abort ?", "discard unsaved editor changes"},
-		{"next ?", "keep staged edits"},
+		{"save ?", "does not apply networking"},
+		{"cancel ?", "discard unsaved editor changes"},
+		{"next ?", "Move up (keeps unsaved edits staged)"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)
@@ -159,7 +159,7 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 	if got := s.completionCandidates(context.Background(), "set ", ""); !reflect.DeepEqual(got, tabBefore) {
 		t.Fatalf("Tab changed: %v -> %v", tabBefore, got)
 	}
-	editorCommands(t, s, "abort", "config network route", "edit office")
+	editorCommands(t, s, "cancel", "config network route", "edit office")
 	beforeRequests = len(api.requests)
 	for _, tc := range []struct{ line, want string }{
 		{"?", "Remove a named route from the candidate"},

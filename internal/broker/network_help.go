@@ -22,14 +22,14 @@ var networkEditorDescriptions = map[string]string{
 	"append":   "Add values to a list without removing existing entries",
 	"unselect": "Remove specific values from a list",
 	"unset":    "Clear a list, or remove the explicit MTU setting",
-	"next":     "Leave the selected item; keep staged edits in the editor",
-	"back":     "Discard unsaved edits to the selected item and return to its item list; from the list, discard this editor and return to the network menu",
-	"end":      "Validate and save the candidate, then exit; does not apply networking",
-	"abort":    "Exit and discard unsaved editor changes; keep any previously saved candidate",
+	"next":     nextDescription,
+	"back":     backDescription,
+	"save":     "Validate and commit the candidate, then exit; does not apply networking",
+	"cancel":   "Exit and discard unsaved editor changes; keep any previously saved candidate",
 	"delete":   "Remove a named route from the candidate",
 }
 var networkInterfaceFields = map[string]string{
-	"addresses":      "Static interface addresses in CIDR form, e.g. 192.0.2.10/24; multiple values allowed",
+	"addresses":      "set addresses <cidr>... - Replace all IP addresses (e.g., 10.0.0.1/24)",
 	"dhcp4":          "Enable or disable DHCP for IPv4; static addresses are kept",
 	"dns":            "DNS server IP addresses; multiple values allowed",
 	"search-domains": "DNS search domains; multiple values allowed",
@@ -61,7 +61,7 @@ func (s *Shell) networkActionHelp(fields []string) error {
 	return fmt.Errorf("usage: execute network ? or execute network ACTION ?")
 }
 func (s *Shell) networkContextHelp(kind string, selected bool) {
-	values := []string{"?", "back", "edit", "show", "diff", "next", "end", "abort"}
+	values := []string{"?", "back", "edit", "show", "diff", "next", "save", "cancel", "exit", "clear", "whoami"}
 	if kind == "route" {
 		values = append(values, "delete")
 	}
@@ -74,6 +74,9 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 	sort.Strings(values)
 	for _, name := range values {
 		desc := networkEditorDescriptions[name]
+		if global, ok := globalDescriptions[name]; ok {
+			desc = global
+		}
 		if name == "?" {
 			desc = "Show available commands; command ? keeps your input"
 		}
@@ -209,7 +212,7 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 			}
 			return nil
 		}
-		placeholders := map[string]string{"addresses": "<IP/CIDR> [...]", "dns": "<IP> [...]", "search-domains": "<domain> [...]", "mtu": "<576..65535>", "destination": "<network/CIDR>", "gateway": "<IP>", "metric": "<0..4294967295>"}
+		placeholders := map[string]string{"addresses": "<cidr>...", "dns": "<IP> [...]", "search-domains": "<domain> [...]", "mtu": "<576..65535>", "destination": "<network/CIDR>", "gateway": "<IP>", "metric": "<0..4294967295>"}
 		s.networkHelpRow(placeholders[fields[1]], desc)
 		return nil
 	default:

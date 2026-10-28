@@ -25,7 +25,7 @@ same signed activation transaction. No ACL change is needed for writer access;
 unsafe parent directories and unsupported metadata are refused.
 
 The interactive user enters `config RESOURCE`, `edit SECTION`, `set KEY VALUE`,
-`diff`, `end`. See [the terminal guide](restricted-terminal.md).
+`diff`, `save`. See [the terminal guide](restricted-terminal.md).
 
 ```mermaid
 flowchart LR

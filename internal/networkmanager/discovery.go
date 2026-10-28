@@ -182,10 +182,10 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			item.Files = append(item.Files, f.Path)
 			reason := ""
 			if renderer != "" && renderer != "networkd" {
-				reason = "renderer must be networkd"
+				reason = fmt.Sprintf("Interface controlled by unsupported Netplan renderer (%s).", renderer)
 			}
 			if r := scalar(child(n, "renderer")); r != "" && r != "networkd" {
-				reason = "interface renderer must be networkd"
+				reason = fmt.Sprintf("Interface controlled by unsupported Netplan renderer (%s).", r)
 			}
 			if !strings.HasPrefix(f.Path, "etc/netplan/") {
 				reason = "definition outside /etc/netplan is read-only"

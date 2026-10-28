@@ -36,14 +36,14 @@ Use config ?, config application ? and Tab to discover authorized paths.
 safeterm::admin> config tunnel
 safeterm::admin(tunnel)> show
 safeterm::admin(tunnel)> set Value_1 1400
-safeterm::admin(tunnel)> set Value_2 443
-safeterm::admin(tunnel)> diff
-safeterm::admin(tunnel)> end
+safeterm::admin(tunnel)*> set Value_2 443
+safeterm::admin(tunnel)*> diff
+safeterm::admin(tunnel)*> save
 Configuration saved.
 ```
 
-Logical fields are directly settable without edit. A logical singleton has no
-next; end saves and exits; abort or cancel discards the draft. show, diff, help,
+Logical fields are directly settable without edit. Use next to return to the parent menu while retaining the draft; reopen the same
+context to continue editing or save. save commits and exits; cancel discards the draft. show, diff, help,
 Tab, typed validation and secret redaction use the logical names. Physical paths
 and unrelated keys do not become user-selectable arguments. Multiple contexts
 can share one registered file, with one version-checked atomic writer. Saving
@@ -75,13 +75,17 @@ Port                             = 8080
 safeterm::admin(options/Server)> set Port ?
 Port                     integer min=1 max=65535
 safeterm::admin(options/Server)> set Port 9090
-safeterm::admin(options/Server)> next
-safeterm::admin(options)> edit Logging
-safeterm::admin(options/Logging)> set Level debug
-safeterm::admin(options/Logging)> diff
-Server.Port: 8080 -> 9090
-Logging.Level: info -> debug
-safeterm::admin(options/Logging)> end
+safeterm::admin(options/Server)*> next
+safeterm::admin(options)*> edit Logging
+safeterm::admin(options/Logging)*> set Level debug
+safeterm::admin(options/Logging)*> diff
+  Server.Port:
+-   8080
++   9090
+  Logging.Level:
+-   info
++   debug
+safeterm::admin(options/Logging)*> save
 Configuration saved.
 ```
 
@@ -98,22 +102,22 @@ Configuration saved.
   comparison, not a promise that all server-side validation has passed.
 - `next`: return to the file context, retaining changes across sections.
   Unlike FortiGate, this does **not** save an entry; SafeTerm saves the entire file
-  as one transaction at `end`.
-- `end`: validate all changes together, save once and leave the editor.
+  as one transaction at `save`.
+- `save`: validate all changes together, save once and leave the editor.
 - `cancel`: discard all unsaved changes and leave the editor.
 - `rollback`: with an empty draft, confirm restoration of the newest retained
   whole-file backup. This can revert other fields and comments to that snapshot.
 - `exit` or Ctrl+]: close the session and discard unsaved changes.
 
 `set` checks scalar types/ranges immediately. Full path, cross-field, application
-and authorization checks run on the server at `end`. A valid final combination
+and authorization checks run on the server at `save`. A valid final combination
 can therefore be staged even if an intermediate combination violates a
 cross-field rule. Up to 512 distinct fields and 256 KiB of draft values/coordinates
 can be staged per session. One successful save creates one backup, if enabled,
 and runs configured activation/health checks once. Existing rollback-on-failure
 policy applies to the entire file update.
 
-If another program changes the file after it was opened, `end` refuses the stale
+If another program changes the file after it was opened, `save` refuses the stale
 version and retains the draft. Review `diff`, then `cancel`, reopen the resource
 and enter the desired changes against the latest version. There is no force
 option. Failed validation does not write some fields and leave others behind.
@@ -199,7 +203,7 @@ raw systemctl output or physical unit names. An error stops the sequence without
 automatic recovery; consult the administrator and protected Audit record for
 physical-unit diagnostics. See the resource guide for group definitions.
 
-Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See [network diagnostics](network-diagnostics.md).
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. The TCP probe sends no application data and does not provide an interactive login. See [network diagnostics](network-diagnostics.md).
 
 ## Help and back navigation
 
@@ -220,15 +224,40 @@ editor commands. Every `back` displays the parent menu or available items.
 | `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
 | `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
 | `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
-| `next` inside a network item or file section | Return to the item list, keeping staged edits |
-| `end` inside an editor | Validate and save the editor draft |
-| `abort` / `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+| `next` inside a network item or file section | Move up (keeps unsaved edits staged) |
+| `next` inside a logical context | Return to the parent menu; reopen the context to continue the draft |
+| `save` inside an editor | Validate and save the editor draft |
+| `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
 
 `back` never writes a file, saves a network candidate or applies networking.
-Previously saved network candidates are kept. In navigation menus, `end` returns
+Previously saved network candidates are kept. In navigation menus, `cancel` returns
 to the main prompt without saving anything. Only explicit save/apply commands
 change configuration.
 
 For example, from `network/interface/ip0`, `back` discards unsaved changes to
 `ip0` and shows the interface list. Another `back` leaves the interface editor
 and shows `interface` and `route`; another returns to the configuration menu.
+
+## Draft indicators and global commands
+
+A `*` after the context path means the current editor has unsaved changes:
+`safeterm::admin(network/interface/ip1)*>`. Restoring all non-secret values to
+their initial values clears the marker. Interface details mark changed fields
+with `(staged)` and use `System default` for inherited DNS/search settings.
+Local `diff` uses removed (`-`) and added (`+`) lines; secrets stay redacted.
+
+`save` replaces the former `end`; `cancel` replaces `abort`. Application saves
+validate and commit the file. Network saves validate and commit a private
+candidate; `execute network apply` starts the separately confirmed timed trial.
+`back` discards the item being left and prints its name when edits were lost.
+`next` preserves its edits in the session. Up to 16 logical contexts may be
+retained; each context saves independently and keeps its original version check.
+Leaving a parent menu with `back` discards drafts under that menu; `cancel` from
+a menu discards retained contexts. Reconnects discard local drafts.
+
+`exit`, `clear`, and `whoami` work at every level. `exit` discards unsaved drafts
+and warns before closing; `exit ?` only shows help.
+
+`execute tcp-test IP [PORT]` is the canonical port probe. `execute telnet`
+remains an alias, prints `Use 'execute tcp-test' for port probing`, and uses the
+same arguments, permissions and signed operation ID.

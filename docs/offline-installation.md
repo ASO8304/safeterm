@@ -64,7 +64,7 @@ rollback also restores account databases, so avoid unrelated account changes
 before using it. Keep ordinary administrator access for recovery.
 
 Inside SafeTerm, use `?` Enter or Tab to discover authorized commands. Configuration
-editing is `config myapp`, `edit SECTION`, `set KEY VALUE`, `diff`, `end`.
+editing is `config myapp`, `edit SECTION`, `set KEY VALUE`, `diff`, `save`.
 Ctrl+C stops an operation and Ctrl+] closes the entire SafeTerm session.
 See [terminal](restricted-terminal.md) and [termctl](termctl.md).
 

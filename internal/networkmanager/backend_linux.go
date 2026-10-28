@@ -214,6 +214,24 @@ func PhysicalInterfaces() map[string]string {
 	}
 	return out
 }
+
+// Read kernel operational state without running a command or changing links.
+func PhysicalInterfaceStates() map[string]string {
+	states := map[string]string{}
+	entries, _ := os.ReadDir("/sys/class/net")
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join("/sys/class/net", entry.Name(), "operstate"))
+		if err != nil {
+			continue
+		}
+		state := strings.TrimSpace(string(data))
+		switch state {
+		case "up", "down", "unknown", "notpresent", "lowerlayerdown", "testing", "dormant":
+			states[entry.Name()] = state
+		}
+	}
+	return states
+}
 func (b *Netplan) Status(ctx context.Context, names []string) (string, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()

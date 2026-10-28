@@ -2,7 +2,6 @@ package broker
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -75,7 +74,7 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	}
 	s.networkEdit = &networkEditSession{kind: f[2], base: *r.View, view: *r.View}
 	s.configMenu = nil
-	s.writeTerminalData([]byte("back discards edits to the item you leave; next keeps them staged. Only end saves a candidate. execute network apply starts a timed trial.\n"))
+	s.writeTerminalData([]byte("back discards edits to the item you leave; next keeps them staged. save validates and commits a candidate. execute network apply starts a timed trial.\n"))
 	return true, s.networkSelectionMenu()
 }
 
@@ -100,8 +99,10 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 			return fmt.Errorf("usage: back")
 		}
 		if e.item == "" {
+			if s.editorDirty() {
+				s.discardedItem(e.kind)
+			}
 			s.networkEdit = nil
-			s.writeTerminalData([]byte("Unsaved edits in this network context discarded. Nothing saved.\n"))
 			return s.openConfigurationPath(ctx, []string{"network"}, false)
 		}
 		remaining := make([]networkmanager.Change, 0, len(e.changes))
@@ -114,10 +115,15 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		if err != nil {
 			return err
 		}
-		s.writeTerminalData([]byte(fmt.Sprintf("Unsaved edits to %s discarded. Nothing saved.\n", e.item)))
+		for _, diff := range networkDiffs(e) {
+			if diff.name == e.item {
+				s.discardedItem(e.item)
+				break
+			}
+		}
 		e.changes, e.view, e.item = remaining, view, ""
 		return s.networkSelectionMenu()
-	case "abort", "cancel":
+	case "cancel":
 		if len(f) != 1 {
 			break
 		}
@@ -157,10 +163,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		if len(f) != 1 {
 			break
 		}
-		data, _ := json.MarshalIndent(e.changes, "", "  ")
-		s.writeTerminalData(append(data, '\n'))
+		s.showNetworkDiff(e)
 		return nil
-	case "end":
+	case "save":
 		if len(f) != 1 {
 			break
 		}
@@ -178,6 +183,10 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		if len(f) < 2 {
 			break
 		}
+		if e.kind == "interface" && e.view.Interfaces[e.item].ReadOnly != "" {
+			reason, _ := interfaceRestriction(e.view.Interfaces[e.item].ReadOnly)
+			return fmt.Errorf("Read-only: %s", reason)
+		}
 		c := networkmanager.Change{Kind: e.kind, Name: e.item, Field: f[1], Action: f[0], Values: f[2:]}
 		v, err := networkmanager.Modify(e.view, []networkmanager.Change{c})
 		if err != nil {
@@ -185,6 +194,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		e.view = v
 		e.changes = append(e.changes, c)
+		if s.editorDirty() {
+			s.writeTerminalData([]byte(dirtyDraftReminder + "\n"))
+		}
 		return nil
 	case "delete":
 		if len(f) != 2 || e.kind != "route" {
@@ -197,6 +209,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		e.view = v
 		e.changes = append(e.changes, c)
+		if s.editorDirty() {
+			s.writeTerminalData([]byte(dirtyDraftReminder + "\n"))
+		}
 		return nil
 	}
 	return fmt.Errorf("network: invalid command; use ?")
@@ -207,7 +222,7 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 		f = f[:len(f)-1]
 	}
 	if e := s.networkEdit; e != nil {
-		values := []string{"?", "back", "edit", "show", "diff", "next", "end", "abort"}
+		values := []string{"?", "back", "edit", "show", "diff", "next", "save", "cancel", "exit", "clear", "whoami"}
 		if e.kind == "route" {
 			values = append(values, "delete")
 		}

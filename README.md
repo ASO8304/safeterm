@@ -49,7 +49,7 @@ Available capabilities:
   typed validation, redacted secrets, expiring proposals, optimistic concurrency,
   atomic writes, bounded backups, rollback, and optional typed activation checks
 - A shared contextual SSH/Console editor: `config RESOURCE`, `edit SECTION`,
-  `set KEY VALUE`, `diff`, `end`; atomic multi-field saves and contextual help
+  `set KEY VALUE`, `diff`, `save`; atomic multi-field saves and contextual help
   without exposing a file editor or operating-system shell. See the
   [terminal guide](docs/restricted-terminal.md) (requires a build containing ADR-030).
 - A repository threat model and dedicated adversarial suite covering injection,
@@ -356,7 +356,7 @@ rollback also restores account databases, so avoid unrelated account changes
 before using it. Keep ordinary administrator access for recovery.
 
 Inside SafeTerm, use `?` Enter or Tab to discover authorized commands. Configuration
-editing is `config myapp`, `edit SECTION`, `set KEY VALUE`, `diff`, `end`.
+editing is `config myapp`, `edit SECTION`, `set KEY VALUE`, `diff`, `save`.
 Ctrl+C stops an operation and Ctrl+] closes the entire SafeTerm session.
 See [terminal](docs/restricted-terminal.md) and [termctl](docs/termctl.md).
 
@@ -427,4 +427,4 @@ System diagnostics use `execute system_info host`, `execute system_info memory` 
 
 Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
 
-Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute telnet IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. Telnet here sends no application data and does not provide an interactive login. See [network diagnostics](docs/network-diagnostics.md).
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. The TCP probe sends no application data and does not provide an interactive login. See [network diagnostics](docs/network-diagnostics.md).

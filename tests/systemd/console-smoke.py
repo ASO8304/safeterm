@@ -51,7 +51,7 @@ def expect(marker, timeout=20):
 def command(text, prompt=b'\nsafeterm::ci-admin> '):
     os.write(fd, b'\x15' + text.encode('ascii') + b'\r')
     result = expect(prompt)
-    if b'error:' in result or b'Permission denied' in result:
+    if b'Error:' in result or b'Permission denied' in result:
         raise RuntimeError('command failed: ' + text)
     return result
 
@@ -71,12 +71,12 @@ try:
             raise RuntimeError('network interface summary missing')
         if b'\"interfaces\"' in interfaces or b'\"pending\"' in interfaces or b'\"version\"' in interfaces:
             raise RuntimeError('network summary exposed protocol JSON')
-        command('abort')
+        command('cancel')
         with socket.socket() as listener:
             listener.bind(('127.0.0.1', 0))
             listener.listen(1)
             listener.settimeout(5)
-            result = command('execute telnet 127.0.0.1 ' + str(listener.getsockname()[1]))
+            result = command('execute tcp-test 127.0.0.1 ' + str(listener.getsockname()[1]))
             if b'TCP port is open' not in result or b'result: success' not in result:
                 raise RuntimeError('native TCP test failed')
             conn, _ = listener.accept()
@@ -97,7 +97,7 @@ try:
                     '--syn', '-m', 'comment', '--comment', 'safeterm-ci-cancel', '-j', 'DROP']
             subprocess.run([firewall, '-w', '5', '-I', *rule], check=True)
             try:
-                os.write(fd, ('execute telnet 127.0.0.1 ' + port + '\r').encode('ascii'))
+                os.write(fd, ('execute tcp-test 127.0.0.1 ' + port + '\r').encode('ascii'))
                 expect(('Trying 127.0.0.1:' + port).encode('ascii'))
                 os.write(fd, b'\x03')
                 expect(b'\nsafeterm::ci-admin> ')
@@ -123,7 +123,7 @@ try:
     if mode == 'logs':
         os.write(fd, b'execute logs fresh-log main\r')
         result = expect(b'CI log fixture')
-        if b'error:' in result:
+        if b'Error:' in result:
             raise RuntimeError('registered log stream failed')
         os.write(fd, b'\x03')
         expect(b'\nsafeterm::ci-admin> ')
@@ -154,18 +154,18 @@ try:
         result = command('show', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
         if b'8080' not in result:
             raise RuntimeError('registered INI value not read')
-        command('set Po\t9090', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
+        command('set Po\t9090', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
         command('back', b'\nsafeterm::ci-admin(fresh-options)> ')
         if 'Port = 8080' not in open('/etc/safeterm-ci/options.ini', encoding='utf-8-sig').read():
             raise RuntimeError('back saved the section')
         command('edit Server', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
         if b'8080' not in command('show', b'\nsafeterm::ci-admin(fresh-options/Server)> '):
             raise RuntimeError('back retained the discarded section edit')
-        command('set Port 9090', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
-        result = command('diff', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
-        if b'8080 -> 9090' not in result:
+        command('set Port 9090', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
+        result = command('diff', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
+        if b'-   8080' not in result or b'+   9090' not in result:
             raise RuntimeError('completed set command did not stage expected edit')
-        result = command('end')
+        result = command('save')
         if b'Configuration saved.' not in result:
             raise RuntimeError('INI change did not commit')
     if mode == 'logical':
@@ -176,20 +176,20 @@ try:
         result = command('show', b'\nsafeterm::ci-admin(tunnel)> ')
         if b'Value_1' not in result or b'TCPMSS' in result:
             raise RuntimeError('physical field name exposed instead of alias')
-        command('set Value_1\t1400', b'\nsafeterm::ci-admin(tunnel)> ')
-        command('set Value_2 443', b'\nsafeterm::ci-admin(tunnel)> ')
+        command('set Value_1\t1400', b'\nsafeterm::ci-admin(tunnel)*> ')
+        command('set Value_2 443', b'\nsafeterm::ci-admin(tunnel)*> ')
         os.write(fd, b'set pat-ips 192.0.2.1,999.1.1.1\r')
-        rejected = expect(b'\nsafeterm::ci-admin(tunnel)> ')
-        if b'error:' not in rejected or b'list item 2' not in rejected:
+        rejected = expect(b'\nsafeterm::ci-admin(tunnel)*> ')
+        if b'Error:' not in rejected or b'list item 2' not in rejected:
             raise RuntimeError('invalid IPv4 list item was not rejected')
-        command('set pat-i\t192.168.222.10,10.20.30.40', b'\nsafeterm::ci-admin(tunnel)> ')
-        result = command('diff', b'\nsafeterm::ci-admin(tunnel)> ')
-        if b'Value_1: 1360 -> 1400' not in result:
+        command('set pat-i\t192.168.222.10,10.20.30.40', b'\nsafeterm::ci-admin(tunnel)*> ')
+        result = command('diff', b'\nsafeterm::ci-admin(tunnel)*> ')
+        if b'Value_1:' not in result or b'-   1360' not in result or b'+   1400' not in result:
             raise RuntimeError('alias diff missing')
-        command('end')
+        command('save')
         command('config application c\t', b'\nsafeterm::ci-admin(application/cat)> ')
-        command('set enabled false', b'\nsafeterm::ci-admin(application/cat)> ')
-        command('end')
+        command('set enabled false', b'\nsafeterm::ci-admin(application/cat)*> ')
+        command('save')
     os.write(fd, b'exit\r')
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:

@@ -102,23 +102,24 @@ After sudo termctl check and sudo termctl apply, reconnect and use:
     set Value_1 1400
     set Value_2 443
     diff
-    end
+    save
 
     config application cat
     set enabled false
-    end
+    save
 
 ? and Tab discover paths, names and typed choices according to resource roles.
 Tab keeps its existing common-prefix/list behavior. A singleton context has direct
-fields, so no edit/next is needed; use end to save and abort/cancel to discard.
+fields. Use save to commit, cancel to discard, or next to return to the parent
+menu while keeping the draft; reopen its context to continue or save.
 There is no automatic entry creation or deletion. Legacy resource/section editing
-continues to use edit/next and saves at end.
+continues to use edit/next and commits with save.
 
-Each end validates the final physical document and saves once; it never restarts
+Each save validates the final physical document and saves once; it never restarts
 or reloads a service. config.on_change is rejected; remove it and use execute
 service ACTION ID separately with the appropriate role. A multi-context file has
 one version/lock authority. External changes reject a stale save and retain the
-draft; abort and reopen before reapplying. No force overwrite exists. Other views'
+draft; cancel and reopen before reapplying. No force overwrite exists. Other views'
 fields/comments are preserved. Cross-field checks still apply to the full file.
 
 Resource read/edit/rollback roles cover every context of that file; contexts do
@@ -160,7 +161,7 @@ Inside SSH or Console:
     show
     set Port 9090
     diff
-    end
+    save
 
 Field types: list, string, integer, port, boolean, enum, path, ipv4, ipv6, ip, cidr, ip_port.
 Existing typed field schema
@@ -506,7 +507,7 @@ In a logical context named `tunnel`, edit it with:
 config tunnel
 set pat-ips 192.168.222.10,10.20.30.40
 diff
-end
+save
 ```
 
 Put this field inside the context's `fields` array. Set `section` to the real

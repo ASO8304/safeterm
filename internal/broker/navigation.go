@@ -26,9 +26,12 @@ func (s *Shell) showConfigurationMenu(ctx context.Context) error {
 		return err
 	}
 	s.networkHelpRow("edit NAME", "Open one of the choices above; typing its name also works")
-	s.networkHelpRow("back", "Return to the previous menu without saving")
+	s.networkHelpRow("back", backDescription)
 	s.networkHelpRow("?", "Show this menu; command ? keeps your input")
-	s.networkHelpRow("end", "Return to the main prompt")
+	s.networkHelpRow("cancel", "Return to the main prompt")
+	for _, command := range []string{"exit", "clear", "whoami"} {
+		s.networkHelpRow(command, globalDescriptions[command])
+	}
 	return nil
 }
 
@@ -44,17 +47,23 @@ func (s *Shell) configurationMenuCommand(ctx context.Context, fields []string) (
 	if len(fields) == 0 || (len(fields) == 1 && (command == "show" || command == "help")) {
 		return true, false, s.showConfigurationMenu(ctx)
 	}
-	if command == "back" || command == "end" || command == "abort" || command == "cancel" {
+	if command == "back" || command == "cancel" {
 		if len(fields) != 1 {
 			return true, false, fmt.Errorf("usage: %s", command)
 		}
 		if help {
-			s.networkHelpRow("<cr>", "Return without saving; back moves up one menu, end/abort returns to the main prompt")
+			description := "Return to the main prompt and discard retained drafts"
+			if command == "back" {
+				description = backDescription
+			}
+			s.networkHelpRow("<cr>", description)
 			return true, false, nil
 		}
 		if command == "back" && len(s.configMenu) > 0 {
+			s.discardLogicalUnder(s.configMenu)
 			return true, false, s.openConfigurationPath(ctx, s.configMenu[:len(s.configMenu)-1], false)
 		}
+		s.discardLogicalUnder(nil)
 		s.configMenu = nil
 		return true, false, s.questionHelp(ctx, nil)
 	}
@@ -103,7 +112,7 @@ func (s *Shell) configurationMenuCompletion(before, prefix string) ([]string, bo
 	}
 	selecting := len(fields) > 0 && fields[0] == "edit"
 	if len(completed) == 0 && !selecting {
-		choices = append(choices, "?", "back", "edit", "show", "end", "abort", "exit")
+		choices = append(choices, "?", "back", "edit", "show", "cancel", "exit", "clear", "whoami")
 	}
 	return matching(choices, prefix), true
 }

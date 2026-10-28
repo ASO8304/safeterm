@@ -33,7 +33,7 @@ set dhcp4 ?             Meaning of enable and disable
 set addresses ?         CIDR address syntax
 unselect ?              Lists supporting removal of selected values
 edit ?                  Existing items, including read-only reasons
-end ?                   Save semantics, without saving anything
+save ?                   Save semantics, without saving anything
 execute network ?       Status, candidate and timed trial actions
 execute network apply ? Trial semantics, without applying anything
 ```
@@ -56,12 +56,12 @@ config network interface
         show
         diff
     next
-end
+save
 ```
 
 `set addresses` replaces the static address list. `append addresses` adds secondary addresses. `unselect addresses 192.168.10.21/24` removes a selected address. `unset addresses`, `unset dns`, `unset search-domains` clear the respective list; `unset mtu` removes the explicit MTU. DHCP is `set dhcp4 enable|disable`. Turning DHCP on does not silently remove static addresses. MTU is limited to 576–65535; the physical device/backend may impose tighter limits, reported by Netplan.
 
-In the interface context, `show` displays a compact table of names, DHCP4, addresses and editing access. `edit NAME` followed by `show` displays that interface's DNS, search domains, MTU, source files and readable restriction details. A `*` marks an interface with unsaved edits. Editing access describes policy, not live link state. This is the editor draft; leave the editor and use `execute network status` for live state. `diff` displays staged edits. `next` leaves the selected item; `end` validates and saves the candidate, without changing `/etc/netplan` or the live network. `abort` discards only unsaved editor changes. `execute network discard` discards the saved candidate. Candidates are private to one SafeTerm identity and survive reconnects. Another operator cannot overwrite that candidate; its owner must discard it first.
+In the interface context, `show` displays a compact table of names, kernel link states, DHCP4, addresses and editing access. `edit NAME` followed by `show` displays that interface's DNS, search domains, MTU, source files and readable restriction details. A `*` marks an interface with unsaved edits. Editing access describes policy. STATE is the kernel operational state recorded when the editor opens, or unknown when unavailable. Address and DHCP columns show configuration values. Use `execute network status` for fresh live details. `diff` displays field changes using removed (-) and added (+) lines. `next` leaves the selected item; `save` validates and saves the candidate, without changing `/etc/netplan` or the live network. `cancel` discards only unsaved editor changes. `execute network discard` discards the saved candidate. Candidates are private to one SafeTerm identity and survive reconnects. Another operator cannot overwrite that candidate; its owner must discard it first.
 
 ## Routes and default gateway
 
@@ -81,7 +81,7 @@ config network route
         set gateway 192.168.10.254
         set metric 200
     next
-end
+save
 ```
 
 `edit office` creates a new route draft when that name does not exist; choose a
@@ -156,15 +156,30 @@ editor commands. Every `back` displays the parent menu or available items.
 | `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
 | `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
 | `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
-| `next` inside a network item or file section | Return to the item list, keeping staged edits |
-| `end` inside an editor | Validate and save the editor draft |
-| `abort` / `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+| `next` inside a network item or file section | Move up (keeps unsaved edits staged) |
+| `next` inside a logical context | Return to the parent menu; reopen the context to continue the draft |
+| `save` inside an editor | Validate and save the editor draft |
+| `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
 
 `back` never writes a file, saves a network candidate or applies networking.
-Previously saved network candidates are kept. In navigation menus, `end` returns
+Previously saved network candidates are kept. In navigation menus, `cancel` returns
 to the main prompt without saving anything. Only explicit save/apply commands
 change configuration.
 
 For example, from `network/interface/ip0`, `back` discards unsaved changes to
 `ip0` and shows the interface list. Another `back` leaves the interface editor
 and shows `interface` and `route`; another returns to the configuration menu.
+
+## Draft display and session controls
+
+A `*` after the prompt context means unsaved edits exist. Interface summaries
+include STATE and show `Read-only (Policy restricted)` for policy denials.
+Interface details use labeled values, `System default` for inherited DNS and
+search domains, and `(staged)` for edited fields. Local diff uses `-` and `+`
+lines. A bare IP is rejected immediately with Address/Prefix guidance.
+
+Use `save` to validate and commit the candidate, `cancel` to discard the editor,
+`back` to move up while discarding edits to the item, and `next` to move up while
+keeping edits staged. `exit`, `clear` and `whoami` are available inside editors.
+Dirty `exit` warns and discards drafts. Saving a network candidate never applies
+networking; the confirmed trial still starts with `execute network apply`.

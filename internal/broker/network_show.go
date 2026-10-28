@@ -29,13 +29,13 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 	sort.Strings(names)
 	var table bytes.Buffer
 	writer := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(writer, "NAME\tDHCP4\tADDRESSES\tEDITING")
+	fmt.Fprintln(writer, "NAME\tSTATE\tDHCP4\tADDRESSES\tEDITING")
 	readOnly, changed := []string{}, false
 	for _, name := range names {
 		item := e.view.Interfaces[name]
 		editing := "Allowed"
 		if item.ReadOnly != "" {
-			editing = "Read-only"
+			editing = "Read-only (" + interfaceRestrictionLabel(item.ReadOnly) + ")"
 			readOnly = append(readOnly, name)
 		}
 		label := name
@@ -48,11 +48,15 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		}
 		addresses := item.Addresses
 		if len(addresses) == 0 {
-			addresses = []string{"none"}
+			addresses = []string{"None"}
 		}
-		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\n", label, dhcp, addresses[0], editing)
+		state := e.view.States[name]
+		if state == "" {
+			state = "unknown"
+		}
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", label, state, dhcp, addresses[0], editing)
 		for _, address := range addresses[1:] {
-			fmt.Fprintf(writer, "\t\t%s\t\n", address)
+			fmt.Fprintf(writer, "\t\t\t%s\t\n", address)
 		}
 	}
 	_ = writer.Flush()
@@ -71,20 +75,30 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		}
 	}
 	if changed {
-		s.writeTerminalData([]byte("\n* Unsaved edits. Use diff to review; end saves the candidate.\n"))
+		s.writeTerminalData([]byte("\n* Unsaved edits staged. Use diff to review; save commits the candidate.\n"))
 	} else {
 		s.writeTerminalData([]byte("\nNo unsaved interface edits.\n"))
 	}
-	s.writeTerminalData([]byte("Details: edit NAME, then show.\nFor live state, leave the editor and use execute network status.\nCommands: edit NAME | diff | back | ?\n"))
+	s.writeTerminalData([]byte("Details: edit NAME, then show.\nSTATE recorded at editor entry; use execute network status for live details.\nCommands: edit NAME | diff | back | ?\n"))
 }
 
 func interfaceHasEdits(e *networkEditSession, name string) bool {
-	for _, change := range e.changes {
-		if change.Kind == "interface" && change.Name == name {
-			return true
-		}
+	return len(interfaceDiff(e.base.Interfaces[name], e.view.Interfaces[name])) > 0
+}
+
+func interfaceRestrictionLabel(reason string) string {
+	switch {
+	case strings.HasPrefix(reason, "interface is outside administrator policy"):
+		return "Policy restricted"
+	case strings.Contains(reason, "renderer"):
+		return "Unsupported renderer"
+	case strings.HasPrefix(reason, "legacy gateway"):
+		return "Legacy gateway"
+	case reason == "physical interface is not present":
+		return "Device absent"
+	default:
+		return "Unsupported configuration"
 	}
-	return false
 }
 
 func interfaceRestriction(reason string) (string, string) {
@@ -106,63 +120,59 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 		s.writeTerminalData([]byte("Interface not found in this editor. Use back to choose an interface.\n"))
 		return
 	}
-	s.writeTerminalData([]byte(fmt.Sprintf("Interface %s (configuration draft)\n\n", name)))
-	row := func(label string, values ...string) {
-		if len(values) == 0 {
-			values = []string{"not configured"}
-		}
-		for i, value := range values {
-			if i == 0 {
-				s.writeTerminalData([]byte(fmt.Sprintf("  %-16s : %s\n", label, value)))
-			} else {
-				s.writeTerminalData([]byte(fmt.Sprintf("  %-16s   %s\n", "", value)))
-			}
-		}
-	}
-	editing := "Allowed"
+	editing := "Editing Allowed"
 	if item.ReadOnly != "" {
-		editing = "Read-only"
+		editing = "Read-only (" + interfaceRestrictionLabel(item.ReadOnly) + ")"
 	}
-	row("Editing", editing)
+	s.writeTerminalData([]byte(fmt.Sprintf("Interface: %s (%s)\n", name, editing)))
+	if interfaceHasEdits(e, name) {
+		s.writeTerminalData([]byte("* Unsaved edits staged\n"))
+	}
+	s.writeTerminalData([]byte("\n"))
 	if item.ReadOnly != "" {
 		reason, action := interfaceRestriction(item.ReadOnly)
-		s.networkParagraph("  ", "Reason: "+reason)
+		s.networkParagraph("", "Read-only: "+reason)
 		if action != "" {
-			s.networkParagraph("  ", "Action: "+action)
+			s.networkParagraph("", "Action: "+action)
 		}
 		s.writeTerminalData([]byte("\n"))
 	}
-	dhcp := "disabled"
-	if item.DHCP4 {
-		dhcp = "enabled"
+	changed := map[string]bool{}
+	for _, field := range interfaceDiff(e.base.Interfaces[name], item) {
+		changed[field.label] = true
 	}
-	row("IPv4 DHCP", dhcp)
-	row("Addresses", item.Addresses...)
-	row("DNS servers", item.DNS...)
-	row("Search domains", item.SearchDomains...)
-	mtu := "automatic"
-	if item.MTU != nil {
-		mtu = fmt.Sprint(*item.MTU)
+	row := func(label, empty string, values ...string) {
+		if len(values) == 0 {
+			values = []string{empty}
+		}
+		for i, value := range values {
+			if changed[label] {
+				value += " (staged)"
+			}
+			key := ""
+			if i == 0 {
+				key = label + ":"
+			}
+			s.writeTerminalData([]byte(fmt.Sprintf("%-16s%s\n", key, value)))
+		}
 	}
-	row("MTU", mtu)
+	row("DHCP4", "", onOff(item.DHCP4))
+	row("Addresses", "None", item.Addresses...)
+	row("DNS Servers", "System default", item.DNS...)
+	row("Search Domains", "System default", item.SearchDomains...)
+	row("MTU", "", optionalNumber(item.MTU))
 	if item.ID != "" && item.ID != name {
-		row("Netplan ID", item.ID)
+		row("Netplan ID", "", item.ID)
 	}
 	files := make([]string, 0, len(item.Files))
 	for _, file := range item.Files {
 		files = append(files, "/"+strings.TrimPrefix(file, "/"))
 	}
-	row("Source files", files...)
-	changes := "none"
-	if interfaceHasEdits(e, name) {
-		changes = "unsaved; use diff to review"
-	}
-	row("Changes", changes)
-	s.writeTerminalData([]byte("\nFor live state, leave the editor and use execute network status.\n"))
+	row("Source", "Not available", files...)
 	if item.ReadOnly == "" {
-		s.writeTerminalData([]byte("Commands: set FIELD VALUE | diff | back | ?\n"))
+		s.writeTerminalData([]byte("\nCommands: set FIELD VALUE | diff | next | back | save | cancel | ?\n"))
 	} else {
-		s.writeTerminalData([]byte("Commands: back | ?\n"))
+		s.writeTerminalData([]byte("\nCommands: back | ?\n"))
 	}
 }
 

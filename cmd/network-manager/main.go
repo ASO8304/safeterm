@@ -82,7 +82,7 @@ func run() error {
 		return err
 	}
 	defer lock.Close()
-	manager, err := networkmanager.New(networkmanager.Options{Root: "/", State: networkmanager.StatePath, Policy: func() (networkmanager.Policy, error) { return networkmanager.ReadPolicy("/") }, Interfaces: networkmanager.PhysicalInterfaces, Backend: &networkmanager.Netplan{Root: "/"}, Audit: sink, TrialLock: networkmanager.LifecycleLock})
+	manager, err := networkmanager.New(networkmanager.Options{Root: "/", State: networkmanager.StatePath, Policy: func() (networkmanager.Policy, error) { return networkmanager.ReadPolicy("/") }, Interfaces: networkmanager.PhysicalInterfaces, LinkStates: networkmanager.PhysicalInterfaceStates, Backend: &networkmanager.Netplan{Root: "/"}, Audit: sink, TrialLock: networkmanager.LifecycleLock})
 	if err != nil {
 		return err
 	}

@@ -46,6 +46,47 @@ func discoverTest(t *testing.T, root string, p Policy) *Snapshot {
 	}
 	return s
 }
+
+func TestLinkStateDoesNotInvalidateSavedCandidates(t *testing.T) {
+	m, root, _, _ := managerTest(t)
+	state := "down"
+	m.opts.LinkStates = func() map[string]string {
+		return map[string]string{"ens19": state, "unrelated": "up"}
+	}
+	before := operatorCall(t, m, Request{Action: "read"})
+	state = "up"
+	after := operatorCall(t, m, Request{Action: "read"})
+	if before.View.States["ens19"] != "down" || after.View.States["ens19"] != "up" || len(after.View.States) != 1 || before.View.Version != after.View.Version {
+		t.Fatal("link state leaked interfaces or changed configuration identity", before, after)
+	}
+	operatorCall(t, m, Request{Action: "save", Version: before.View.Version, Changes: []Change{{Kind: "interface", Name: "ens19", Field: "mtu", Action: "set", Values: []string{"1400"}}}})
+	data, err := os.ReadFile(filepath.Join(root, "state", "candidate.json"))
+	if err != nil || strings.Contains(string(data), `"states"`) {
+		t.Fatal("display metadata changed the persisted candidate format", err)
+	}
+	state = "dormant"
+	after = operatorCall(t, m, Request{Action: "read"})
+	if after.View.States["ens19"] != "dormant" || after.View.Interfaces["ens19"].MTU == nil {
+		t.Fatal("candidate returned stale link state or lost edits", after)
+	}
+}
+
+func TestUnsupportedRendererReasonNamesTheRenderer(t *testing.T) {
+	for _, yaml := range []string{
+		strings.Replace(fixture, "renderer: networkd", "renderer: NetworkManager", 1),
+		strings.Replace(fixture, "dhcp4: false", "renderer: NetworkManager\n      dhcp4: false", 1),
+	} {
+		root, p := testTree(t)
+		writeTest(t, root, "etc/netplan/arbitrary-name.yaml", yaml)
+		view := discoverTest(t, root, p).View
+		if got := view.Interfaces["ens19"].ReadOnly; got != "Interface controlled by unsupported Netplan renderer (NetworkManager)." {
+			t.Fatal(got)
+		}
+		if _, err := Modify(view, []Change{{Kind: "interface", Name: "ens19", Field: "dhcp4", Action: "set", Values: []string{"enable"}}}); err == nil {
+			t.Fatal("unsupported renderer became editable")
+		}
+	}
+}
 func TestInterfacePolicyDenialExplainsAdministratorFix(t *testing.T) {
 	root, p := testTree(t)
 	p.Interfaces = nil

@@ -62,7 +62,7 @@ func TestConfigEditorStagesAcrossSectionsAndCommitsOnce(t *testing.T) {
 	if !strings.Contains(out.String(), "9091") || strings.Contains(out.String(), "secret-sentinel-editor") {
 		t.Fatal("incorrect or secret output")
 	}
-	editorCommands(t, s, "end")
+	editorCommands(t, s, "save")
 	data, _ = os.ReadFile(path)
 	expected := strings.Replace(strings.Replace(string(before), "8080", "9091", 1), "Level = info", "Level = debug", 1)
 	if string(data) != expected || s.editing != nil {
@@ -107,7 +107,7 @@ func TestConfigEditorCancelConflictAndHelpAreSafe(t *testing.T) {
 	editorCommands(t, s, "config options", "edit Server", "set Port 9000")
 	external := append(append([]byte(nil), before...), []byte("; external\r\n")...)
 	_ = os.WriteFile(path, external, 0640)
-	if _, err := s.executeLine(ctx, "end", nil); err == nil {
+	if _, err := s.executeLine(ctx, "save", nil); err == nil {
 		t.Fatal("stale end accepted")
 	}
 	after, _ = os.ReadFile(path)
@@ -127,7 +127,7 @@ func TestConfigEditorSecretsUsePrivatePromptAndNeverHistory(t *testing.T) {
 	if _, err := s.executeLine(context.Background(), "set Password", input); err != nil {
 		t.Fatal(err)
 	}
-	editorCommands(t, s, "show", "diff", "end")
+	editorCommands(t, s, "show", "diff", "save")
 	if strings.Contains(out.String(), "my-private-value") {
 		t.Fatal("secret echoed")
 	}

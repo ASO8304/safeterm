@@ -10,11 +10,11 @@ import (
 )
 
 func positionalDiagnostic(op config.OperationDefinition) bool {
-	return op.Name == "ping" || op.Name == "telnet"
+	return op.Name == "ping" || op.Name == "telnet" || op.Name == "tcp-test"
 }
 func parseDiagnosticArguments(op config.OperationDefinition, fields []string) (map[string]string, error) {
 	result := map[string]string{}
-	usage := "usage: execute telnet IP [PORT]"
+	usage := "usage: execute tcp-test IP [PORT]"
 	if op.Name == "ping" {
 		usage = "usage: execute ping IP [-c COUNT]"
 	}
@@ -47,10 +47,10 @@ func parseDiagnosticArguments(op config.OperationDefinition, fields []string) (m
 			result["host"] = ip.String()
 			continue
 		}
-		if op.Name == "telnet" && result["port"] == "" {
+		if op.Name != "ping" && result["port"] == "" {
 			n, err := strconv.Atoi(token)
 			if err != nil || n < 1 || n > 65535 {
-				return nil, fmt.Errorf("telnet: port must be between 1 and 65535")
+				return nil, fmt.Errorf("tcp-test: port must be between 1 and 65535")
 			}
 			result["port"] = strconv.Itoa(n)
 			continue

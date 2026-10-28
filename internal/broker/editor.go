@@ -105,7 +105,7 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 					// Help is handled without submitting the input buffer. Retain
 					// the exact command prefix so typing can continue after Enter.
 					if _, err := s.executeLine(ctx, strings.TrimSpace(value), nil); err != nil {
-						fmt.Fprintf(s.output, "error: %v\r\n", err)
+						s.writeTerminalData([]byte(fmt.Sprintf("Error: %v\n", err)))
 					}
 					prefix := strings.TrimRight(value, " \t")
 					line = []byte(prefix[:len(prefix)-1])

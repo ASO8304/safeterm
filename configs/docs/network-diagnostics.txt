@@ -24,13 +24,13 @@ session bounds still apply. Output streams live; Ctrl+C stops the operation.
 are rejected in this CLI. Tab offers `-c` and bounded count suggestions instead of
 internal parameter names. Contextual `?` explains the syntax without execution.
 
-## TCP test named telnet
+## TCP port test
 
 ```text
-execute telnet 192.0.2.10 443
-execute telnet 192.0.2.10
-execute telnet ::1 23
-execute telnet ?
+execute tcp-test 192.0.2.10 443
+execute tcp-test 192.0.2.10
+execute tcp-test ::1 23
+execute tcp-test ?
 ```
 
 The first argument is a literal unicast IPv4/IPv6 address. DNS hostnames, scoped
@@ -70,3 +70,7 @@ request authorization, rejection before dialing, successful connection/close
 without data, refusal, bounded timeout, cancellation, completion/help and
 continued use of SafeTerm after Ctrl+C. The disposable systemd Console test runs
 real loopback ping and TCP probes through the production Runner.
+
+`execute telnet IP [PORT]` remains a deprecated alias. It prints
+`Use 'execute tcp-test' for port probing`, then runs the same authorized probe.
+The signed catalog operation ID remains `telnet` for existing permissions.
