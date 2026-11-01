@@ -80,6 +80,12 @@ func TestConfigBrokerRoutesAuthenticatedIdentityIntoRestrictedShell(t *testing.T
 	if service.actor.BrokerType != "ssh" || service.actor.UserID != "alice" || len(service.actor.Roles) != 1 || service.actor.Roles[0] != "netops" {
 		t.Fatalf("actor=%+v", service.actor)
 	}
+	if output.Len() != 0 {
+		t.Fatal("config entry printed an automatic menu")
+	}
+	if _, err := shell.executeLine(context.Background(), "?", nil); err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Contains(output.Bytes(), []byte("cats-options")) {
 		t.Fatalf("output=%q", output.String())
 	}

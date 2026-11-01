@@ -112,7 +112,7 @@ func TestInterfaceShowExplainsEmptyValuesAndReadOnlyReasons(t *testing.T) {
 	editorCommands(t, s, "config network interface")
 	out.Reset()
 	editorCommands(t, s, "show")
-	if !strings.Contains(out.String(), "No supported interfaces found") || !strings.Contains(out.String(), "back") {
+	if !strings.Contains(out.String(), "No supported interfaces found") || !strings.Contains(out.String(), "exit") {
 		t.Fatal(out.String())
 	}
 }

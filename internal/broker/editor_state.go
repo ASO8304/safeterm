@@ -1,6 +1,7 @@
 package broker
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -9,7 +10,7 @@ import (
 )
 
 const dirtyDraftReminder = "[!] Unsaved edits exist. Use 'next' to stage them or 'save' to commit."
-const backDescription = "Move up (discards unsaved edits to this item)"
+const exitDescription = "Move up one level (discards unsaved edits to this item)"
 const nextDescription = "Move up (keeps unsaved edits staged)"
 
 var globalDescriptions = map[string]string{
@@ -19,14 +20,20 @@ var globalDescriptions = map[string]string{
 }
 
 // Globals are resolved before editors, including help, so exit ? cannot exit.
-func (s *Shell) globalCommand(fields []string) (handled, exit bool, err error) {
+func (s *Shell) globalCommand(ctx context.Context, fields []string) (handled, exit bool, err error) {
 	command := fields[0]
 	if command == "logout" || command == "quit" {
 		command = "exit"
 	}
+	if command == "whoami" && !s.atRoot() {
+		return true, false, fmt.Errorf("whoami is available only at the main prompt; use exit to move up")
+	}
 	description, ok := globalDescriptions[command]
 	if !ok {
 		return false, false, nil
+	}
+	if command == "exit" && !s.atRoot() {
+		description = exitDescription
 	}
 	if len(fields) == 2 && fields[1] == "?" {
 		s.networkHelpRow("<cr>", description)
@@ -37,6 +44,22 @@ func (s *Shell) globalCommand(fields []string) (handled, exit bool, err error) {
 	}
 	switch command {
 	case "exit":
+		if s.networkEdit != nil {
+			return true, false, s.networkEditor(ctx, "exit")
+		}
+		if s.editing != nil {
+			_, err := s.configEditor(ctx, "exit", nil)
+			return true, false, err
+		}
+		if s.configMenu != nil {
+			path := append([]string{}, s.configMenu...)
+			s.discardLogicalUnder(path)
+			if len(path) == 0 {
+				s.configMenu = nil
+				return true, false, nil
+			}
+			return true, false, s.openConfigurationPath(ctx, path[:len(path)-1], false)
+		}
 		if s.editorDirty() || len(s.stagedLogical) > 0 {
 			s.writeStyled(styleWarning, "Warning: Unsaved drafts were discarded before closing the session.\n")
 		}
@@ -90,3 +113,5 @@ func (s *Shell) discardLogicalUnder(path []string) {
 		}
 	}
 }
+
+func (s *Shell) atRoot() bool { return s.editing == nil && s.networkEdit == nil && s.configMenu == nil }

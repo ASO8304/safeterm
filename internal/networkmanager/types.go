@@ -20,6 +20,9 @@ const maxBytes = 4 << 20
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$`)
 var domainPattern = regexp.MustCompile(`^~?[A-Za-z0-9][A-Za-z0-9.-]{0,252}$`)
 
+// ValidItemName reports whether a terminal item name matches the manager boundary.
+func ValidItemName(name string) bool { return namePattern.MatchString(name) }
+
 type Policy struct {
 	Version             int      `json:"version"`
 	Interfaces          []string `json:"interfaces"`

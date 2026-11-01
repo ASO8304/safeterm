@@ -60,7 +60,7 @@ func TestNetworkCandidateCLIAndCompletion(t *testing.T) {
 	if api.requests[len(api.requests)-1].Action != "save" || len(api.view.Interfaces["ens19"].Addresses) != 2 {
 		t.Fatal(api.requests)
 	}
-	editorCommands(t, s, "config network route", "edit office", "set interface ens19", "set destination 198.51.100.0/24", "set gateway 192.0.2.254", "set metric 100", "save")
+	editorCommands(t, s, "config network route", "add office", "set interface ens19", "set destination 198.51.100.0/24", "set gateway 192.0.2.254", "set metric 100", "save")
 	if api.view.Routes["office"].Gateway != "192.0.2.254" {
 		t.Fatal(api.view.Routes)
 	}
@@ -118,7 +118,7 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 		{"execute network apply ?", "confirmation is required"},
 		{"execute network confirm ?", "persist its Netplan changes"},
 		{"config network interface ?", "Select an existing network interface"},
-		{"config network route ?", "choose a name for a new route"},
+		{"config network route ?", "use add NAME for a new route"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)
@@ -159,14 +159,14 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 	if got := s.completionCandidates(context.Background(), "set ", ""); !reflect.DeepEqual(got, tabBefore) {
 		t.Fatalf("Tab changed: %v -> %v", tabBefore, got)
 	}
-	editorCommands(t, s, "cancel", "config network route", "edit office")
+	editorCommands(t, s, "cancel", "config network route", "add office")
 	beforeRequests = len(api.requests)
 	for _, tc := range []struct{ line, want string }{
 		{"?", "Remove a named route from the candidate"},
 		{"set ?", "Destination network CIDR"},
 		{"set destination ?", "<network/CIDR>"},
 		{"set interface ?", "ens19                   Use this allowed outgoing interface"},
-		{"edit ?", "Choose a new route name"},
+		{"add ?", "Create a named route draft"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)
@@ -198,14 +198,12 @@ func TestRouteShowGroupsOnlyCandidateRoutesByInterface(t *testing.T) {
 	out.Reset()
 	editorCommands(t, s, "show")
 	text := out.String()
-	for _, want := range []string{"Configured routes (candidate)", "Interface ip0", "Interface ip1", "NAME", "DESTINATION", "GATEWAY", "METRIC", "office", "10.50.0.0/16", "192.168.222.1", "100", "default-uplink", "0.0.0.0/0", "auto"} {
+	for _, want := range []string{"Routes (configuration draft)", "ip0", "ip1", "ID", "DESTINATION", "GATEWAY", "INTERFACE", "METRIC", "10.50.0.0/16", "192.168.222.1", "100", "0.0.0.0/0", "Automatic"} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("missing %q: %s", want, text)
 		}
 	}
-	if strings.Index(text, "Interface ip0") > strings.Index(text, "Interface ip1") {
-		t.Fatal("interface groups are not sorted")
-	}
+
 	for _, hidden := range []string{"private-version", "192.168.222.10/24", "9.9.9.9", "private-file.yaml", "\"interfaces\"", "\"dhcp4\"", "\"pending\""} {
 		if strings.Contains(text, hidden) {
 			t.Fatalf("route view leaked unrelated data %q: %s", hidden, text)
@@ -226,7 +224,7 @@ func TestRouteShowGroupsOnlyCandidateRoutesByInterface(t *testing.T) {
 	editorCommands(t, s, "next")
 	out.Reset()
 	editorCommands(t, s, "show")
-	if !strings.Contains(out.String(), "default-uplink") {
+	if !strings.Contains(out.String(), "0.0.0.0/0") {
 		t.Fatal("next did not restore full route table")
 	}
 }
@@ -238,25 +236,25 @@ func TestRouteShowExplainsEmptyAndIncompleteRoutes(t *testing.T) {
 	editorCommands(t, s, "config network route")
 	out.Reset()
 	editorCommands(t, s, "show", "edit ?")
-	if !strings.Contains(out.String(), "No entries in the Netplan routes list.") || !strings.Contains(out.String(), "Use edit NAME") || !strings.Contains(out.String(), "Choose a new route name") {
+	if !strings.Contains(out.String(), "No routes configured.") {
 		t.Fatalf("empty route guidance missing: %s", out.String())
 	}
-	editorCommands(t, s, "edit new-route")
+	editorCommands(t, s, "add new-route")
 	out.Reset()
 	editorCommands(t, s, "show")
-	if !strings.Contains(out.String(), "has no fields yet") {
+	if !strings.Contains(out.String(), "Not set") {
 		t.Fatalf("new route guidance missing: %s", out.String())
 	}
 	editorCommands(t, s, "set destination 10.60.0.0/16")
 	out.Reset()
 	editorCommands(t, s, "show")
-	if !strings.Contains(out.String(), "Unassigned routes") || !strings.Contains(out.String(), "new-route") {
+	if !strings.Contains(out.String(), "Not set") || !strings.Contains(out.String(), "new-route") {
 		t.Fatal(out.String())
 	}
 	editorCommands(t, s, "set interface ip1")
 	out.Reset()
 	editorCommands(t, s, "show")
-	if !strings.Contains(out.String(), "Interface ip1") || !strings.Contains(out.String(), "10.60.0.0/16") {
+	if !strings.Contains(out.String(), "ip1") || !strings.Contains(out.String(), "10.60.0.0/16") {
 		t.Fatal(out.String())
 	}
 	if len(api.requests) != 1 {

@@ -19,7 +19,7 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 	}
 	s.writeStyled(styleHeading, "Interfaces (configuration draft)\n\n")
 	if len(e.view.Interfaces) == 0 {
-		s.writeTerminalData([]byte("No supported interfaces found in Netplan configuration.\nUse back to return to the network menu.\n"))
+		s.writeTerminalData([]byte("No supported interfaces found in Netplan configuration.\nUse exit to return to the network menu.\n"))
 		return
 	}
 	names := make([]string, 0, len(e.view.Interfaces))
@@ -79,7 +79,7 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 	} else {
 		s.writeTerminalData([]byte("\nNo unsaved interface edits.\n"))
 	}
-	s.writeTerminalData([]byte("Details: edit NAME, then show.\nSTATE recorded at editor entry; use execute network status for live details.\nCommands: edit NAME | diff | back | ?\n"))
+	s.writeTerminalData([]byte("Details: edit NAME, then show.\nSTATE recorded at editor entry; use execute network status for live details.\n"))
 }
 
 func interfaceHasEdits(e *networkEditSession, name string) bool {
@@ -117,7 +117,7 @@ func interfaceRestriction(reason string) (string, string) {
 func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 	item, ok := e.view.Interfaces[name]
 	if !ok {
-		s.writeTerminalData([]byte("Interface not found in this editor. Use back to choose an interface.\n"))
+		s.writeTerminalData([]byte("Interface not found in this editor. Use exit to choose an interface.\n"))
 		return
 	}
 	editing := "Editing Allowed"
@@ -177,11 +177,6 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 		files = append(files, "/"+strings.TrimPrefix(file, "/"))
 	}
 	row("Source", "Not available", files...)
-	if item.ReadOnly == "" {
-		s.writeTerminalData([]byte("\nCommands: set FIELD VALUE | diff | next | back | save | cancel | ?\n"))
-	} else {
-		s.writeTerminalData([]byte("\nCommands: back | ?\n"))
-	}
 }
 
 // Wrap explanations independently of table columns so a policy denial does not
@@ -210,78 +205,40 @@ func (s *Shell) networkStyledParagraph(style, indent, text string) {
 // This is the configured candidate, not the kernel's DHCP/learned routing table.
 // Display uses the cached editor view and never contacts or changes the network.
 func (s *Shell) showNetworkRoutes(e *networkEditSession) {
-	groups := map[string][]networkmanager.Route{}
-	if e.item == "" {
-		for name := range e.view.Interfaces {
-			groups[name] = nil
-		}
-	}
 	if e.item != "" {
-		if _, exists := e.view.Routes[e.item]; !exists {
-			s.writeTerminalData([]byte(fmt.Sprintf("Route %s has no fields yet. Use set interface NAME and set destination NETWORK/CIDR; gateway and metric are optional.\n", e.item)))
-			return
-		}
-	}
-	for name, route := range e.view.Routes {
-		if e.item != "" && name != e.item {
-			continue
-		}
-		route.Name = name
-		groups[route.Interface] = append(groups[route.Interface], route)
-	}
-	s.writeStyled(styleHeading, "Configured routes (candidate)\n")
-	if len(groups) == 0 {
-		s.writeTerminalData([]byte("No configured interfaces or routes.\n"))
+		s.showNetworkRoute(e)
 		return
 	}
-	names := []string{}
-	for name := range groups {
-		names = append(names, name)
+	s.writeStyled(styleHeading, "Routes (configuration draft)\n\n")
+	if len(e.view.Routes) == 0 {
+		s.writeTerminalData([]byte("No routes configured.\n"))
+		return
 	}
-	sort.Strings(names)
-	total := 0
-	for _, name := range names {
-		heading := "Interface " + name
-		if name == "" {
-			heading = "Unassigned routes (use set interface NAME)"
-		}
-		if item, exists := e.view.Interfaces[name]; exists && item.ReadOnly != "" {
-			heading += " [read-only: " + item.ReadOnly + "]"
-		}
-		s.writeTerminalData([]byte(heading + "\n"))
-		routes := groups[name]
-		sort.Slice(routes, func(i, j int) bool { return routes[i].Name < routes[j].Name })
-		if len(routes) == 0 {
-			s.writeTerminalData([]byte("  No entries in the Netplan routes list.\n"))
-			continue
-		}
-		var table bytes.Buffer
-		writer := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
-		fmt.Fprintln(writer, "  NAME\tDESTINATION\tGATEWAY\tMETRIC")
-		for _, route := range routes {
-			destination := route.Destination
-			if destination == "" {
-				destination = "<not set>"
+	var table bytes.Buffer
+	writer := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(writer, "ID\tDESTINATION\tGATEWAY\tINTERFACE\tMETRIC")
+	for _, id := range e.itemChoices() {
+		name, _ := e.resolveItem(id)
+		route := e.view.Routes[name]
+		label := id
+		for _, diff := range networkDiffs(e) {
+			if diff.name == name {
+				label += " *"
+				break
 			}
-			gateway := route.Gateway
-			if gateway == "" {
-				gateway = "-"
-			}
-			metric := "auto"
-			if route.Metric != nil {
-				metric = fmt.Sprint(*route.Metric)
-			}
-			label := route.Name
-			if route.ReadOnly != "" {
-				label += " [read-only]"
-			}
-			fmt.Fprintf(writer, "  %s\t%s\t%s\t%s\n", label, destination, gateway, metric)
 		}
-		_ = writer.Flush()
-		s.writeTable(table.Bytes())
-		total += len(routes)
+		destination, gateway := route.Destination, route.Gateway
+		if destination == "" {
+			destination = "Not set"
+		}
+		if gateway == "" {
+			gateway = "Direct"
+		}
+		if route.ReadOnly != "" {
+			label += " (read-only)"
+		}
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", label, destination, gateway, route.Interface, optionalNumber(route.Metric))
 	}
-	if total == 0 {
-		s.writeTerminalData([]byte("Use edit NAME to create a route, then set interface NAME and set destination NETWORK/CIDR.\n"))
-	}
+	_ = writer.Flush()
+	s.writeTable(table.Bytes())
 }

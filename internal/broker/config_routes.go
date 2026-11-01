@@ -80,7 +80,7 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 			delete(s.stagedLogical, key)
 			s.configMenu = nil
 			s.writeTerminalData([]byte("Resumed unsaved edits.\n"))
-			return s.editorHelp(nil)
+			return nil
 		}
 		s.configMenu = nil
 		if r.view != nil {
@@ -94,11 +94,8 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 			}
 			e.description.Fields = aliasDescriptions(e.description.Fields, *r.view)
 			e.base = e.aliasRead(e.base)
-			fmt.Fprint(s.output, "Use set NAME VALUE, show, diff; save validates and commits; next keeps edits; back discards this context and returns to its parent.\r\n")
-		} else {
-			fmt.Fprint(s.output, "Use edit SECTION, show, ?; save validates and commits, cancel discards.\r\n")
 		}
-		return s.editorHelp(nil)
+		return nil
 	}
 	found := false
 	seen := map[string]bool{}
@@ -120,7 +117,7 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 	}
 	if !help {
 		s.configMenu = append([]string{}, path...)
-		return s.showConfigurationMenu(ctx)
+		return nil
 	}
 	return nil
 }

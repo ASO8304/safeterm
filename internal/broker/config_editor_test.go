@@ -208,7 +208,7 @@ func TestSystemInfoGroupRequiresAuthorizedSubcommand(t *testing.T) {
 	}
 	client := &fakeGateway{}
 	s, _ := NewShell(client, catalog, Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader(""), &bytes.Buffer{})
-	if _, err = s.executeLine(context.Background(), "execute system_info", nil); err != nil {
+	if _, err = s.executeLine(context.Background(), "execute system_info", nil); err == nil {
 		t.Fatal(err)
 	}
 	if len(client.requests) != 0 {

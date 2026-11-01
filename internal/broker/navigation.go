@@ -19,18 +19,23 @@ func (s *Shell) openConfigurationPath(ctx context.Context, path []string, help b
 }
 
 func (s *Shell) showConfigurationMenu(ctx context.Context) error {
+	if err := s.showConfigurationChildren(ctx); err != nil {
+		return err
+	}
+	s.networkHelpRow("edit PATH", "Open a child or relative path; typing the path directly also works")
+	s.networkHelpRow("exit", exitDescription)
+	s.networkHelpRow("?", "Show this menu; command ? keeps your input")
+	s.networkHelpRow("cancel", "Return to the main prompt")
+	s.networkHelpRow("clear", globalDescriptions["clear"])
+	return nil
+}
+
+func (s *Shell) showConfigurationChildren(ctx context.Context) error {
 	if len(s.configMenu) == 1 && s.configMenu[0] == "network" {
 		s.networkHelpRow("interface", "Choose an interface to edit")
 		s.networkHelpRow("route", "Choose a static route to edit")
 	} else if err := s.configPath(ctx, s.configMenu, true); err != nil {
 		return err
-	}
-	s.networkHelpRow("edit NAME", "Open one of the choices above; typing its name also works")
-	s.networkHelpRow("back", backDescription)
-	s.networkHelpRow("?", "Show this menu; command ? keeps your input")
-	s.networkHelpRow("cancel", "Return to the main prompt")
-	for _, command := range []string{"exit", "clear", "whoami"} {
-		s.networkHelpRow(command, globalDescriptions[command])
 	}
 	return nil
 }
@@ -45,35 +50,31 @@ func (s *Shell) configurationMenuCommand(ctx context.Context, fields []string) (
 		fields = fields[:len(fields)-1]
 	}
 	if len(fields) == 0 || (len(fields) == 1 && (command == "show" || command == "help")) {
+		if command == "show" && !help {
+			return true, false, s.showConfigurationChildren(ctx)
+		}
 		return true, false, s.showConfigurationMenu(ctx)
 	}
-	if command == "back" || command == "cancel" {
+	if command == "cancel" {
 		if len(fields) != 1 {
 			return true, false, fmt.Errorf("usage: %s", command)
 		}
 		if help {
 			description := "Return to the main prompt and discard retained drafts"
-			if command == "back" {
-				description = backDescription
-			}
 			s.networkHelpRow("<cr>", description)
 			return true, false, nil
 		}
-		if command == "back" && len(s.configMenu) > 0 {
-			s.discardLogicalUnder(s.configMenu)
-			return true, false, s.openConfigurationPath(ctx, s.configMenu[:len(s.configMenu)-1], false)
-		}
 		s.discardLogicalUnder(nil)
 		s.configMenu = nil
-		return true, false, s.questionHelp(ctx, nil)
+		return true, false, nil
 	}
 	path := append([]string{}, s.configMenu...)
 	if command == "edit" {
 		if len(fields) == 1 && help {
 			return true, false, s.showConfigurationMenu(ctx)
 		}
-		if len(fields) != 2 {
-			return true, false, fmt.Errorf("usage: edit NAME; use ? to list choices")
+		if len(fields) < 2 {
+			return true, false, fmt.Errorf("usage: edit PATH; use ? to list choices")
 		}
 		fields = fields[1:]
 	}
@@ -109,10 +110,6 @@ func (s *Shell) configurationMenuCompletion(before, prefix string) ([]string, bo
 		if len(path) == 0 && s.network != nil {
 			choices = append(choices, "network")
 		}
-	}
-	selecting := len(fields) > 0 && fields[0] == "edit"
-	if len(completed) == 0 && !selecting {
-		choices = append(choices, "?", "back", "edit", "show", "cancel", "exit", "clear", "whoami")
 	}
 	return matching(choices, prefix), true
 }

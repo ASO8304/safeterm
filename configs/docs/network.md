@@ -65,40 +65,51 @@ In the interface context, `show` displays a compact table of names, kernel link 
 
 ## Routes and default gateway
 
-A gateway is represented as a default route, avoiding deprecated `gateway4` settings:
+At config network route, show lists routes by a short ID with destination,
+gateway, interface and metric columns. IDs remain stable while the editor is
+open, including after deleting or adding routes. They are session selectors;
+reopen show after reconnecting. Generated route hashes stay internal to the
+presentation. Existing stored names are accepted as well.
 
 ```text
 config network route
-    edit default-uplink
-        set interface ens160
-        set destination 0.0.0.0/0
-        set gateway 192.168.10.1
-        set metric 100
-    next
-    edit office
-        set interface ens160
-        set destination 10.50.0.0/16
-        set gateway 192.168.10.254
-        set metric 200
-    next
+show
+edit 1
+show
+set gateway 192.168.222.1
+diff
+next
 save
 ```
 
-`edit office` creates a new route draft when that name does not exist; choose a
-name yourself rather than waiting for it to appear in completion. `edit ?` lists
-existing routes and explains how to create a new named route.
+A selected route's show uses labeled Destination, Gateway, Interface and Metric
+values. 0.0.0.0/0 is the IPv4 default route; ::/0 is the IPv6 default route.
+Gateway is an IP address without a CIDR prefix. No gateway means a direct route.
 
-Within `config network route`, `show` displays only candidate route tables,
-grouped by interface, with name, destination, gateway and metric columns. It does
-not dump interface addresses, DNS, source filenames, internal versions or the
-whole network view. Empty interfaces have an explicit empty-list message. A
-selected route limits `show` to that route; `next` returns to all route tables.
-Incomplete drafts receive instructions for missing fields. These are configured
-Netplan `routes` entries, not DHCP/kernel-learned routes; use `execute network
-status` for live state. Legacy `gateway4`/`gateway6` fields are not imported into
-this table, and their interface remains read-only as described below.
+Create a route explicitly with add NAME, using a descriptive name:
 
-Use `delete office` in the route context to remove a route. Destination must be a canonical network CIDR; gateway must be an IP of the same address family. The route's interface must be editable under policy. Several routes and several addresses per interface are supported. Existing routes receive stable displayed names; names created in SafeTerm remain available after confirmation.
+```text
+config network route
+add office
+set interface ip0
+set destination 10.50.0.0/16
+set gateway 192.168.222.1
+set metric 100
+diff
+next
+save
+```
+
+Use edit ID (or a stored name) to select an existing route; an unknown edit is an
+error and cannot accidentally create a new route. add alone never saves a route.
+The new route needs an interface and network destination before it can be saved.
+delete ID stages removal of that exact route. set ? describes the fields and
+set interface followed by Tab lists editable interfaces.
+
+exit from a route discards its edits and returns to the route list. next keeps
+its edits staged. Neither applies networking; the save/apply/confirm flow below
+remains required. Underlying route identities, ownership and policy checks are
+unchanged by the short display IDs.
 
 ## Timed apply, confirmation and rollback
 
@@ -137,38 +148,30 @@ Unit/CLI tests cover discovery, merging, validation, source conflicts, permissio
 
 References: [Netplan file merging](https://netplan.readthedocs.io/en/stable/netplan-generate/), [Netplan try](https://netplan.readthedocs.io/en/stable/netplan-try/).
 
-## Help and back navigation
+## Navigation and help
 
-After login, SafeTerm displays the main command menu automatically. Type `?`
-and press Enter for commands at the current level. Contextual help keeps your
-input: after `execute ?` and Enter, the prompt still contains `execute `, so you
-can continue with a command name. The same applies to `config ?`, `edit ?` and
-`set FIELD ?`. Help never executes a command, stages a change or saves anything.
-Use Ctrl+U to clear the retained line and start another command. Password and
-confirmation prompts keep their normal input behavior.
+Login prints the main command menu once. Entering, selecting or leaving a context
+is quiet. Use ? (or COMMAND ?) explicitly for help; help keeps the input prefix.
+Tab in a configuration menu lists only its child names, such as interface and
+route. At an editor item list it offers item names or route IDs. Inside a selected
+item, use set followed by Tab for field names; empty Tab does not dump commands.
 
-`config` opens a menu. Choose an entry by typing its name or `edit NAME`;
-`config network` opens the interface/route menu. Tab completes menu entries and
-editor commands. Every `back` displays the parent menu or available items.
+exit moves up one level and discards unsaved edits to the item being left, naming
+it if changes were discarded. Other staged items remain. At an item list, exit
+leaves that editor and discards its remaining draft. At the root prompt only,
+exit closes the session. Ctrl+] closes the whole session from any level.
+The former back command is removed.
 
-| Command | Effect |
-|---|---|
-| `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
-| `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
-| `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
-| `next` inside a network item or file section | Move up (keeps unsaved edits staged) |
-| `next` inside a logical context | Return to the parent menu; reopen the context to continue the draft |
-| `save` inside an editor | Validate and save the editor draft |
-| `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+next leaves a selected item while keeping edits staged; save validates and
+commits the editor. Network save stores a candidate for the separate timed
+execute network apply flow. cancel discards the current editor and returns to
+root. Parent-menu exit discards retained logical drafts under that menu.
+whoami is available only at root. clear remains available in all contexts.
 
-`back` never writes a file, saves a network candidate or applies networking.
-Previously saved network candidates are kept. In navigation menus, `cancel` returns
-to the main prompt without saving anything. Only explicit save/apply commands
-change configuration.
+Choose a menu child by typing its name, or use edit with a relative path. From
+the config menu, edit network interface opens the interface list directly.
+Navigation never saves a file, applies networking or prints an automatic menu.
 
-For example, from `network/interface/ip0`, `back` discards unsaved changes to
-`ip0` and shows the interface list. Another `back` leaves the interface editor
-and shows `interface` and `route`; another returns to the configuration menu.
 
 ## Draft display and session controls
 
@@ -179,7 +182,7 @@ search domains, and `(staged)` for edited fields. Local diff uses `-` and `+`
 lines. A bare IP is rejected immediately with Address/Prefix guidance.
 
 Use `save` to validate and commit the candidate, `cancel` to discard the editor,
-`back` to move up while discarding edits to the item, and `next` to move up while
-keeping edits staged. `exit`, `clear` and `whoami` are available inside editors.
-Dirty `exit` warns and discards drafts. Saving a network candidate never applies
+`exit` to move up while discarding edits to the item, and `next` to move up while
+keeping edits staged. `exit` moves up one level; `whoami` is root-only and `clear` works everywhere.
+Leaving a dirty item discards its edits. Saving a network candidate never applies
 networking; the confirmed trial still starts with `execute network apply`.

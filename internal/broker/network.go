@@ -12,9 +12,10 @@ import (
 )
 
 type networkEditSession struct {
-	kind, item string
-	base, view networkmanager.View
-	changes    []networkmanager.Change
+	kind, item   string
+	base, view   networkmanager.View
+	changes      []networkmanager.Change
+	routeNumbers map[string]string
 }
 
 func (s *Shell) SetNetworkClient(client networkmanager.API) { s.network = client }
@@ -35,7 +36,7 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 		return true, fmt.Errorf("leave the current configuration context first")
 	}
 	if f[0] == "execute" {
-		if len(f) == 2 || (len(f) == 3 && f[2] == "?") {
+		if len(f) == 3 && f[2] == "?" {
 			return true, s.networkActionHelp(nil)
 		}
 		if len(f) > 3 && f[len(f)-1] == "?" {
@@ -52,7 +53,7 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	}
 	if len(f) == 2 {
 		s.configMenu = []string{"network"}
-		return true, s.showConfigurationMenu(ctx)
+		return true, nil
 	}
 	if len(f) == 3 && f[2] == "?" {
 		s.writeTerminalData([]byte("interface    Addresses, DHCP, DNS and MTU\nroute        Static routes\n"))
@@ -74,15 +75,10 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	}
 	s.networkEdit = &networkEditSession{kind: f[2], base: *r.View, view: *r.View}
 	s.configMenu = nil
-	s.writeTerminalData([]byte("back discards edits to the item you leave; next keeps them staged. save validates and commits a candidate. execute network apply starts a timed trial.\n"))
-	return true, s.networkSelectionMenu()
+	s.networkEdit.ensureRouteNumbers()
+	return true, nil
 }
 
-func (s *Shell) networkSelectionMenu() error {
-	s.networkContextHelp(s.networkEdit.kind, false)
-	s.writeTerminalData([]byte("Available items (use edit NAME):\n"))
-	return s.networkEditorHelp([]string{"edit"})
-}
 func (s *Shell) networkEditor(ctx context.Context, line string) error {
 	e := s.networkEdit
 	f := strings.Fields(line)
@@ -94,9 +90,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 	}
 
 	switch f[0] {
-	case "back":
+	case "exit":
 		if len(f) != 1 {
-			return fmt.Errorf("usage: back")
+			return fmt.Errorf("usage: exit")
 		}
 		if e.item == "" {
 			if s.editorDirty() {
@@ -117,38 +113,60 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		for _, diff := range networkDiffs(e) {
 			if diff.name == e.item {
-				s.discardedItem(e.item)
+				label := e.item
+				if e.kind == "route" {
+					label = e.routeTitle(e.item)
+				}
+				s.discardedItem(label)
 				break
 			}
 		}
 		e.changes, e.view, e.item = remaining, view, ""
-		return s.networkSelectionMenu()
+		return nil
 	case "cancel":
 		if len(f) != 1 {
 			break
 		}
 		s.networkEdit = nil
 		s.writeTerminalData([]byte("Unsaved editor changes discarded; any previously saved candidate is kept.\n"))
-		return s.questionHelp(ctx, nil)
-	case "edit":
+		return nil
+	case "edit", "add":
 		if len(f) != 2 {
-			break
+			return fmt.Errorf("usage: %s NAME", f[0])
 		}
-		if e.kind == "interface" {
-			if _, ok := e.view.Interfaces[f[1]]; !ok {
+		name := f[1]
+		if f[0] == "add" {
+			if e.kind != "route" {
+				return fmt.Errorf("add is available only for routes")
+			}
+			if !networkmanager.ValidItemName(name) || numericRouteName(name) || !(name[0] >= 'a' && name[0] <= 'z' || name[0] >= 'A' && name[0] <= 'Z') {
+				return fmt.Errorf("use a route name starting with a letter, such as office or default-uplink")
+			}
+			if _, exists := e.view.Routes[name]; exists {
+				return fmt.Errorf("route already exists; use edit %s", name)
+			}
+		} else {
+			resolved, exists := e.resolveItem(name)
+			if !exists {
+				if e.kind == "route" {
+					return fmt.Errorf("route %q not found; use show to list routes or add NAME to create one", name)
+				}
 				return fmt.Errorf("network: unknown interface")
 			}
+			name = resolved
 		}
-		e.item = f[1]
-		s.networkContextHelp(e.kind, true)
+		e.item = name
 		return nil
 	case "next":
 		if len(f) != 1 {
 			break
 		}
+		if e.item == "" {
+			return fmt.Errorf("select an item first; use exit to leave this list")
+		}
 		e.item = ""
 		s.writeTerminalData([]byte("Edits kept in this editor; nothing saved.\n"))
-		return s.networkSelectionMenu()
+		return nil
 	case "show":
 		if len(f) != 1 {
 			break
@@ -168,6 +186,11 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 	case "save":
 		if len(f) != 1 {
 			break
+		}
+		if e.kind == "route" && e.item != "" {
+			if _, exists := e.view.Routes[e.item]; !exists {
+				return fmt.Errorf("set interface and destination before saving the new route")
+			}
 		}
 		r, err := s.networkCall(ctx, networkmanager.Request{Action: "save", Version: e.base.Version, Changes: e.changes})
 		if err != nil {
@@ -202,7 +225,11 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		if len(f) != 2 || e.kind != "route" {
 			break
 		}
-		c := networkmanager.Change{Kind: "route", Name: f[1], Action: "delete"}
+		name, exists := e.resolveItem(f[1])
+		if !exists {
+			return fmt.Errorf("route not found; use show to list routes")
+		}
+		c := networkmanager.Change{Kind: "route", Name: name, Action: "delete"}
 		v, err := networkmanager.Modify(e.view, []networkmanager.Change{c})
 		if err != nil {
 			return err
@@ -214,6 +241,12 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		return nil
 	}
+	if len(f) == 1 && e.item == "" {
+		if name, exists := e.resolveItem(f[0]); exists {
+			e.item = name
+			return nil
+		}
+	}
 	return fmt.Errorf("network: invalid command; use ?")
 }
 func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
@@ -222,30 +255,28 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 		f = f[:len(f)-1]
 	}
 	if e := s.networkEdit; e != nil {
-		values := []string{"?", "back", "edit", "show", "diff", "next", "save", "cancel", "exit", "clear", "whoami"}
+		values := []string{"?", "edit", "show", "diff", "save", "cancel", "exit", "clear"}
 		if e.kind == "route" {
-			values = append(values, "delete")
+			values = append(values, "delete", "add")
 		}
 		if e.item != "" {
-			values = append(values, "set")
+			values = append(values, "set", "next")
 			if e.kind == "interface" {
 				values = append(values, "append", "unselect", "unset")
 			}
+		}
+		if len(f) == 0 && strings.TrimSpace(before) == "" {
+			if e.item == "" {
+				return matching(e.itemChoices(), prefix), true
+			}
+			return nil, true
 		}
 		if len(f) > 0 {
 			values = nil
 			switch f[0] {
 			case "edit", "delete":
 				if len(f) == 1 {
-					if e.kind == "interface" {
-						for name := range e.view.Interfaces {
-							values = append(values, name)
-						}
-					} else {
-						for name := range e.view.Routes {
-							values = append(values, name)
-						}
-					}
+					values = e.itemChoices()
 				}
 			case "set", "unset", "append", "unselect":
 				if len(f) == 1 {
@@ -260,11 +291,16 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 				} else if len(f) == 2 && f[1] == "dhcp4" {
 					values = []string{"enable", "disable"}
 				} else if len(f) == 2 && f[1] == "interface" {
-					for name := range e.view.Interfaces {
-						values = append(values, name)
+					for name, item := range e.view.Interfaces {
+						if item.ReadOnly == "" {
+							values = append(values, name)
+						}
 					}
 				}
 			}
+		}
+		if len(f) == 0 && e.item == "" {
+			values = append(values, e.itemChoices()...)
 		}
 		sort.Strings(values)
 		return matching(values, prefix), true

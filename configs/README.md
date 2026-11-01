@@ -21,8 +21,8 @@ All SafeTerm administrator settings live under `/etc/safeterm`:
 
 Copy a directory's inactive `TEMPLATE.json` to a new JSON filename, edit it,
 then run `sudo termctl check` and `sudo termctl apply`. Inside SafeTerm, login
-shows the command menu, `?` help keeps your input, and `back` discards the item
-you are leaving and shows its parent menu. `next` keeps staged item edits.
+shows the command menu, `?` help keeps your input, and `exit` moves up one
+level while discarding edits to the item being left. Context changes are quiet. `next` keeps staged item edits.
 Manage credentials with
 `sudo termctl user`; preserve their existing roles when changing them.
 

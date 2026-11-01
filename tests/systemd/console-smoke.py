@@ -72,7 +72,14 @@ try:
     if b'Show available commands' not in login_menu or b'Show your identity and roles' not in login_menu:
         raise RuntimeError('login did not show the command menu')
     if mode == 'empty':
-        command('config network interface', b'\nsafeterm::ci-admin(network/interface)> ')
+        entered = command('config network', b'\nsafeterm::ci-admin(network)> ')
+        if b'Choose an interface' in entered or b'Show available commands' in entered:
+            raise RuntimeError('context entry printed automatic help')
+        os.write(fd, b'\t\t')
+        choices = expect(b'interface  route')
+        if b'whoami' in choices or b'cancel' in choices or b'edit ' in choices:
+            raise RuntimeError('menu completion listed control commands')
+        command('interface', b'\nsafeterm::ci-admin(network/interface)> ')
         if b'\x1b[1;34m(network/interface)\x1b[0m' not in transcript:
             raise RuntimeError('configuration path did not have its own prompt color')
         interfaces = command('show', b'\nsafeterm::ci-admin(network/interface)> ')
@@ -125,7 +132,7 @@ try:
             raise RuntimeError('help lost the execute prefix')
     command('config ?')
     command('config', b'\nsafeterm::ci-admin(config)> ')
-    command('back')
+    command('exit')
     result = command('execute system_info disk')
     if b'result: success' not in result:
         raise RuntimeError('Gateway/Runner execution failed')
@@ -164,12 +171,12 @@ try:
         if b'8080' not in result:
             raise RuntimeError('registered INI value not read')
         command('set Po\t9090', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
-        command('back', b'\nsafeterm::ci-admin(fresh-options)> ')
+        command('exit', b'\nsafeterm::ci-admin(fresh-options)> ')
         if 'Port = 8080' not in open('/etc/safeterm-ci/options.ini', encoding='utf-8-sig').read():
-            raise RuntimeError('back saved the section')
+            raise RuntimeError('exit saved the section')
         command('edit Server', b'\nsafeterm::ci-admin(fresh-options/Server)> ')
         if b'8080' not in command('show', b'\nsafeterm::ci-admin(fresh-options/Server)> '):
-            raise RuntimeError('back retained the discarded section edit')
+            raise RuntimeError('exit retained the discarded section edit')
         command('set Port 9090', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
         result = command('diff', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
         if b'-   8080' not in result or b'+   9090' not in result:

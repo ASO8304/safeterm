@@ -328,38 +328,30 @@ Service targets are registered exclusively by administrator `resources.d` defini
 
 Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. The TCP probe sends no application data and does not provide an interactive login. See `docs/network-diagnostics.txt` for full details.
 
-## Help and back navigation
+## Navigation and help
 
-After login, SafeTerm displays the main command menu automatically. Type `?`
-and press Enter for commands at the current level. Contextual help keeps your
-input: after `execute ?` and Enter, the prompt still contains `execute `, so you
-can continue with a command name. The same applies to `config ?`, `edit ?` and
-`set FIELD ?`. Help never executes a command, stages a change or saves anything.
-Use Ctrl+U to clear the retained line and start another command. Password and
-confirmation prompts keep their normal input behavior.
+Login prints the main command menu once. Entering, selecting or leaving a context
+is quiet. Use ? (or COMMAND ?) explicitly for help; help keeps the input prefix.
+Tab in a configuration menu lists only its child names, such as interface and
+route. At an editor item list it offers item names or route IDs. Inside a selected
+item, use set followed by Tab for field names; empty Tab does not dump commands.
 
-`config` opens a menu. Choose an entry by typing its name or `edit NAME`;
-`config network` opens the interface/route menu. Tab completes menu entries and
-editor commands. Every `back` displays the parent menu or available items.
+exit moves up one level and discards unsaved edits to the item being left, naming
+it if changes were discarded. Other staged items remain. At an item list, exit
+leaves that editor and discards its remaining draft. At the root prompt only,
+exit closes the session. Ctrl+] closes the whole session from any level.
+The former back command is removed.
 
-| Command | Effect |
-|---|---|
-| `back` inside an interface, route or file section | Discard that item's unsaved edits and return to its item list; other staged items remain |
-| `back` at an editor's item list | Discard the remaining editor draft and return to the parent configuration menu |
-| `back` in a logical configuration context | Discard that context's unsaved edits and return to its parent menu |
-| `next` inside a network item or file section | Move up (keeps unsaved edits staged) |
-| `next` inside a logical context | Return to the parent menu; reopen the context to continue the draft |
-| `save` inside an editor | Validate and save the editor draft |
-| `cancel` inside an editor | Discard the whole unsaved editor draft and return to the main prompt |
+next leaves a selected item while keeping edits staged; save validates and
+commits the editor. Network save stores a candidate for the separate timed
+execute network apply flow. cancel discards the current editor and returns to
+root. Parent-menu exit discards retained logical drafts under that menu.
+whoami is available only at root. clear remains available in all contexts.
 
-`back` never writes a file, saves a network candidate or applies networking.
-Previously saved network candidates are kept. In navigation menus, `cancel` returns
-to the main prompt without saving anything. Only explicit save/apply commands
-change configuration.
+Choose a menu child by typing its name, or use edit with a relative path. From
+the config menu, edit network interface opens the interface list directly.
+Navigation never saves a file, applies networking or prints an automatic menu.
 
-For example, from `network/interface/ip0`, `back` discards unsaved changes to
-`ip0` and shows the interface list. Another `back` leaves the interface editor
-and shows `interface` and `route`; another returns to the configuration menu.
 
 ## Visible drafts and editor commands
 
@@ -369,13 +361,13 @@ apply starts the separately confirmed trial. A * after the prompt context marks
 unsaved edits. Local diff uses - and + lines and hides secrets. Interface show
 includes STATE at editor entry, clear editing permissions and staged values.
 
-back moves up and discards edits to the item; next moves up and keeps them.
+exit moves up and discards edits to the item; next moves up and keeps them.
 Logical contexts retain drafts in their parent menu; reopen the context to
-continue or save. Parent-menu back discards drafts under that menu. Each logical
+continue or save. Parent-menu exit discards drafts under that menu. Each logical
 context saves independently with its original version check.
 
-exit, clear and whoami work inside editors. Dirty exit warns and discards all
-unsaved session drafts before closing. execute tcp-test IP [PORT] is the port
+exit moves up one level; root exit closes the session. whoami is root-only,
+and clear works everywhere. Leaving a dirty item discards its edits. execute tcp-test IP [PORT] is the port
 probe; execute telnet remains an alias and prints a migration notice.
 
 ## Terminal colors

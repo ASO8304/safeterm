@@ -62,9 +62,9 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 	}
 	command := fields[0]
 	switch command {
-	case "back":
+	case "exit":
 		if len(fields) != 1 {
-			return false, fmt.Errorf("usage: back")
+			return false, fmt.Errorf("usage: exit")
 		}
 		if !e.logical && e.inSection {
 			section, dirty := e.section, false
@@ -83,10 +83,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 				}
 				s.discardedItem(section)
 			}
-			if err := s.editorHelp(nil); err != nil {
-				return false, err
-			}
-			return false, s.editorHelp([]string{"edit"})
+			return false, nil
 		}
 		parent := []string{}
 		if e.logical {
@@ -124,7 +121,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 			if f.Section == section {
 				e.section = section
 				e.inSection = true
-				return false, s.editorHelp(nil)
+				return false, nil
 			}
 		}
 		return false, fmt.Errorf("section is unknown or unauthorized; use edit ?")
@@ -147,10 +144,13 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 			return false, s.openConfigurationPath(ctx, e.path[:len(e.path)-1], false)
 		}
 		// Keep one resource transaction across sections; only save writes the file.
+		if !e.inSection {
+			return false, fmt.Errorf("select a section first; use exit to leave this list")
+		}
 		e.section = ""
 		e.inSection = false
 		fmt.Fprint(s.output, "Edits kept in this editor; nothing saved.\r\n")
-		return false, s.editorHelp([]string{"edit"})
+		return false, nil
 	case "show":
 		if len(fields) != 1 {
 			return false, fmt.Errorf("usage: show")
@@ -329,6 +329,17 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 		s.editing = nil
 		s.writeStyled(styleSuccess, "Configuration saved.\n")
 	default:
+		if !e.logical && !e.inSection && len(fields) == 1 {
+			for _, field := range e.description.Fields {
+				name := field.Section
+				if name == "" {
+					name = "-"
+				}
+				if fields[0] == name {
+					return s.configEditor(ctx, "edit "+name, input)
+				}
+			}
+		}
 		return false, fmt.Errorf("unknown configuration command; use ?")
 	}
 	return false, nil
@@ -341,8 +352,11 @@ func (s *Shell) editorHelp(fields []string) error {
 	}
 	if len(fields) == 0 {
 		row("?", "Show available commands; command ? keeps your input")
-		row("back", backDescription)
-		for _, r := range [][2]string{{"show", "Show values including staged changes; secrets are hidden"}, {"edit SECTION", "Select a registered section"}, {"set KEY VALUE", "Stage a value; omit VALUE for a secret"}, {"diff", "Show unsaved changes"}, {"next", nextDescription}, {"save", "Validate and commit all changes, then leave configuration"}, {"rollback", "Restore the latest file backup; asks for confirmation"}, {"cancel", "Discard unsaved changes and leave configuration"}, {"exit", globalDescriptions["exit"]}, {"clear", globalDescriptions["clear"]}, {"whoami", globalDescriptions["whoami"]}} {
+		row("exit", exitDescription)
+		for _, r := range [][2]string{{"show", "Show values including staged changes; secrets are hidden"}, {"edit SECTION", "Select a registered section"}, {"set KEY VALUE", "Stage a value; omit VALUE for a secret"}, {"diff", "Show unsaved changes"}, {"next", nextDescription}, {"save", "Validate and commit all changes, then leave configuration"}, {"rollback", "Restore the latest file backup; asks for confirmation"}, {"cancel", "Discard unsaved changes and leave configuration"}, {"clear", globalDescriptions["clear"]}} {
+			if !e.inSection && (r[0] == "set KEY VALUE" || r[0] == "next") {
+				continue
+			}
 			if e.logical && r[0] == "edit SECTION" {
 				continue
 			}
@@ -350,8 +364,8 @@ func (s *Shell) editorHelp(fields []string) error {
 		}
 		return nil
 	}
-	if len(fields) == 1 && fields[0] == "back" {
-		row("<cr>", backDescription)
+	if len(fields) == 1 && fields[0] == "exit" {
+		row("<cr>", exitDescription)
 		return nil
 	}
 	if len(fields) == 1 {
@@ -417,9 +431,23 @@ func (s *Shell) editorCompletion(before, prefix string) []string {
 		index++
 	}
 	if index <= 0 {
-		commands := []string{"?", "back", "show", "set", "diff", "save", "cancel", "rollback", "next", "exit", "clear", "whoami"}
+		commands := []string{"?", "show", "set", "diff", "save", "cancel", "rollback", "next", "exit", "clear"}
 		if !s.editing.logical {
 			commands = append(commands, "edit")
+		}
+		if strings.TrimSpace(before) == "" {
+			if !s.editing.logical && !s.editing.inSection {
+				sections := []string{}
+				for _, field := range s.editing.description.Fields {
+					name := field.Section
+					if name == "" {
+						name = "-"
+					}
+					sections = append(sections, name)
+				}
+				return matching(sections, prefix)
+			}
+			return nil
 		}
 		return matching(commands, prefix)
 	}

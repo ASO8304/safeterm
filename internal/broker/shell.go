@@ -188,7 +188,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	if len(fields) == 0 {
 		return false, nil
 	}
-	if handled, exit, err := s.globalCommand(fields); handled {
+	if handled, exit, err := s.globalCommand(ctx, fields); handled {
 		return exit, err
 	}
 	if s.networkEdit != nil {
@@ -221,7 +221,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	case "execute":
 		operation, args, ok := s.resolveOperation(fields[1:])
 		if !ok {
-			return false, s.operationTreeHelp(fields[1:])
+			return false, fmt.Errorf("unknown or incomplete operation; use execute ?")
 		}
 		if fields[1] == "telnet" {
 			s.writeTerminalData([]byte("Use 'execute tcp-test' for port probing\n"))
@@ -502,7 +502,14 @@ func (s *Shell) prompt() string {
 	if e := s.networkEdit; e != nil {
 		path := "network/" + e.kind
 		if e.item != "" {
-			path += "/" + e.item
+			item := e.item
+			if e.kind == "route" && generatedRouteName(item) {
+				e.ensureRouteNumbers()
+				if number := e.routeNumbers[item]; number != "" {
+					item = number
+				}
+			}
+			path += "/" + item
 		}
 		return s.formatPrompt("("+path+")", dirty)
 	}

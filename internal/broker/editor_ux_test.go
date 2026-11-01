@@ -38,7 +38,7 @@ func TestEditorDirtyPromptsReflectEffectiveValues(t *testing.T) {
 		t.Fatal("restoring the base value remains dirty")
 	}
 	out.Reset()
-	editorCommands(t, s, "diff", "back")
+	editorCommands(t, s, "diff", "exit")
 	if !strings.Contains(out.String(), "No changes.") || strings.Contains(out.String(), "Discarded unsaved") {
 		t.Fatal(out.String())
 	}
@@ -89,7 +89,7 @@ func TestGlobalsInsideAllEditorsDoNotSaveAndHelpCannotExit(t *testing.T) {
 							editorCommands(t, s, "set mtu 1400")
 						}
 					} else {
-						editorCommands(t, s, "config network route", "edit office")
+						editorCommands(t, s, "config network route", "add office")
 						if dirty {
 							editorCommands(t, s, "set interface ip1")
 						}
@@ -97,16 +97,27 @@ func TestGlobalsInsideAllEditorsDoNotSaveAndHelpCannotExit(t *testing.T) {
 				}
 				prompt := s.prompt()
 				out.Reset()
-				editorCommands(t, s, "whoami", "clear", "exit ?", "whoami ?", "clear ?")
-				if !strings.Contains(out.String(), "user: alice") || !strings.Contains(out.String(), "\x1b[2J\x1b[H") || s.prompt() != prompt {
-					t.Fatal("global command changed the draft", out)
+				editorCommands(t, s, "clear", "exit ?", "clear ?")
+				for _, command := range []string{"whoami", "whoami ?"} {
+					if _, err := s.executeLine(context.Background(), command, nil); err == nil {
+						t.Fatal("whoami accepted below root")
+					}
+				}
+				if !strings.Contains(out.String(), "\x1b[2J\x1b[H") || s.prompt() != prompt {
+					t.Fatal("global help changed draft", out)
 				}
 				exit, err := s.executeLine(context.Background(), "exit", nil)
-				if !exit || err != nil || s.editing != nil || s.networkEdit != nil {
-					t.Fatal(exit, err)
+				if exit || err != nil {
+					t.Fatal("context exit closed session", exit, err)
 				}
-				if strings.Contains(out.String(), "Unsaved drafts were discarded") != dirty {
+				if strings.Contains(out.String(), "Discarded unsaved edits") != dirty {
 					t.Fatal(out.String())
+				}
+				if s.networkEdit != nil && s.networkEdit.item != "" {
+					t.Fatal("did not leave network item")
+				}
+				if s.editing != nil && s.editing.inSection {
+					t.Fatal("did not leave section")
 				}
 				if path != "" {
 					after, _ := os.ReadFile(path)
@@ -220,7 +231,7 @@ func TestLogicalNextStagesThenResumesAndBackDiscards(t *testing.T) {
 	if !strings.Contains(out.String(), "Resumed unsaved edits.") || s.editing.changes[0].Value != "false" {
 		t.Fatal("draft not resumed")
 	}
-	editorCommands(t, s, "next", "back")
+	editorCommands(t, s, "next", "exit")
 	if len(s.stagedLogical) != 0 || !strings.Contains(out.String(), "Discarded unsaved edits for 'cat'.") {
 		t.Fatal("back kept draft")
 	}
@@ -237,15 +248,15 @@ func TestLogicalNextStagesThenResumesAndBackDiscards(t *testing.T) {
 func TestRouteDiffShowsCreationDeletionAndRestoredDraft(t *testing.T) {
 	s, api, out := uxNetworkFixture(t)
 	api.view.Routes["office"] = networkmanager.Route{Name: "office", Interface: "ip1", Destination: "10.0.0.0/8", Gateway: "192.0.2.1"}
-	editorCommands(t, s, "config network route", "delete office", "edit default", "set interface ip1", "set destination 0.0.0.0/0", "set gateway 192.0.2.2")
+	editorCommands(t, s, "config network route", "delete office", "add default", "set interface ip1", "set destination 0.0.0.0/0", "set gateway 192.0.2.2")
 	out.Reset()
 	editorCommands(t, s, "diff")
-	for _, want := range []string{"Route: default", "+   ip1", "+   0.0.0.0/0", "+   192.0.2.2", "Route: office", "-   ip1", "-   10.0.0.0/8", "-   192.0.2.1"} {
+	for _, want := range []string{"(default)", "+   ip1", "+   0.0.0.0/0", "+   192.0.2.2", "(office)", "-   ip1", "-   10.0.0.0/8", "-   192.0.2.1"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, out)
 		}
 	}
-	editorCommands(t, s, "back", "edit office", "set interface ip1", "set destination 10.0.0.0/8", "set gateway 192.0.2.1")
+	editorCommands(t, s, "exit", "add office", "set interface ip1", "set destination 10.0.0.0/8", "set gateway 192.0.2.1")
 	if s.editorDirty() {
 		t.Fatal("restored route remains dirty")
 	}
@@ -287,14 +298,14 @@ func TestCanonicalEditorHelpAndCompletion(t *testing.T) {
 			editorCommands(t, s, "config options", "edit Server")
 		}
 		out.Reset()
-		editorCommands(t, s, "?", "save ?", "cancel ?", "back ?", "next ?")
-		for _, want := range []string{"save", "cancel", "clear", "whoami", "exit", backDescription, nextDescription} {
+		editorCommands(t, s, "?", "save ?", "cancel ?", "exit ?", "next ?")
+		for _, want := range []string{"save", "cancel", "clear", "exit", exitDescription, nextDescription} {
 			if !strings.Contains(out.String(), want) {
 				t.Fatalf("missing %q: %s", want, out)
 			}
 		}
 		commands := s.completionCandidates(context.Background(), "", "")
-		for _, old := range []string{"end", "abort"} {
+		for _, old := range []string{"end", "abort", "back", "whoami"} {
 			for _, command := range commands {
 				if command == old {
 					t.Fatal("legacy command in completion", commands)
@@ -312,8 +323,11 @@ func TestExitDiscardsRetainedLogicalDraftEvenWithCleanActiveEditor(t *testing.T)
 	before, _ := os.ReadFile(path)
 	editorCommands(t, s, "config tunnel", "set Value_1 1400", "next", "application", "cat")
 	out.Reset()
+	for !s.atRoot() {
+		editorCommands(t, s, "exit")
+	}
 	exit, err := s.executeLine(context.Background(), "exit", nil)
-	if err != nil || !exit || len(s.stagedLogical) != 0 || !strings.Contains(out.String(), "Unsaved drafts were discarded") {
+	if err != nil || !exit || len(s.stagedLogical) != 0 || !strings.Contains(out.String(), "Discarded unsaved edits for 'tunnel'.") {
 		t.Fatal(exit, err, out)
 	}
 	after, _ := os.ReadFile(path)

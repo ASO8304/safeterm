@@ -102,7 +102,11 @@ func (s *Shell) showNetworkDiff(e *networkEditSession) {
 		if e.kind == "route" {
 			kind = "Route"
 		}
-		s.writeTerminalData([]byte(fmt.Sprintf("%s: %s\n", kind, item.name)))
+		label := item.name
+		if e.kind == "route" {
+			label = e.routeTitle(item.name)
+		}
+		s.writeTerminalData([]byte(fmt.Sprintf("%s: %s\n", kind, label)))
 		for _, field := range item.fields {
 			s.writeTerminalData([]byte("  " + field.label + ":\n"))
 			s.diffValues(field.before, field.after)

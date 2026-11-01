@@ -81,7 +81,7 @@ func (s *Shell) writeTable(data []byte) {
 			cell := line[start:end]
 			style := ""
 			switch name {
-			case "NAME":
+			case "NAME", "ID":
 				style = styleCommand
 			case "STATE":
 				if strings.TrimSpace(cell) == "up" {
@@ -95,7 +95,7 @@ func (s *Shell) writeTable(data []byte) {
 					style = styleWarning
 				}
 			}
-			if name == "NAME" && strings.Contains(cell, " *") {
+			if (name == "NAME" || name == "ID") && strings.Contains(cell, " *") {
 				before, after, _ := strings.Cut(cell, " *")
 				s.writeStyled(style, before)
 				s.writeStyled(styleWarning, " *")

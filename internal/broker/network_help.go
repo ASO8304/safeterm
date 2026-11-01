@@ -23,9 +23,10 @@ var networkEditorDescriptions = map[string]string{
 	"unselect": "Remove specific values from a list",
 	"unset":    "Clear a list, or remove the explicit MTU setting",
 	"next":     nextDescription,
-	"back":     backDescription,
+	"exit":     exitDescription,
 	"save":     "Validate and commit the candidate, then exit; does not apply networking",
 	"cancel":   "Exit and discard unsaved editor changes; keep any previously saved candidate",
+	"add":      "Create a named route draft; use add office",
 	"delete":   "Remove a named route from the candidate",
 }
 var networkInterfaceFields = map[string]string{
@@ -61,12 +62,12 @@ func (s *Shell) networkActionHelp(fields []string) error {
 	return fmt.Errorf("usage: execute network ? or execute network ACTION ?")
 }
 func (s *Shell) networkContextHelp(kind string, selected bool) {
-	values := []string{"?", "back", "edit", "show", "diff", "next", "save", "cancel", "exit", "clear", "whoami"}
+	values := []string{"?", "edit", "show", "diff", "save", "cancel", "exit", "clear"}
 	if kind == "route" {
-		values = append(values, "delete")
+		values = append(values, "delete", "add")
 	}
 	if selected {
-		values = append(values, "set")
+		values = append(values, "set", "next")
 		if kind == "interface" {
 			values = append(values, "append", "unselect", "unset")
 		}
@@ -74,7 +75,7 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 	sort.Strings(values)
 	for _, name := range values {
 		desc := networkEditorDescriptions[name]
-		if global, ok := globalDescriptions[name]; ok {
+		if global, ok := globalDescriptions[name]; ok && name != "exit" {
 			desc = global
 		}
 		if name == "?" {
@@ -84,7 +85,7 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 			if kind == "interface" {
 				desc = "Select an existing network interface"
 			} else {
-				desc = "Select an existing route or choose a name for a new route"
+				desc = "Select an existing route by ID or name; use add NAME for a new route"
 			}
 		}
 		if name == "show" && kind == "route" {
@@ -114,39 +115,26 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 		} else if len(fields) > 2 {
 			return fmt.Errorf("usage: %s NAME", command)
 		}
-		names := []string{}
-		if e.kind == "interface" {
-			for name := range e.view.Interfaces {
-				names = append(names, name)
-			}
-		} else {
-			for name := range e.view.Routes {
-				names = append(names, name)
-			}
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			if !strings.HasPrefix(name, prefix) {
+		for _, choice := range e.itemChoices() {
+			if !strings.HasPrefix(choice, prefix) {
 				continue
 			}
+			name, _ := e.resolveItem(choice)
 			desc := "Select network interface"
 			reason := ""
 			if e.kind == "interface" {
 				reason = e.view.Interfaces[name].ReadOnly
 			} else {
-				desc = "Select named route"
+				desc = e.routeDescription(name)
 				reason = e.view.Routes[name].ReadOnly
 			}
 			if command == "delete" {
-				desc = "Remove named route from the candidate"
+				desc = "Remove route: " + desc
 			}
 			if reason != "" {
 				desc += "; read-only: " + reason
 			}
-			s.networkHelpRow(name, desc)
-		}
-		if e.kind == "route" && command == "edit" {
-			s.networkHelpRow("<name>", "Choose a new route name; set interface, destination and optional gateway/metric")
+			s.networkHelpRow(choice, desc)
 		}
 		return nil
 	case "set", "append", "unselect", "unset":
