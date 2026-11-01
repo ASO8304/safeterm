@@ -1,23 +1,25 @@
 package broker
 
 import (
-	"encoding/hex"
+	"crypto/rand"
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
+
+	"safeterm/internal/networkmanager"
 )
 
-func numericRouteName(name string) bool {
-	if name == "" {
-		return false
-	}
-	for _, c := range name {
-		if c < '0' || c > '9' {
-			return false
+func (e *networkEditSession) addRoute() {
+	e.ensureRouteNumbers()
+	for {
+		name := "route-" + rand.Text()
+		if _, used := e.routeNumbers[name]; used {
+			continue
 		}
+		e.item = name
+		e.ensureRouteNumbers()
+		return
 	}
-	return true
 }
 
 // Selectors belong to this cached editor, not to persisted Netplan route names.
@@ -36,6 +38,9 @@ func (e *networkEditSession) ensureRouteNumbers() {
 	for name := range e.view.Routes {
 		names[name] = true
 	}
+	if e.item != "" {
+		names[e.item] = true
+	}
 	ordered := make([]string, 0, len(names))
 	for name := range names {
 		ordered = append(ordered, name)
@@ -51,7 +56,7 @@ func (e *networkEditSession) ensureRouteNumbers() {
 		}
 		for n := 1; ; n++ {
 			number := strconv.Itoa(n)
-			if used[number] || (names[number] && number != name) {
+			if used[number] {
 				continue
 			}
 			e.routeNumbers[name], used[number] = number, true
@@ -66,9 +71,6 @@ func (e *networkEditSession) resolveItem(value string) (string, bool) {
 		return value, ok
 	}
 	e.ensureRouteNumbers()
-	if _, ok := e.view.Routes[value]; ok {
-		return value, true
-	}
 	for name, number := range e.routeNumbers {
 		if number == value {
 			_, ok := e.view.Routes[name]
@@ -95,34 +97,38 @@ func (e *networkEditSession) itemChoices() []string {
 	return choices
 }
 
-func generatedRouteName(name string) bool {
-	if !strings.HasPrefix(name, "route-") || len(name) != 18 {
-		return false
+func (e *networkEditSession) protectedRoute(name string) bool {
+	return networkmanager.IsDefaultRoute(e.base.Routes[name]) || networkmanager.IsDefaultRoute(e.view.Routes[name])
+}
+
+func (e *networkEditSession) deletableRoutes() []string {
+	choices := []string{}
+	for _, id := range e.itemChoices() {
+		name, _ := e.resolveItem(id)
+		if !e.protectedRoute(name) && e.view.Routes[name].ReadOnly == "" {
+			choices = append(choices, id)
+		}
 	}
-	_, err := hex.DecodeString(name[6:])
-	return err == nil
+	return choices
 }
 
 func (e *networkEditSession) routeTitle(name string) string {
 	e.ensureRouteNumbers()
-	label := name
-	if generatedRouteName(name) {
-		r, ok := e.view.Routes[name]
-		if !ok {
-			r = e.base.Routes[name]
-		}
-		label = "Static route"
-		if r.Destination == "0.0.0.0/0" {
-			label = "Default IPv4"
-		}
-		if r.Destination == "::/0" {
-			label = "Default IPv6"
-		}
+	r, ok := e.view.Routes[name]
+	if !ok {
+		r, ok = e.base.Routes[name]
 	}
-	if number := e.routeNumbers[name]; number != "" {
-		return number + " (" + label + ")"
+	label := "Static route"
+	if !ok {
+		label = "new"
 	}
-	return label + " (new)"
+	if r.Destination == "0.0.0.0/0" {
+		label = "Default IPv4"
+	}
+	if r.Destination == "::/0" {
+		label = "Default IPv6"
+	}
+	return e.routeNumbers[name] + " (" + label + ")"
 }
 
 func (e *networkEditSession) routeDescription(name string) string {
@@ -131,11 +137,11 @@ func (e *networkEditSession) routeDescription(name string) string {
 	if r.Gateway != "" {
 		via = "via " + r.Gateway
 	}
-	label := ""
-	if !generatedRouteName(name) {
-		label = name + ": "
+	description := fmt.Sprintf("%s %s on %s", r.Destination, via, r.Interface)
+	if e.protectedRoute(name) {
+		description += "; default route, deletion protected"
 	}
-	return fmt.Sprintf("%s%s %s on %s", label, r.Destination, via, r.Interface)
+	return description
 }
 
 func (s *Shell) showNetworkRoute(e *networkEditSession) {
@@ -163,5 +169,8 @@ func (s *Shell) showNetworkRoute(e *networkEditSession) {
 	}
 	if r.ReadOnly != "" {
 		s.networkStyledParagraph(styleWarning, "", "Read-only: "+r.ReadOnly)
+	}
+	if e.protectedRoute(e.item) {
+		s.networkStyledParagraph(styleWarning, "", "Deletion: Protected (default route)")
 	}
 }

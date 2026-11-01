@@ -274,6 +274,9 @@ same arguments, permissions and signed operation ID.
 Use config network route, show, then edit ID (for example edit 1). Long generated
 route hashes are replaced by short selectors in tables and prompts. Selected
 routes use labeled destination, gateway, interface and metric values. Create a
-new route with add office; edit never creates an unknown route. Route IDs remain
+new route with add, then use set destination CIDR, set interface NAME and optional
+set gateway IP / set metric NUMBER. No route name is required or accepted.
+Only display IDs are accepted by edit and delete. Default IPv4 and IPv6 routes
+cannot be deleted; the network manager enforces this at save and apply. IDs remain
 stable within the editor and map to the original backend identities. See the
 [network guide](network-configuration.md) for complete examples.

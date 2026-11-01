@@ -503,7 +503,7 @@ func (s *Shell) prompt() string {
 		path := "network/" + e.kind
 		if e.item != "" {
 			item := e.item
-			if e.kind == "route" && generatedRouteName(item) {
+			if e.kind == "route" {
 				e.ensureRouteNumbers()
 				if number := e.routeNumbers[item]; number != "" {
 					item = number

@@ -89,7 +89,7 @@ func TestGlobalsInsideAllEditorsDoNotSaveAndHelpCannotExit(t *testing.T) {
 							editorCommands(t, s, "set mtu 1400")
 						}
 					} else {
-						editorCommands(t, s, "config network route", "add office")
+						editorCommands(t, s, "config network route", "add")
 						if dirty {
 							editorCommands(t, s, "set interface ip1")
 						}
@@ -247,20 +247,21 @@ func TestLogicalNextStagesThenResumesAndBackDiscards(t *testing.T) {
 
 func TestRouteDiffShowsCreationDeletionAndRestoredDraft(t *testing.T) {
 	s, api, out := uxNetworkFixture(t)
-	api.view.Routes["office"] = networkmanager.Route{Name: "office", Interface: "ip1", Destination: "10.0.0.0/8", Gateway: "192.0.2.1"}
-	editorCommands(t, s, "config network route", "delete office", "add default", "set interface ip1", "set destination 0.0.0.0/0", "set gateway 192.0.2.2")
+	metric := uint32(0)
+	api.view.Routes["office"] = networkmanager.Route{Name: "office", Interface: "ip1", Destination: "10.0.0.0/8", Gateway: "192.0.2.1", Metric: &metric}
+	editorCommands(t, s, "config network route", "delete 1", "add", "set interface ip1", "set destination 0.0.0.0/0", "set gateway 192.0.2.2")
 	out.Reset()
 	editorCommands(t, s, "diff")
-	for _, want := range []string{"(default)", "+   ip1", "+   0.0.0.0/0", "+   192.0.2.2", "(office)", "-   ip1", "-   10.0.0.0/8", "-   192.0.2.1"} {
+	for _, want := range []string{"Route: 2 (Default IPv4)", "+   ip1", "+   0.0.0.0/0", "+   192.0.2.2", "Route: 1 (Static route)", "-   ip1", "-   10.0.0.0/8", "-   192.0.2.1"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, out)
 		}
 	}
-	editorCommands(t, s, "exit", "add office", "set interface ip1", "set destination 10.0.0.0/8", "set gateway 192.0.2.1")
+	editorCommands(t, s, "exit", "cancel", "config network route", "edit 1", "set metric 100", "set metric 0")
 	if s.editorDirty() {
 		t.Fatal("restored route remains dirty")
 	}
-	if len(api.requests) != 1 {
+	if len(api.requests) != 2 {
 		t.Fatal("route diff called backend")
 	}
 }

@@ -130,30 +130,25 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		s.networkEdit = nil
 		s.writeTerminalData([]byte("Unsaved editor changes discarded; any previously saved candidate is kept.\n"))
 		return nil
-	case "edit", "add":
+	case "add":
+		if e.kind != "route" || len(f) != 1 {
+			return fmt.Errorf("usage: add; then set destination CIDR and set interface NAME")
+		}
+		e.addRoute()
+		return nil
+	case "edit":
 		if len(f) != 2 {
+			if e.kind == "route" {
+				return fmt.Errorf("usage: edit ID; use show to list routes")
+			}
 			return fmt.Errorf("usage: %s NAME", f[0])
 		}
-		name := f[1]
-		if f[0] == "add" {
-			if e.kind != "route" {
-				return fmt.Errorf("add is available only for routes")
+		name, exists := e.resolveItem(f[1])
+		if !exists {
+			if e.kind == "route" {
+				return fmt.Errorf("route ID %q not found; use show to list routes or add to create one", f[1])
 			}
-			if !networkmanager.ValidItemName(name) || numericRouteName(name) || !(name[0] >= 'a' && name[0] <= 'z' || name[0] >= 'A' && name[0] <= 'Z') {
-				return fmt.Errorf("use a route name starting with a letter, such as office or default-uplink")
-			}
-			if _, exists := e.view.Routes[name]; exists {
-				return fmt.Errorf("route already exists; use edit %s", name)
-			}
-		} else {
-			resolved, exists := e.resolveItem(name)
-			if !exists {
-				if e.kind == "route" {
-					return fmt.Errorf("route %q not found; use show to list routes or add NAME to create one", name)
-				}
-				return fmt.Errorf("network: unknown interface")
-			}
-			name = resolved
+			return fmt.Errorf("network: unknown interface")
 		}
 		e.item = name
 		return nil
@@ -163,6 +158,11 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		if e.item == "" {
 			return fmt.Errorf("select an item first; use exit to leave this list")
+		}
+		if e.kind == "route" {
+			if _, exists := e.view.Routes[e.item]; !exists {
+				return fmt.Errorf("set destination CIDR and set interface NAME before staging the new route; exit discards it")
+			}
 		}
 		e.item = ""
 		s.writeTerminalData([]byte("Edits kept in this editor; nothing saved.\n"))
@@ -190,6 +190,15 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		if e.kind == "route" && e.item != "" {
 			if _, exists := e.view.Routes[e.item]; !exists {
 				return fmt.Errorf("set interface and destination before saving the new route")
+			}
+		}
+		if e.kind == "route" {
+			for _, id := range e.itemChoices() {
+				name, _ := e.resolveItem(id)
+				route := e.view.Routes[name]
+				if route.ReadOnly == "" && (route.Interface == "" || route.Destination == "") {
+					return fmt.Errorf("route %s: set destination CIDR and set interface NAME before saving", id)
+				}
 			}
 		}
 		r, err := s.networkCall(ctx, networkmanager.Request{Action: "save", Version: e.base.Version, Changes: e.changes})
@@ -229,6 +238,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		if !exists {
 			return fmt.Errorf("route not found; use show to list routes")
 		}
+		if e.protectedRoute(name) {
+			return fmt.Errorf("default routes cannot be deleted; edit %s to change its settings", f[1])
+		}
 		c := networkmanager.Change{Kind: "route", Name: name, Action: "delete"}
 		v, err := networkmanager.Modify(e.view, []networkmanager.Change{c})
 		if err != nil {
@@ -236,6 +248,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		e.view = v
 		e.changes = append(e.changes, c)
+		if e.item == name {
+			e.item = ""
+		}
 		if s.editorDirty() {
 			s.writeStyled(styleWarning, dirtyDraftReminder+"\n")
 		}
@@ -277,6 +292,10 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 			case "edit", "delete":
 				if len(f) == 1 {
 					values = e.itemChoices()
+					if f[0] == "delete" && e.kind == "route" {
+						values = e.deletableRoutes()
+					}
+					return matching(values, prefix), true
 				}
 			case "set", "unset", "append", "unselect":
 				if len(f) == 1 {

@@ -141,7 +141,7 @@ func TestRouteCreationIsExplicitAndSelectorsDoNotShiftAfterDelete(t *testing.T) 
 			t.Fatal("invalid selection/creation changed context", command, err)
 		}
 	}
-	editorCommands(t, s, "delete 1", "add office", "set interface ip1", "set destination 198.51.100.0/24", "next")
+	editorCommands(t, s, "delete 1", "add", "set interface ip1", "set destination 198.51.100.0/24", "next")
 	if got := s.networkEdit.itemChoices(); !reflect.DeepEqual(got, []string{"2", "3"}) {
 		t.Fatal("route selectors shifted", got)
 	}
@@ -167,7 +167,7 @@ func TestNumberedRouteStillEnforcesReadOnlyRestriction(t *testing.T) {
 
 func TestNewRouteWithoutFieldsCannotBeSilentlySaved(t *testing.T) {
 	s, api, _ := uxNetworkFixture(t)
-	editorCommands(t, s, "config network route", "add office")
+	editorCommands(t, s, "config network route", "add")
 	if _, err := s.executeLine(context.Background(), "save", nil); err == nil || s.networkEdit == nil || len(api.requests) != 1 {
 		t.Fatal("empty route creation pretended to save", err)
 	}

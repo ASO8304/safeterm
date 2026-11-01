@@ -58,7 +58,7 @@ func TestRouteBackRemovesUnsavedNewRoute(t *testing.T) {
 	s, _, _ := editorFixture(t)
 	api := &networkFixtureAPI{view: networkmanager.View{Version: "base", Interfaces: map[string]networkmanager.Interface{"ip0": {Name: "ip0"}}, Routes: map[string]networkmanager.Route{}}}
 	s.SetNetworkClient(api)
-	editorCommands(t, s, "config network route", "add office", "set interface ip0", "set destination 10.0.0.0/8", "exit")
+	editorCommands(t, s, "config network route", "add", "set interface ip0", "set destination 10.0.0.0/8", "exit")
 	if len(s.networkEdit.view.Routes) != 0 || len(s.networkEdit.changes) != 0 || len(api.requests) != 1 {
 		t.Fatal("back retained/saved a new route")
 	}

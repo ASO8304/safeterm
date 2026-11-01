@@ -15,7 +15,7 @@ var networkActionDescriptions = map[string]string{
 	"discard":  "Discard your saved candidate; leave active networking unchanged",
 }
 var networkEditorDescriptions = map[string]string{
-	"edit":     "Select an interface or named route to edit",
+	"edit":     "Select an existing item to edit",
 	"show":     "Show a compact interface table; edit NAME then show for addresses, DNS, MTU and source files",
 	"diff":     "Show edits staged in this editor session",
 	"set":      "Replace a field value or its entire list in the editor",
@@ -26,8 +26,8 @@ var networkEditorDescriptions = map[string]string{
 	"exit":     exitDescription,
 	"save":     "Validate and commit the candidate, then exit; does not apply networking",
 	"cancel":   "Exit and discard unsaved editor changes; keep any previously saved candidate",
-	"add":      "Create a named route draft; use add office",
-	"delete":   "Remove a named route from the candidate",
+	"add":      "Create a route draft with an automatic ID; then use set FIELD VALUE",
+	"delete":   "Remove a route by ID; default routes are protected",
 }
 var networkInterfaceFields = map[string]string{
 	"addresses":      "set addresses <cidr>... - Replace all IP addresses (e.g., 10.0.0.1/24)",
@@ -85,11 +85,11 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 			if kind == "interface" {
 				desc = "Select an existing network interface"
 			} else {
-				desc = "Select an existing route by ID or name; use add NAME for a new route"
+				desc = "Select an existing route by ID; use edit 1 or add to create a route"
 			}
 		}
 		if name == "show" && kind == "route" {
-			desc = "Show candidate routes grouped by interface; limit to the selected route when editing"
+			desc = "Show routes by ID and deletion protection; show details when a route is selected"
 		}
 		s.networkHelpRow(name, desc)
 	}
@@ -113,9 +113,16 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 		if len(fields) == 2 {
 			prefix = fields[1]
 		} else if len(fields) > 2 {
+			if e.kind == "route" {
+				return fmt.Errorf("usage: %s ID", command)
+			}
 			return fmt.Errorf("usage: %s NAME", command)
 		}
-		for _, choice := range e.itemChoices() {
+		choices := e.itemChoices()
+		if command == "delete" {
+			choices = e.deletableRoutes()
+		}
+		for _, choice := range choices {
 			if !strings.HasPrefix(choice, prefix) {
 				continue
 			}
@@ -142,7 +149,7 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 			return fmt.Errorf("use edit NAME first")
 		}
 		if e.kind == "route" && command != "set" {
-			return fmt.Errorf("routes use set FIELD VALUE; use delete NAME to remove a route")
+			return fmt.Errorf("routes use set FIELD VALUE; use delete ID to remove a non-default route")
 		}
 		definitions := networkInterfaceFields
 		if e.kind == "route" {
@@ -209,7 +216,7 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 			return fmt.Errorf("unknown network editor command; use ?")
 		}
 		if command == "show" && e.kind == "route" {
-			desc = "Show candidate routes grouped by interface; limit to the selected route when editing"
+			desc = "Show routes by ID and deletion protection; show details when a route is selected"
 		}
 		s.networkHelpRow("<cr>", desc)
 		return nil

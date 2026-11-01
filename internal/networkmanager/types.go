@@ -76,6 +76,24 @@ type Route struct {
 	Metric      *uint32 `json:"metric,omitempty"`
 	ReadOnly    string  `json:"read_only,omitempty"`
 }
+
+// IsDefaultRoute recognizes IPv4 and IPv6 default destinations.
+func IsDefaultRoute(r Route) bool {
+	prefix, err := netip.ParsePrefix(r.Destination)
+	return err == nil && prefix.Bits() == 0
+}
+
+func validateDefaultRouteDeletions(before, after View) error {
+	for name, route := range before.Routes {
+		if IsDefaultRoute(route) {
+			if _, exists := after.Routes[name]; !exists {
+				return fmt.Errorf("network: default routes cannot be deleted")
+			}
+		}
+	}
+	return nil
+}
+
 type View struct {
 	Version string `json:"version"`
 	// Link states are display metadata, excluded from configuration identity.
@@ -105,6 +123,10 @@ type Reply struct {
 
 func Modify(v View, changes []Change) (View, error) {
 	v = cloneView(v)
+	protected := map[string]bool{}
+	for name, route := range v.Routes {
+		protected[name] = IsDefaultRoute(route)
+	}
 	if len(changes) > 256 {
 		return v, fmt.Errorf("network: too many changes")
 	}
@@ -192,6 +214,9 @@ func Modify(v View, changes []Change) (View, error) {
 			if c.Action == "delete" {
 				if !exists {
 					return v, fmt.Errorf("network: unknown route")
+				}
+				if protected[c.Name] || IsDefaultRoute(r) {
+					return v, fmt.Errorf("network: default routes cannot be deleted")
 				}
 				delete(v.Routes, c.Name)
 				continue

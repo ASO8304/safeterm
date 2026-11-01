@@ -69,7 +69,8 @@ At config network route, show lists routes by a short ID with destination,
 gateway, interface and metric columns. IDs remain stable while the editor is
 open, including after deleting or adding routes. They are session selectors;
 reopen show after reconnecting. Generated route hashes stay internal to the
-presentation. Existing stored names are accepted as well.
+presentation. Select and delete routes using only the displayed IDs; stored
+names are internal and are not accepted as CLI selectors.
 
 ```text
 config network route
@@ -86,11 +87,12 @@ A selected route's show uses labeled Destination, Gateway, Interface and Metric
 values. 0.0.0.0/0 is the IPv4 default route; ::/0 is the IPv6 default route.
 Gateway is an IP address without a CIDR prefix. No gateway means a direct route.
 
-Create a route explicitly with add NAME, using a descriptive name:
+Create a route with add. SafeTerm assigns the next available editor ID and
+opens that route. Use set commands to fill in its fields:
 
 ```text
 config network route
-add office
+add
 set interface ip0
 set destination 10.50.0.0/16
 set gateway 192.168.222.1
@@ -100,10 +102,18 @@ next
 save
 ```
 
-Use edit ID (or a stored name) to select an existing route; an unknown edit is an
-error and cannot accidentally create a new route. add alone never saves a route.
+Use edit ID to select an existing route; an unknown edit is an error and cannot
+accidentally create a new route. add takes no name or ID and never saves a route.
 The new route needs an interface and network destination before it can be saved.
-delete ID stages removal of that exact route. set ? describes the fields and
+Gateway and metric are optional: omitting them means direct routing and an
+automatic metric. show displays Not set for missing required fields.
+
+Use delete ID to stage removal of that exact route. IPv4 and IPv6 default routes
+(0.0.0.0/0 and ::/0) cannot be deleted. The table's DELETION column and route details
+identify this protection; delete ? and delete followed by Tab offer only routes
+that can be deleted. Protection is enforced by the network manager at save and
+apply, including candidates from older releases. Existing default routes can
+still be edited, for example with set gateway. set ? describes the fields and
 set interface followed by Tab lists editable interfaces.
 
 exit from a route discards its edits and returns to the route list. next keeps

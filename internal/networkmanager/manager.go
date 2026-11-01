@@ -370,6 +370,9 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if err != nil {
 			return Reply{}, err
 		}
+		if err = validateDefaultRouteDeletions(s.View, modified); err != nil {
+			return Reply{}, err
+		}
 		if err = ValidateView(modified); err != nil {
 			return Reply{}, err
 		}
@@ -403,6 +406,9 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		if c.Base != s.View.Version {
 			return Reply{}, fmt.Errorf("network: Netplan sources changed; reload candidate")
+		}
+		if err = validateDefaultRouteDeletions(s.View, c.View); err != nil {
+			return Reply{}, err
 		}
 		changed, err := s.Render(c.View)
 		if err != nil {

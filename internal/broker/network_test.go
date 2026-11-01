@@ -60,9 +60,14 @@ func TestNetworkCandidateCLIAndCompletion(t *testing.T) {
 	if api.requests[len(api.requests)-1].Action != "save" || len(api.view.Interfaces["ens19"].Addresses) != 2 {
 		t.Fatal(api.requests)
 	}
-	editorCommands(t, s, "config network route", "add office", "set interface ens19", "set destination 198.51.100.0/24", "set gateway 192.0.2.254", "set metric 100", "save")
-	if api.view.Routes["office"].Gateway != "192.0.2.254" {
+	editorCommands(t, s, "config network route", "add", "set interface ens19", "set destination 198.51.100.0/24", "set gateway 192.0.2.254", "set metric 100", "save")
+	if len(api.view.Routes) != 1 {
 		t.Fatal(api.view.Routes)
+	}
+	for _, route := range api.view.Routes {
+		if route.Gateway != "192.0.2.254" {
+			t.Fatal(route)
+		}
 	}
 	before := len(api.requests)
 	editorCommands(t, s, "execute network ?")
@@ -118,7 +123,7 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 		{"execute network apply ?", "confirmation is required"},
 		{"execute network confirm ?", "persist its Netplan changes"},
 		{"config network interface ?", "Select an existing network interface"},
-		{"config network route ?", "use add NAME for a new route"},
+		{"config network route ?", "use edit 1 or add to create a route"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)
@@ -159,14 +164,14 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 	if got := s.completionCandidates(context.Background(), "set ", ""); !reflect.DeepEqual(got, tabBefore) {
 		t.Fatalf("Tab changed: %v -> %v", tabBefore, got)
 	}
-	editorCommands(t, s, "cancel", "config network route", "add office")
+	editorCommands(t, s, "cancel", "config network route", "add")
 	beforeRequests = len(api.requests)
 	for _, tc := range []struct{ line, want string }{
-		{"?", "Remove a named route from the candidate"},
+		{"?", "Remove a route by ID"},
 		{"set ?", "Destination network CIDR"},
 		{"set destination ?", "<network/CIDR>"},
 		{"set interface ?", "ens19                   Use this allowed outgoing interface"},
-		{"add ?", "Create a named route draft"},
+		{"add ?", "Create a route draft with an automatic ID"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)
@@ -177,7 +182,7 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 			t.Fatal("help offered read-only interface for a route")
 		}
 	}
-	if len(api.requests) != beforeRequests || len(s.networkEdit.changes) != 0 || s.networkEdit.item != "office" {
+	if len(api.requests) != beforeRequests || len(s.networkEdit.changes) != 0 || s.networkEdit.routeNumbers[s.networkEdit.item] != "1" {
 		t.Fatal("route help mutated state")
 	}
 }
@@ -212,7 +217,7 @@ func TestRouteShowGroupsOnlyCandidateRoutesByInterface(t *testing.T) {
 	if len(api.requests) != requests {
 		t.Fatal("show contacted manager")
 	}
-	editorCommands(t, s, "edit office", "set metric 25")
+	editorCommands(t, s, "edit 2", "set metric 25")
 	out.Reset()
 	editorCommands(t, s, "show")
 	if strings.Contains(out.String(), "default-uplink") || !strings.Contains(out.String(), "25") {
@@ -239,7 +244,7 @@ func TestRouteShowExplainsEmptyAndIncompleteRoutes(t *testing.T) {
 	if !strings.Contains(out.String(), "No routes configured.") {
 		t.Fatalf("empty route guidance missing: %s", out.String())
 	}
-	editorCommands(t, s, "add new-route")
+	editorCommands(t, s, "add")
 	out.Reset()
 	editorCommands(t, s, "show")
 	if !strings.Contains(out.String(), "Not set") {
@@ -248,7 +253,7 @@ func TestRouteShowExplainsEmptyAndIncompleteRoutes(t *testing.T) {
 	editorCommands(t, s, "set destination 10.60.0.0/16")
 	out.Reset()
 	editorCommands(t, s, "show")
-	if !strings.Contains(out.String(), "Not set") || !strings.Contains(out.String(), "new-route") {
+	if !strings.Contains(out.String(), "Not set") || !strings.Contains(out.String(), "Route: 1") {
 		t.Fatal(out.String())
 	}
 	editorCommands(t, s, "set interface ip1")

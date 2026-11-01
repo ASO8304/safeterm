@@ -216,7 +216,7 @@ func (s *Shell) showNetworkRoutes(e *networkEditSession) {
 	}
 	var table bytes.Buffer
 	writer := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(writer, "ID\tDESTINATION\tGATEWAY\tINTERFACE\tMETRIC")
+	fmt.Fprintln(writer, "ID\tDESTINATION\tGATEWAY\tINTERFACE\tMETRIC\tDELETION")
 	for _, id := range e.itemChoices() {
 		name, _ := e.resolveItem(id)
 		route := e.view.Routes[name]
@@ -234,10 +234,17 @@ func (s *Shell) showNetworkRoutes(e *networkEditSession) {
 		if gateway == "" {
 			gateway = "Direct"
 		}
-		if route.ReadOnly != "" {
-			label += " (read-only)"
+		deletion := "Allowed"
+		if e.protectedRoute(name) {
+			deletion = "Protected (default)"
+		} else if route.ReadOnly != "" {
+			deletion = "Read-only"
 		}
-		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", label, destination, gateway, route.Interface, optionalNumber(route.Metric))
+		iface := route.Interface
+		if iface == "" {
+			iface = "Not set"
+		}
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", label, destination, gateway, iface, optionalNumber(route.Metric), deletion)
 	}
 	_ = writer.Flush()
 	s.writeTable(table.Bytes())
