@@ -20,6 +20,9 @@ if mode not in ('empty', 'configured', 'site', 'logical', 'logs', 'services'):
     raise SystemExit('expected empty, configured, site, logical, logs or services')
 pid, fd = pty.fork()
 if pid == 0:
+    # Exercise the colored Console explicitly rather than inheriting CI's dumb TERM.
+    os.environ['TERM'] = 'xterm-256color'
+    os.environ.pop('NO_COLOR', None)
     os.execv('/usr/bin/sudo', ['sudo', '-iu', 'safeterm'])
 pending = b''
 transcript = b''
@@ -64,10 +67,14 @@ try:
     expect(b'Password: ')
     os.write(fd, b'SmokeTest42\r')
     login_menu = expect(b'\nsafeterm::ci-admin> ')
+    if b'\x1b[1;36msafeterm\x1b[0m::\x1b[32mci-admin\x1b[0m' not in transcript:
+        raise RuntimeError('Console did not enable colors for the interactive terminal')
     if b'Show available commands' not in login_menu or b'Show your identity and roles' not in login_menu:
         raise RuntimeError('login did not show the command menu')
     if mode == 'empty':
         command('config network interface', b'\nsafeterm::ci-admin(network/interface)> ')
+        if b'\x1b[1;34m(network/interface)\x1b[0m' not in transcript:
+            raise RuntimeError('configuration path did not have its own prompt color')
         interfaces = command('show', b'\nsafeterm::ci-admin(network/interface)> ')
         if b'Interfaces (configuration draft)' not in interfaces:
             raise RuntimeError('network interface summary missing')
