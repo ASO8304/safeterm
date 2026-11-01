@@ -177,6 +177,7 @@ func rejectGlobalRequests(requests <-chan *ssh.Request) {
 func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requests <-chan *ssh.Request, principal Principal) {
 	defer channel.Close()
 	ptyAccepted := false
+	terminal := ""
 	shellStarted := false
 	shellDone := make(chan error, 1)
 	for {
@@ -195,6 +196,10 @@ func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requ
 			case "pty-req":
 				accepted = !ptyAccepted && !shellStarted && validPTYRequest(request.Payload)
 				ptyAccepted = ptyAccepted || accepted
+				if accepted {
+					length := int(binary.BigEndian.Uint32(request.Payload[:4]))
+					terminal = string(request.Payload[4 : 4+length])
+				}
 			case "window-change":
 				accepted = ptyAccepted && validWindowChange(request.Payload)
 			case "shell":
@@ -206,6 +211,7 @@ func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requ
 						accepted = false
 						shellStarted = false
 					} else {
+						shell.SetTerminal(terminal)
 						shell.SetNetworkClient(s.network)
 						go func() { shellDone <- shell.Run(ctx) }()
 					}

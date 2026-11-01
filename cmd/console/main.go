@@ -122,6 +122,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	shell.SetTerminal(os.Getenv("TERM"))
 	shell.SetNetworkClient(networkClient)
 	return shell.Run(ctx)
 }

@@ -3,6 +3,7 @@
 import errno
 import os
 import pty
+import re
 import select
 import signal
 import socket
@@ -41,7 +42,8 @@ def expect(marker, timeout=20):
             raise
         if not data:
             raise RuntimeError('Console EOF before ' + repr(marker))
-        pending += data
+        # Strip only SGR colors; keep cursor and screen controls for UX checks.
+        pending = re.sub(rb'\x1b\[[0-9;]*m', b'', pending + data)
         transcript += data
     end = pending.index(marker) + len(marker)
     result, pending = pending[:end], pending[end:]

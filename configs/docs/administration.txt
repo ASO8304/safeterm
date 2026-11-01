@@ -377,3 +377,15 @@ context saves independently with its original version check.
 exit, clear and whoami work inside editors. Dirty exit warns and discards all
 unsaved session drafts before closing. execute tcp-test IP [PORT] is the port
 probe; execute telnet remains an alias and prints a migration notice.
+
+## Terminal colors
+
+Interactive SSH and Console use cyan commands/headings, a green username, a blue
+configuration path, an amber unsaved * and warnings, and red errors. Interface
+tables show up/allowed in green and down/read-only in amber. Diff additions are
+green and removals red. Labels and symbols remain available without color.
+
+The theme uses the terminal's ANSI palette and resets before typed input. An
+unset TERM or TERM=dumb keeps plain output. Set NO_COLOR=1 in the Console or
+SSH broker process environment to disable colors. SSH reads TERM from the PTY
+request; arbitrary client environment variables are not accepted.

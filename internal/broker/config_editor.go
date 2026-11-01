@@ -160,8 +160,10 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 				continue
 			}
 			value := f.Value
+			staged := false
 			for _, c := range e.changes {
 				if c.Section == f.Section && c.Key == f.Key {
+					staged = true
 					value = c.Value
 					if f.Redacted {
 						value = "[REDACTED]"
@@ -172,7 +174,13 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 			if !e.inSection && f.Section != "" {
 				name = f.Section + "." + f.Key
 			}
-			s.writeTerminalData([]byte(fmt.Sprintf("%-32s = %s\n", name, value)))
+			s.writeStyled(styleCommand, fmt.Sprintf("%-32s", name))
+			s.writeTerminalData([]byte(" = "))
+			style := ""
+			if staged {
+				style = styleWarning
+			}
+			s.writeStyled(style, value+"\n")
 		}
 	case "set":
 		if !e.inSection {
@@ -247,7 +255,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 		}
 		e.pruneChanges()
 		if len(e.changes) > 0 {
-			s.writeTerminalData([]byte(dirtyDraftReminder + "\n"))
+			s.writeStyled(styleWarning, dirtyDraftReminder+"\n")
 		}
 	case "rollback":
 		if len(fields) != 1 {
@@ -302,7 +310,8 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 				}
 				s.writeTerminalData([]byte(fmt.Sprintf("  %s:\n", strings.TrimPrefix(name, "."))))
 				if secret {
-					s.writeTerminalData([]byte("-   [REDACTED]\n+   [REDACTED]\n"))
+					s.writeStyled(styleError, "-   [REDACTED]\n")
+					s.writeStyled(styleSuccess, "+   [REDACTED]\n")
 				} else {
 					s.diffValues([]string{old}, []string{value})
 				}
@@ -318,7 +327,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 			return false, err
 		}
 		s.editing = nil
-		fmt.Fprint(s.output, "Configuration saved.\r\n")
+		s.writeStyled(styleSuccess, "Configuration saved.\n")
 	default:
 		return false, fmt.Errorf("unknown configuration command; use ?")
 	}
@@ -328,7 +337,7 @@ func (s *Shell) configEditor(ctx context.Context, line string, input <-chan byte
 func (s *Shell) editorHelp(fields []string) error {
 	e := s.editing
 	row := func(name, description string) {
-		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, description)))
+		s.helpRow(name, description)
 	}
 	if len(fields) == 0 {
 		row("?", "Show available commands; command ? keeps your input")

@@ -26,6 +26,7 @@ type GatewayClient interface {
 }
 
 type Shell struct {
+	color         bool
 	network       networkmanager.API
 	networkEdit   *networkEditSession
 	editing       *configEditSession
@@ -87,14 +88,14 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	defer close(done)
 	go readBytes(s.input, input, done, cancel)
 	if s.consoleLogin != nil {
-		fmt.Fprint(s.output, "\r\nSafeTerm Console login (Ctrl+] exits)\r\n")
+		s.writeStyled(styleHeading, "\nSafeTerm Console login (Ctrl+] exits)\n")
 		authenticated := false
 		for attempt := 0; attempt < 3; attempt++ {
-			user, err := s.readLine(ctx, input, "Username: ", false, false)
+			user, err := s.readLine(ctx, input, s.styled(styleCommand, "Username: "), false, false)
 			if err != nil {
 				return err
 			}
-			password, err := s.readLine(ctx, input, "Password: ", true, false)
+			password, err := s.readLine(ctx, input, s.styled(styleCommand, "Password: "), true, false)
 			if err != nil {
 				return err
 			}
@@ -103,7 +104,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			clear(secret)
 			password = ""
 			if err != nil {
-				fmt.Fprint(s.output, "Login failed.\r\n")
+				s.writeStyled(styleError, "Login failed.\n")
 				continue
 			}
 			if principal.ConsoleSession == "" || principal.BrokerType != "console" || !identityPattern.MatchString(principal.UserID) || len(principal.Roles) == 0 || !expires.After(time.Now()) {
@@ -125,7 +126,8 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			return fmt.Errorf("broker: Console login denied")
 		}
 	}
-	fmt.Fprintf(s.output, "\r\nSafeTerm restricted shell\r\nAuthenticated as %s.\r\nQuick start: '?' lists commands; 'execute ?' lists operations; 'config ?' lists files. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
+	s.writeStyled(styleHeading, "\nSafeTerm restricted shell\n")
+	fmt.Fprintf(s.output, "Authenticated as %s.\r\nQuick start: '?' lists commands; 'execute ?' lists operations; 'config ?' lists files. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
 	if err := s.questionHelp(ctx, nil); err != nil {
 		return err
 	}
@@ -143,7 +145,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			return ctx.Err()
 		}
 		if err != nil {
-			s.writeTerminalData([]byte(fmt.Sprintf("Error: %v\n", err)))
+			s.writeStyled(styleError, fmt.Sprintf("Error: %v\n", err))
 		}
 		if exit {
 			fmt.Fprint(s.output, "bye\r\n")
@@ -240,7 +242,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 // Tab completion remains the editor's existing Linux-style workflow.
 func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	row := func(name, description string) {
-		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, strings.Join(strings.Fields(description), " "))))
+		s.helpRow(name, strings.Join(strings.Fields(description), " "))
 	}
 	if len(fields) == 0 {
 		for _, item := range [][2]string{
@@ -502,11 +504,11 @@ func (s *Shell) prompt() string {
 		if e.item != "" {
 			path += "/" + e.item
 		}
-		return fmt.Sprintf("safeterm::%s(%s)%s> ", s.principal.UserID, path, dirty)
+		return s.formatPrompt("("+path+")", dirty)
 	}
 	if e := s.editing; e != nil {
 		if e.logical {
-			return fmt.Sprintf("safeterm::%s(%s)%s> ", s.principal.UserID, strings.Join(e.path, "/"), dirty)
+			return s.formatPrompt("("+strings.Join(e.path, "/")+")", dirty)
 		}
 		context = "(" + e.resource
 		if e.inSection {
@@ -525,12 +527,12 @@ func (s *Shell) prompt() string {
 		}
 		context = "(" + path + ")"
 	}
-	return fmt.Sprintf("safeterm::%s%s%s> ", s.principal.UserID, context, dirty)
+	return s.formatPrompt(context, dirty)
 }
 
 func (s *Shell) writeResponse(response *contract.ExecutionResponse) {
 	if response == nil {
-		fmt.Fprint(s.output, "result: invalid response\r\n")
+		s.writeStyled(styleError, "result: invalid response\n")
 		return
 	}
 	if response.Stdout != "" {
@@ -545,9 +547,13 @@ func (s *Shell) writeResponse(response *contract.ExecutionResponse) {
 			fmt.Fprint(s.output, "\r\n")
 		}
 	}
-	fmt.Fprintf(s.output, "result: %s exit=%d", response.Result, response.ExitCode)
+	style := styleError
+	if response.Result == contract.ResultSuccess && response.ExitCode == 0 {
+		style = styleSuccess
+	}
+	s.writeStyled(style, fmt.Sprintf("result: %s exit=%d", response.Result, response.ExitCode))
 	if response.Message != "" {
-		fmt.Fprintf(s.output, " message=%s", response.Message)
+		s.writeTerminalData([]byte(" message=" + response.Message))
 	}
 	fmt.Fprint(s.output, "\r\n")
 }

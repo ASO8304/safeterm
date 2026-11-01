@@ -174,7 +174,7 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 			return err
 		}
 		s.networkEdit = nil
-		s.writeTerminalData([]byte(r.Text + "\nCandidate saved; use execute network diff, then execute network apply.\n"))
+		s.writeStyled(styleSuccess, r.Text+"\nCandidate saved; use execute network diff, then execute network apply.\n")
 		return nil
 	case "set", "append", "unselect", "unset":
 		if e.item == "" {
@@ -195,7 +195,7 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		e.view = v
 		e.changes = append(e.changes, c)
 		if s.editorDirty() {
-			s.writeTerminalData([]byte(dirtyDraftReminder + "\n"))
+			s.writeStyled(styleWarning, dirtyDraftReminder+"\n")
 		}
 		return nil
 	case "delete":
@@ -210,7 +210,7 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		e.view = v
 		e.changes = append(e.changes, c)
 		if s.editorDirty() {
-			s.writeTerminalData([]byte(dirtyDraftReminder + "\n"))
+			s.writeStyled(styleWarning, dirtyDraftReminder+"\n")
 		}
 		return nil
 	}

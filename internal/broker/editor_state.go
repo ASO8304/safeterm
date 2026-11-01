@@ -38,7 +38,7 @@ func (s *Shell) globalCommand(fields []string) (handled, exit bool, err error) {
 	switch command {
 	case "exit":
 		if s.editorDirty() || len(s.stagedLogical) > 0 {
-			s.writeTerminalData([]byte("Warning: Unsaved drafts were discarded before closing the session.\n"))
+			s.writeStyled(styleWarning, "Warning: Unsaved drafts were discarded before closing the session.\n")
 		}
 		s.editing, s.networkEdit, s.configMenu, s.stagedLogical = nil, nil, nil, nil
 		return true, true, nil
@@ -74,7 +74,7 @@ func (e *configEditSession) pruneChanges() {
 }
 
 func (s *Shell) discardedItem(name string) {
-	s.writeTerminalData([]byte(fmt.Sprintf("Discarded unsaved edits for '%s'.\n", name)))
+	s.writeStyled(styleWarning, fmt.Sprintf("Discarded unsaved edits for '%s'.\n", name))
 }
 
 func (s *Shell) discardLogicalUnder(path []string) {

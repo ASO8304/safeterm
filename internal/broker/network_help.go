@@ -43,7 +43,7 @@ var networkRouteFields = map[string]string{
 }
 
 func (s *Shell) networkHelpRow(name, description string) {
-	s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, description)))
+	s.helpRow(name, description)
 }
 func (s *Shell) networkActionHelp(fields []string) error {
 	if len(fields) == 0 {

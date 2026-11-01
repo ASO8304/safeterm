@@ -105,7 +105,7 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 					// Help is handled without submitting the input buffer. Retain
 					// the exact command prefix so typing can continue after Enter.
 					if _, err := s.executeLine(ctx, strings.TrimSpace(value), nil); err != nil {
-						s.writeTerminalData([]byte(fmt.Sprintf("Error: %v\n", err)))
+						s.writeStyled(styleError, fmt.Sprintf("Error: %v\n", err))
 					}
 					prefix := strings.TrimRight(value, " \t")
 					line = []byte(prefix[:len(prefix)-1])
@@ -213,7 +213,7 @@ func (s *Shell) completeLine(ctx context.Context, line []byte, cursor int, promp
 		replacement = candidates[0]
 	}
 	if replacement == prefix && len(candidates) > 1 {
-		fmt.Fprint(s.output, "\r\n"+strings.Join(candidates, "  ")+"\r\n")
+		fmt.Fprint(s.output, "\r\n"+s.styled(styleCommand, strings.Join(candidates, "  "))+"\r\n")
 		fmt.Fprint(s.output, prompt)
 	}
 	updated := make([]byte, 0, len(line)-len(prefix)+len(replacement)+1)

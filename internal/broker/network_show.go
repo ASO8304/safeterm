@@ -17,7 +17,7 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		s.showNetworkInterface(e, e.item)
 		return
 	}
-	s.writeTerminalData([]byte("Interfaces (configuration draft)\n\n"))
+	s.writeStyled(styleHeading, "Interfaces (configuration draft)\n\n")
 	if len(e.view.Interfaces) == 0 {
 		s.writeTerminalData([]byte("No supported interfaces found in Netplan configuration.\nUse back to return to the network menu.\n"))
 		return
@@ -60,9 +60,9 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		}
 	}
 	_ = writer.Flush()
-	s.writeTerminalData(table.Bytes())
+	s.writeTable(table.Bytes())
 	if len(readOnly) > 0 {
-		s.writeTerminalData([]byte("\nRead-only details\n"))
+		s.writeStyled(styleWarning, "\nRead-only details\n")
 		policyBlocked := false
 		for _, name := range readOnly {
 			reason, _ := interfaceRestriction(e.view.Interfaces[name].ReadOnly)
@@ -75,7 +75,7 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		}
 	}
 	if changed {
-		s.writeTerminalData([]byte("\n* Unsaved edits staged. Use diff to review; save commits the candidate.\n"))
+		s.writeStyled(styleWarning, "\n* Unsaved edits staged. Use diff to review; save commits the candidate.\n")
 	} else {
 		s.writeTerminalData([]byte("\nNo unsaved interface edits.\n"))
 	}
@@ -124,14 +124,14 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 	if item.ReadOnly != "" {
 		editing = "Read-only (" + interfaceRestrictionLabel(item.ReadOnly) + ")"
 	}
-	s.writeTerminalData([]byte(fmt.Sprintf("Interface: %s (%s)\n", name, editing)))
+	s.writeStyled(styleHeading, fmt.Sprintf("Interface: %s (%s)\n", name, editing))
 	if interfaceHasEdits(e, name) {
-		s.writeTerminalData([]byte("* Unsaved edits staged\n"))
+		s.writeStyled(styleWarning, "* Unsaved edits staged\n")
 	}
 	s.writeTerminalData([]byte("\n"))
 	if item.ReadOnly != "" {
 		reason, action := interfaceRestriction(item.ReadOnly)
-		s.networkParagraph("", "Read-only: "+reason)
+		s.networkStyledParagraph(styleWarning, "", "Read-only: "+reason)
 		if action != "" {
 			s.networkParagraph("", "Action: "+action)
 		}
@@ -153,7 +153,15 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 			if i == 0 {
 				key = label + ":"
 			}
-			s.writeTerminalData([]byte(fmt.Sprintf("%-16s%s\n", key, value)))
+			s.writeStyled(styleCommand, fmt.Sprintf("%-16s", key))
+			style := ""
+			if label == "Source" {
+				style = stylePath
+			}
+			if changed[label] {
+				style = styleWarning
+			}
+			s.writeStyled(style, value+"\n")
 		}
 	}
 	row("DHCP4", "", onOff(item.DHCP4))
@@ -179,10 +187,14 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 // Wrap explanations independently of table columns so a policy denial does not
 // turn the interface summary into a very wide terminal dump.
 func (s *Shell) networkParagraph(indent, text string) {
+	s.networkStyledParagraph("", indent, text)
+}
+
+func (s *Shell) networkStyledParagraph(style, indent, text string) {
 	line := indent
 	for _, word := range strings.Fields(text) {
 		if len(line) > len(indent) && len(line)+1+len(word) > 78 {
-			s.writeTerminalData([]byte(line + "\n"))
+			s.writeStyled(style, line+"\n")
 			line = indent
 		}
 		if len(line) > len(indent) {
@@ -191,7 +203,7 @@ func (s *Shell) networkParagraph(indent, text string) {
 		line += word
 	}
 	if len(line) > len(indent) {
-		s.writeTerminalData([]byte(line + "\n"))
+		s.writeStyled(style, line+"\n")
 	}
 }
 
@@ -217,7 +229,7 @@ func (s *Shell) showNetworkRoutes(e *networkEditSession) {
 		route.Name = name
 		groups[route.Interface] = append(groups[route.Interface], route)
 	}
-	s.writeTerminalData([]byte("Configured routes (candidate)\n"))
+	s.writeStyled(styleHeading, "Configured routes (candidate)\n")
 	if len(groups) == 0 {
 		s.writeTerminalData([]byte("No configured interfaces or routes.\n"))
 		return
@@ -266,7 +278,7 @@ func (s *Shell) showNetworkRoutes(e *networkEditSession) {
 			fmt.Fprintf(writer, "  %s\t%s\t%s\t%s\n", label, destination, gateway, metric)
 		}
 		_ = writer.Flush()
-		s.writeTerminalData(table.Bytes())
+		s.writeTable(table.Bytes())
 		total += len(routes)
 	}
 	if total == 0 {

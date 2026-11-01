@@ -183,6 +183,7 @@ func TestRestrictedShellFiltersCatalogInjectsIdentityAndMapsInterrupt(t *testing
 
 // TEST-BROKER-006, TEST-BROKER-007, TEST-BROKER-008
 func TestSSHServerProvidesPTYRestrictedShellAndRejectsExec(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
 	catalog, _ := NewCatalog(brokerTestConfig())
 	userSigner := testSigner(t)
 	server, err := NewSSHServer("unused", testSigner(t), testAuthenticator(t, catalog, userSigner), &fakeGateway{}, catalog)
@@ -236,6 +237,9 @@ func TestSSHServerProvidesPTYRestrictedShellAndRejectsExec(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(result)
+	if !strings.Contains(text, "\x1b[1;36msafeterm\x1b[0m::\x1b[32malice\x1b[0m") {
+		t.Fatalf("PTY terminal type did not enable the prompt theme: %q", text)
+	}
 	if !strings.Contains(text, "SafeTerm restricted shell") || !strings.Contains(text, "user: alice") || !strings.Contains(text, "roles: netops") {
 		t.Fatalf("unexpected terminal output: %q", text)
 	}

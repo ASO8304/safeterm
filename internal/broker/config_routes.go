@@ -111,7 +111,7 @@ func (s *Shell) configPath(ctx context.Context, path []string, help bool) error 
 			seen[name] = true
 			found = true
 			if help {
-				s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, r.description)))
+				s.helpRow(name, r.description)
 			}
 		}
 	}

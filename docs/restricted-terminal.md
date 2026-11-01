@@ -4,6 +4,21 @@ The SSH and Console terminal use the same context-based command language.
 These commands require a build containing ADR-030; older releases keep their
 previous terminal interface. `termctl` remains the administrator's Linux utility.
 
+## Terminal colors
+
+Interactive SSH and Console sessions use the terminal's ANSI palette: cyan for
+SafeTerm, commands and headings; green for the authenticated username and diff
+additions; blue for the configuration path; amber for the unsaved `*` marker and
+warnings; red for errors and diff removals. Interface names are cyan, up/allowed
+states green, and down/read-only states amber. Detail labels and staged values
+use the same palette. Typed input uses the default foreground.
+Table columns and the plain-text prompt layout remain unchanged.
+
+Colors are disabled for `TERM=dumb` or an unset terminal type. Set `NO_COLOR=1`
+in the Console or SSH broker process environment to disable colors globally;
+SSH uses the terminal type supplied by the client's PTY request. Embedded shell
+users retain plain output unless they call `SetTerminal` before `Run`.
+
 ## Discover commands
 
 ```text

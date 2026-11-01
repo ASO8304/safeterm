@@ -115,7 +115,18 @@ func (s *Shell) showNetworkDiff(e *networkEditSession) {
 func (s *Shell) diffValues(before, after []string) {
 	write := func(prefix, value string) {
 		for _, line := range strings.Split(value, "\n") {
-			s.writeTerminalData([]byte(prefix + "   " + line + "\n"))
+			style := ""
+			switch prefix {
+			case "+":
+				style = styleSuccess
+			case "-":
+				style = styleError
+			}
+			if style == "" {
+				s.writeTerminalData([]byte(prefix + "   " + line + "\n"))
+			} else {
+				s.writeStyled(style, prefix+"   "+line+"\n")
+			}
 		}
 	}
 	if len(before)*len(after) > 4096 {

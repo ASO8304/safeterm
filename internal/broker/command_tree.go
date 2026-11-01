@@ -81,7 +81,7 @@ func (s *Shell) operationTreeHelp(fields []string) error {
 		return nil
 	}
 	row := func(name, description string) {
-		s.writeTerminalData([]byte(fmt.Sprintf("%-24s %s\n", name, strings.Join(strings.Fields(description), " "))))
+		s.helpRow(name, strings.Join(strings.Fields(description), " "))
 	}
 	seen := map[string]bool{}
 	found := false
