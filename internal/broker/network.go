@@ -206,6 +206,9 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 				}
 			}
 		}
+		if err := networkmanager.ValidateView(e.view); err != nil {
+			return e.saveValidationError(err)
+		}
 		r, err := s.networkCall(ctx, networkmanager.Request{Action: "save", Version: e.base.Version, Changes: e.changes})
 		if err != nil {
 			return err
@@ -227,7 +230,7 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		c := networkmanager.Change{Kind: e.kind, Name: e.item, Field: f[1], Action: f[0], Values: f[2:]}
 		v, err := networkmanager.Modify(e.view, []networkmanager.Change{c})
 		if err != nil {
-			return err
+			return e.validationError(err)
 		}
 		e.view = v
 		e.changes = append(e.changes, c)

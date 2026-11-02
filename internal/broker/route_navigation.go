@@ -25,9 +25,6 @@ func (e *networkEditSession) addRoute() {
 // Selectors belong to this cached editor, not to persisted Netplan route names.
 // Keep deleted selectors reserved so another route cannot silently take its ID.
 func (e *networkEditSession) ensureRouteNumbers() {
-	if e.kind != "route" {
-		return
-	}
 	if e.routeNumbers == nil {
 		e.routeNumbers = map[string]string{}
 	}
@@ -38,7 +35,7 @@ func (e *networkEditSession) ensureRouteNumbers() {
 	for name := range e.view.Routes {
 		names[name] = true
 	}
-	if e.item != "" {
+	if e.kind == "route" && e.item != "" {
 		names[e.item] = true
 	}
 	ordered := make([]string, 0, len(names))
@@ -170,6 +167,7 @@ func (s *Shell) showNetworkRoute(e *networkEditSession) {
 	if r.ReadOnly != "" {
 		s.networkStyledParagraph(styleWarning, "", "Read-only: "+r.ReadOnly)
 	}
+	s.showRouteValidation(e, e.item)
 	if e.protectedRoute(e.item) {
 		s.networkStyledParagraph(styleWarning, "", "Deletion: Protected (default route)")
 	}

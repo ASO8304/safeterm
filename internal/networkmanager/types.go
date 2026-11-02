@@ -241,15 +241,24 @@ func Modify(v View, changes []Change) (View, error) {
 				continue
 			}
 			if c.Action != "set" || len(c.Values) != 1 {
-				return v, fmt.Errorf("network: route requires set FIELD VALUE")
+				return v, fmt.Errorf("network: usage: set %s VALUE; use set %s ? for the required format", c.Field, c.Field)
 			}
 			r.Name = c.Name
 			switch c.Field {
 			case "interface":
+				if problem := routeInterfaceProblem(v, c.Values[0]); problem != "" {
+					return v, routeIssue(r, "interface", problem)
+				}
 				r.Interface = c.Values[0]
 			case "destination":
+				if problem := routeDestinationProblem(c.Values[0]); problem != "" {
+					return v, routeIssue(r, "destination", problem)
+				}
 				r.Destination = c.Values[0]
 			case "gateway":
+				if problem := routeGatewayProblem(c.Values[0]); problem != "" {
+					return v, routeIssue(r, "gateway", problem)
+				}
 				r.Gateway = c.Values[0]
 			case "metric":
 				var n uint64
@@ -302,27 +311,22 @@ func ValidateView(v View) error {
 		}
 	}
 	seen := map[string]bool{}
-	for _, r := range v.Routes {
+	routeNames := make([]string, 0, len(v.Routes))
+	for name := range v.Routes {
+		routeNames = append(routeNames, name)
+	}
+	slices.Sort(routeNames)
+	for _, name := range routeNames {
+		r := v.Routes[name]
 		if r.ReadOnly != "" {
 			continue
 		}
-		i, ok := v.Interfaces[r.Interface]
-		if !ok || i.ReadOnly != "" {
-			return fmt.Errorf("network: route %s requires an editable interface", r.Name)
-		}
-		p, err := netip.ParsePrefix(r.Destination)
-		if err != nil || p != p.Masked() {
-			return fmt.Errorf("network: route %s needs a network destination CIDR", r.Name)
-		}
-		if r.Gateway != "" {
-			g, err := netip.ParseAddr(r.Gateway)
-			if err != nil || g.IsUnspecified() || g.IsMulticast() || g.Zone() != "" || g.Is4() != p.Addr().Is4() {
-				return fmt.Errorf("network: route %s has invalid gateway", r.Name)
-			}
+		if err := ValidateRoute(v, r); err != nil {
+			return err
 		}
 		key := fmt.Sprintf("%s|%s|%s|%v", r.Interface, r.Destination, r.Gateway, metricValue(r.Metric))
 		if seen[key] {
-			return fmt.Errorf("network: duplicate route %s", r.Name)
+			return routeIssue(r, "destination", fmt.Sprintf("route to %s on interface %s duplicates another configured route", r.Destination, r.Interface))
 		}
 		seen[key] = true
 	}

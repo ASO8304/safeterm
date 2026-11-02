@@ -263,4 +263,8 @@ func (s *Shell) showNetworkRoutes(e *networkEditSession) {
 	}
 	_ = writer.Flush()
 	s.writeTable(table.Bytes())
+	for _, id := range e.itemChoices() {
+		name, _ := e.resolveItem(id)
+		s.showRouteValidation(e, name)
+	}
 }

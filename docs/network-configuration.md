@@ -196,6 +196,37 @@ A selected route's show uses labeled Destination, Gateway, Interface and Metric
 values. 0.0.0.0/0 is the IPv4 default route; ::/0 is the IPv6 default route.
 Gateway is an IP address without a CIDR prefix. No gateway means a direct route.
 
+Route fields validate their syntax as you enter them. A gateway such as
+`192.168.222.1/24` is rejected immediately; use `192.168.222.1`. Destinations need
+network CIDRs, such as `10.0.0.0/8`; interface addresses use host CIDRs, such as
+`192.168.222.10/24`. A future persistent name is not selectable as a route's
+interface until the device adopts it; choose its current name in the meantime.
+
+Saving validates the whole network candidate, including existing routes. An
+invalid imported default gateway can therefore block saving an unrelated new
+interface or route. Route show output identifies invalid configuration. Save
+errors identify its displayed route ID, type, current interface, bad value and
+correction instead of an internal generated name. The draft and previous valid
+field values remain intact after a rejected command or save. From the route
+editor you can select the reported ID, repair it and save the combined edits.
+From an interface editor, review the draft before leaving it, then repair the
+existing route in `config network route` before retrying the interface changes.
+
+For example, repair route 1's invalid gateway:
+
+```text
+config network route
+edit 1
+set gateway 192.168.222.1
+save
+execute network diff
+execute network apply
+execute network confirm
+```
+
+Save still stores a candidate only; apply starts a timed trial and confirm
+persists it. Default route deletion remains protected.
+
 Create a route with add. SafeTerm assigns the next available editor ID and
 opens that route. Use set commands to fill in its fields:
 

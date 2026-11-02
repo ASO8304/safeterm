@@ -40,7 +40,7 @@ var networkInterfaceFields = map[string]string{
 var networkRouteFields = map[string]string{
 	"interface":   "Allowed outgoing interface for this route",
 	"destination": "Destination network CIDR, e.g. 10.50.0.0/16 or 0.0.0.0/0",
-	"gateway":     "Gateway IP address in the same address family as the destination",
+	"gateway":     "Gateway IP without a CIDR prefix, e.g. 192.168.222.1; same IP family as destination",
 	"metric":      "Route priority from 0 to 4294967295; lower values are preferred",
 }
 
