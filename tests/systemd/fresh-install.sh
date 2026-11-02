@@ -19,6 +19,21 @@ trap on_failure ERR
 printf 'SmokeTest42\n' | "$package/payload/bin/safeterm-password-hash" --stdin --output "$work/password.hash"
 "$package/install.sh" --local-signing --non-interactive --install-dependencies \
   --ssh-user ci-admin --ssh-password-hash-file "$work/password.hash"
+cmp "$package/payload/bin/safeterm-termctl" /usr/local/bin/termctl
+cmp "$package/payload/bin/safeterm-termctl" /usr/local/bin/safeterm-termctl
+"$package/payload/bin/safeterm-termctl" version >"$work/package-version-full.txt"
+termctl version >"$work/installed-version-full.txt"
+head -n 3 "$work/package-version-full.txt" >"$work/package-version.txt"
+head -n 3 "$work/installed-version-full.txt" >"$work/installed-version.txt"
+cmp "$work/package-version.txt" "$work/installed-version.txt"
+grep -q '^SafeTerm ' "$work/installed-version.txt"
+termctl catalog list >"$work/catalog.txt"
+grep -q '^tcp-test ' "$work/catalog.txt"
+if grep -q '^telnet ' "$work/catalog.txt"; then
+  echo 'catalog advertised the deprecated TCP probe name' >&2; exit 1
+fi
+termctl catalog describe tcp-test >"$work/probe-description.txt"
+grep -q '^tcp-test:' "$work/probe-description.txt"
 termctl user add console --id ci-admin --roles viewer,netops,log-viewer,service-viewer,service-operator,config-viewer,config-operator --password-hash-file "$work/password.hash"
 # The legacy demo root must not be manufactured on a fresh installation.
 [[ ! -e /etc/safeterm-managed ]]

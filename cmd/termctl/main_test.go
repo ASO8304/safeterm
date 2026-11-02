@@ -61,6 +61,7 @@ func TestBashCompletionActuallyCompletes(t *testing.T) {
 		{"termctl user add s", 3, "ssh"},
 		{"termctl app", 1, "apply"},
 		{"termctl ch", 1, "check"},
+		{"termctl ver", 1, "version"},
 		{"termctl apply --ex", 2, "--export"},
 		{"termctl apply --rec", 2, "--recover"},
 		{"termctl service restart config-w", 3, "config-writer"},
@@ -160,6 +161,22 @@ func TestCatalogListUsesShippedConfig(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "ping") || !strings.Contains(out.String(), "capture") {
 		t.Fatalf("catalog output missing new operations: %q", out.String())
+	}
+	if !strings.Contains(out.String(), "tcp-test") || strings.Contains(out.String(), "\ntelnet ") {
+		t.Fatal("catalog did not use the public TCP probe name", out.String())
+	}
+	for _, name := range []string{"tcp-test", "telnet"} {
+		out.Reset()
+		if err := run([]string{"--config-dir", "../../internal/defaults/catalog", "catalog", "describe", name}, &out, &out); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.HasPrefix(out.String(), "tcp-test:") || !strings.Contains(out.String(), "operation ID: telnet") {
+			t.Fatal("probe alias or permission compatibility missing", out.String())
+		}
+	}
+	out.Reset()
+	if err := run([]string{"--config-dir", "../../internal/defaults/catalog", "role", "describe", "netops"}, &out, &out); err != nil || !strings.Contains(out.String(), "  - tcp-test\n") || strings.Contains(out.String(), "  - telnet\n") {
+		t.Fatal("role inspection differs from the public catalog", out.String(), err)
 	}
 }
 

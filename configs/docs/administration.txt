@@ -4,6 +4,17 @@ SafeTerm includes ready-to-use, signed package defaults. No custom definitions
 are needed for normal installation. Add JSON files only when changing a default
 or adding a site-specific capability.
 
+Run `termctl version` (or `termctl --version`) to see this binary's release, commit,
+source state, Go compiler, platform and executable path without loading config.
+Before installing, compare it with `payload/bin/safeterm-termctl version` from
+the extracted package. Extracting an archive alone does not update installed
+binaries. Use `sudo termctl update PACKAGE_DIR` for installation.
+
+`termctl catalog` and role inspection show the public `tcp-test` command.
+`termctl catalog describe tcp-test` explains the retained `telnet` permission ID
+and deprecated alias. `termctl defaults operation tcp-test` emits the compatible
+definition with that original ID for existing permission maps.
+
 ```text
 /etc/safeterm/
   access/

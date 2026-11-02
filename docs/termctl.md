@@ -3,6 +3,22 @@
 Run termctl from an ordinary Linux administrator shell. Mutations require sudo.
 The restricted SSH/Console terminal has its own grammar and never grants an OS shell.
 
+## Check the installed version
+
+```sh
+termctl version
+termctl --version
+/path/to/extracted/package/payload/bin/safeterm-termctl version
+```
+
+Version output identifies that executable's embedded release/module version,
+source commit, clean/modified source state, Go compiler, platform and executable
+path. It requires neither root nor working configuration/services. Untagged or
+unstamped builds are identified without claiming a release. Comparing the
+packaged and installed commands helps detect an older extracted archive or a
+package that has not yet been installed. Extracting a release does not update
+`/usr/local/bin/termctl`; use `sudo termctl update PACKAGE_DIR` to install it.
+
 ## Define resources
 
 ```sh
@@ -38,6 +54,7 @@ apply does not restart consumers. Changed activation disconnects active sessions
 ```sh
 termctl catalog list
 termctl catalog describe ping
+termctl catalog describe tcp-test
 termctl role list
 termctl role describe netops
 termctl config list
@@ -49,6 +66,13 @@ sudo termctl service stop ssh
 sudo termctl service enable ssh
 sudo termctl service disable ssh
 ```
+
+Catalog and role inspection display `tcp-test`, matching the restricted terminal.
+`catalog describe tcp-test` also identifies the legacy signed operation ID
+`telnet`, retained for existing permission maps. The deprecated `telnet` alias
+still resolves to that description. `termctl defaults operation tcp-test` accepts
+the public name and emits an override with the original signed ID; do not rename
+that ID when preserving existing permissions.
 
 Service names select a fixed SafeTerm unit map. Arbitrary units/commands are
 refused. External application services use resource definitions and the restricted

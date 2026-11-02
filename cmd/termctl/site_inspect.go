@@ -34,7 +34,7 @@ func defaultsCommand(dir string, args []string, out io.Writer) error {
 			}
 		case "operation":
 			for _, v := range cfg.Operations {
-				names = append(names, v.Name)
+				names = append(names, catalogOperationName(v.Name))
 			}
 		case "profile":
 			for _, v := range cfg.Profiles {
@@ -75,7 +75,7 @@ func defaultDefinition(cfg *config.Config, kind, name string) (any, error) {
 		}
 	case "operation":
 		for _, op := range cfg.Operations {
-			if op.Name == name {
+			if op.Name == name || catalogOperationName(op.Name) == name {
 				return siteconfig.Operation{Operation: op}, nil
 			}
 		}

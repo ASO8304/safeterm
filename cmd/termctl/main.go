@@ -66,6 +66,8 @@ func run(args []string, out, errOut io.Writer) error {
 		return nil
 	}
 	switch args[0] {
+	case "version", "--version":
+		return versionCommand(args[1:], out)
 	case "check", "apply", "initialize":
 		return resourceCommand(configDir, args, out)
 	case "update":
@@ -111,6 +113,7 @@ func run(args []string, out, errOut io.Writer) error {
 func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "SafeTerm control utility")
 	fmt.Fprintln(out, "Usage:")
+	fmt.Fprintln(out, "  termctl version (release, source commit and executable path)")
 	fmt.Fprintln(out, "  termctl check (validate all administrator JSON definitions without activation)")
 	fmt.Fprintln(out, "  termctl apply [--signed-catalog DIR | --key-file FILE]")
 	fmt.Fprintln(out, "  termctl apply --export DIR (export unsigned candidate for offline signing)")
@@ -184,7 +187,7 @@ func catalogCommand(dir string, args []string, out io.Writer) error {
 			return err
 		}
 		for _, op := range cfg.Operations {
-			fmt.Fprintf(out, "%-24s %s\n", op.Name, op.Description)
+			fmt.Fprintf(out, "%-24s %s\n", catalogOperationName(op.Name), op.Description)
 		}
 		return nil
 	}
@@ -196,10 +199,14 @@ func catalogCommand(dir string, args []string, out io.Writer) error {
 		return err
 	}
 	for _, op := range cfg.Operations {
-		if op.Name != args[1] {
+		if op.Name != args[1] && catalogOperationName(op.Name) != args[1] {
 			continue
 		}
-		fmt.Fprintf(out, "%s: %s\nprofile: %s\n", op.Name, op.Description, op.RunnerProfile)
+		fmt.Fprintf(out, "%s: %s\nprofile: %s\n", catalogOperationName(op.Name), op.Description, op.RunnerProfile)
+		if op.Name == "telnet" {
+			fmt.Fprintln(out, "operation ID: telnet (retained for permission compatibility)")
+			fmt.Fprintln(out, "alias: telnet (deprecated; use execute tcp-test)")
+		}
 		if op.Systemd != nil {
 			fmt.Fprintf(out, "systemd: %s %s (timeout %ds)\n", op.Systemd.Action, strings.Join(op.Systemd.OrderedUnits(), ", "), op.Systemd.Timeout())
 		}
@@ -234,7 +241,7 @@ func roleCommand(dir string, args []string, out io.Writer) error {
 			sort.Strings(policies[role.Name])
 			fmt.Fprintf(out, "%s: %s\n", role.Name, role.Description)
 			for _, operation := range policies[role.Name] {
-				fmt.Fprintf(out, "  - %s\n", operation)
+				fmt.Fprintf(out, "  - %s\n", catalogOperationName(operation))
 			}
 			return nil
 		}
@@ -865,7 +872,7 @@ func writeCompletion(out io.Writer, args []string) error {
 	if len(args) != 1 || (args[0] != "bash" && args[0] != "zsh") {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
 	}
-	commands := "check apply defaults profile executable catalog role service config user shell update rollback uninstall completion help"
+	commands := "version check apply defaults profile executable catalog role service config user shell update rollback uninstall completion help"
 	services := "audit config-writer identity network-manager gateway ssh diagnostics network logs services config-application config-database config-network all"
 	serviceActions := "status start stop restart enable disable"
 	if args[0] == "bash" {
