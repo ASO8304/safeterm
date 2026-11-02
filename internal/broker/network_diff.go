@@ -40,6 +40,13 @@ func interfaceDiff(before, after networkmanager.Interface) []editorFieldDiff {
 		}
 	}
 	add("DHCP4", []string{onOff(before.DHCP4)}, []string{onOff(after.DHCP4)})
+	if before.PersistentName != after.PersistentName {
+		oldName := before.PersistentName
+		if oldName == "" {
+			oldName = before.Name + " (current name)"
+		}
+		add("Persistent Name", []string{oldName}, []string{after.PersistentName})
+	}
 	add("Addresses", before.Addresses, after.Addresses)
 	add("DNS Servers", before.DNS, after.DNS)
 	add("Search Domains", before.SearchDomains, after.SearchDomains)

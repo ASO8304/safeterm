@@ -1,7 +1,6 @@
 package networkmanager
 
 import (
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,150 +8,11 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"safeterm/internal/contract"
 )
 
 type namingTransaction struct {
 	Files   []File
 	Changed map[string][]byte
-}
-
-func (s *Snapshot) bindInterfaceMAC(name, mac string) (map[string][]byte, error) {
-	patches := map[int][]textPatch{}
-	fragments := s.fragments[name]
-	if len(fragments) == 0 {
-		index := s.managedSourceIndex()
-		if index < 0 {
-			return nil, fmt.Errorf("network: interface has no writable Netplan source")
-		}
-		network := child(s.Files[index].doc.Content[0], "network")
-		ethernet := child(network, "ethernets")
-		item := s.View.Interfaces[name]
-		node := interfaceNode(item, mac, routesFor(s.View, name))
-		key, mapping := item.ID, ethernet
-		if ethernet == nil || len(ethernet.Content) == 0 {
-			wrapper := nodeFor(map[string]string{})
-			setChild(wrapper, item.ID, node)
-			node, key, mapping = wrapper, "ethernets", network
-		}
-		patch, err := fieldPatch(s.Files[index], mapping, key, node)
-		if err != nil {
-			return nil, err
-		}
-		patches[index] = append(patches[index], patch)
-	} else {
-		for index, fragment := range fragments {
-			var match = nodeFor(map[string]string{"macaddress": mac})
-			if index != len(fragments)-1 {
-				match = nil
-			}
-			for _, key := range []string{"match", "set-name"} {
-				value := match
-				if key == "set-name" {
-					value = nil
-				}
-				if value == nil && child(fragment.node, key) == nil {
-					continue
-				}
-				patch, err := fieldPatch(s.Files[fragment.file], fragment.node, key, value)
-				if err != nil {
-					return nil, err
-				}
-				patches[fragment.file] = append(patches[fragment.file], patch)
-			}
-		}
-	}
-	return s.renderPatches(patches)
-}
-
-func (m *Manager) nameInterface(ctx context.Context, req *contract.ExecutionRequest, request Request, policy Policy, snapshot *Snapshot, hasCandidate bool) (Reply, error) {
-	if !interfaceNamePattern.MatchString(request.NewName) || request.NewName == "lo" {
-		return Reply{}, fmt.Errorf("network: new name must start with a letter, use letters/digits/_/-, and be at most 15 characters")
-	}
-	item, exists := snapshot.View.Interfaces[request.Interface]
-	if !exists || item.ReadOnly != "" {
-		return Reply{}, fmt.Errorf("network: renaming requires a present, editable interface allowed by policy")
-	}
-	if !policy.AllowsInterface(request.NewName) {
-		return Reply{}, fmt.Errorf("network: allow the future name %q in network/policy.json or enable allow_all_interfaces before renaming", request.NewName)
-	}
-	if hasCandidate {
-		return Reply{}, fmt.Errorf("network: save/apply/confirm or discard the existing network candidate before renaming")
-	}
-	mac, valid := normalizedMAC(snapshot.View.MACs[request.Interface])
-	if !valid {
-		return Reply{}, fmt.Errorf("network: renaming requires a valid Ethernet MAC address")
-	}
-	for name, value := range m.opts.Interfaces() {
-		if name != request.Interface && (strings.EqualFold(value, mac) || name == request.NewName) {
-			return Reply{}, fmt.Errorf("network: MAC address or requested name conflicts with another present interface")
-		}
-	}
-	rules, err := readLinkRules(m.opts.Root)
-	if err != nil {
-		return Reply{}, err
-	}
-	for _, rule := range rules {
-		if rule.name == request.NewName && !contains(rule.macs, mac) {
-			return Reply{}, fmt.Errorf("network: requested name is reserved by another .link rule: %s", rule.file.Path)
-		}
-	}
-	link, err := selectLinkRule(m.opts.Root, mac, rules)
-	if err != nil {
-		return Reply{}, err
-	}
-	changed, err := snapshot.bindInterfaceMAC(request.Interface, mac)
-	if err != nil {
-		return Reply{}, err
-	}
-	if err := m.acquireTrialLock(); err != nil {
-		return Reply{}, err
-	}
-	defer m.releaseTrialLock()
-	if err := m.opts.Backend.Validate(ctx, snapshot.Files, changed); err != nil {
-		return Reply{}, err
-	}
-	currentPolicy, err := m.opts.Policy()
-	if err != nil || policyHash(currentPolicy) != policyHash(policy) {
-		return Reply{}, fmt.Errorf("network: administrator policy changed during naming validation; retry")
-	}
-	latest, err := m.snapshot(policy)
-	if err != nil || latest.View.Version != snapshot.View.Version {
-		return Reply{}, fmt.Errorf("network: sources or interfaces changed during naming validation; retry")
-	}
-	if err := prepareNamingDirectory(m.opts.Root); err != nil {
-		return Reply{}, err
-	}
-	tx := namingTransaction{Changed: changed}
-	for _, file := range snapshot.Files {
-		if _, changed := changed[file.Path]; changed {
-			tx.Files = append(tx.Files, file)
-		}
-	}
-	// The .link is committed last. No udev trigger, netplan apply, service
-	// restart, live rename or reboot is executed by this operation.
-	tx.Files = append(tx.Files, link)
-	tx.Changed[link.Path] = renameLink(link, mac, request.NewName)
-	if err := m.report(ctx, req, "apply-authorized", snapshot.View.Version); err != nil {
-		return Reply{}, err
-	}
-	if err := m.save("naming-pending.json", tx); err != nil {
-		return Reply{}, err
-	}
-	for _, file := range tx.Files {
-		if err := replaceFile(m.opts.Root, file, tx.Changed[file.Path]); err != nil {
-			recovery := m.recoverNaming()
-			return Reply{}, fmt.Errorf("network: persistent naming failed: %v; recovery: %v", err, recovery)
-		}
-	}
-	if err := m.remove("naming-pending.json"); err != nil {
-		return Reply{}, err
-	}
-	if err := m.report(ctx, req, "applied", "network-v1"); err != nil {
-		return Reply{}, fmt.Errorf("network: name persisted, completion audit unavailable: %w", err)
-	}
-	return Reply{Text: fmt.Sprintf("Persistent name: %s -> %s (MAC %s).\nUpdated /%s and bound its Netplan definition to the MAC.\nTakes effect on next reboot/device activation; the live interface was not renamed.", request.Interface, request.NewName, mac, link.Path)}, nil
 }
 
 func prepareNamingDirectory(root string) error {
@@ -259,6 +119,10 @@ func addPersistentNames(snapshot *Snapshot, rules []linkRule) {
 		if matches != 1 {
 			delete(snapshot.View.Names, name)
 		}
+	}
+	for name, item := range snapshot.View.Interfaces {
+		item.PersistentName = snapshot.View.Names[name]
+		snapshot.View.Interfaces[name] = item
 	}
 	if len(rules) > 0 {
 		hash := sha256.New()

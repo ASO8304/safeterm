@@ -70,7 +70,7 @@ func TestNewInterfaceTrialPersistsOnlyOnConfirmAndRollbackRemovesOnlyCreatedFile
 	}
 }
 
-func TestPersistentRenameReusesMACRuleAndDoesNotApplyLiveNetworking(t *testing.T) {
+func TestPersistentRenameReusesMACRuleAndDoesNotRenameLiveInterface(t *testing.T) {
 	m, root, p, backend := managerTest(t)
 	p.Interfaces = append(p.Interfaces, "lan0")
 	m.opts.Policy = func() (Policy, error) { return p, nil }
@@ -84,14 +84,14 @@ func TestPersistentRenameReusesMACRuleAndDoesNotApplyLiveNetworking(t *testing.T
 	if err := os.Chmod(filepath.Join(root, rulePath), 0640); err != nil {
 		t.Fatal(err)
 	}
-	result := operatorCall(t, m, Request{Action: "rename", Interface: "ens19", NewName: "lan0"})
+	result := persistNameTest(t, m, "ens19", "lan0")
 	data, err := os.ReadFile(filepath.Join(root, rulePath))
-	if err != nil || !strings.Contains(string(data), "Name=lan0\r\n") || !strings.Contains(string(data), "# Retain MTU\r\nMTUBytes=1500\r\n") || !strings.Contains(result.Text, "live interface was not renamed") {
+	if err != nil || !strings.Contains(string(data), "Name=lan0\r\n") || !strings.Contains(string(data), "# Retain MTU\r\nMTUBytes=1500\r\n") || !strings.Contains(result.Text, "next reboot/device activation") {
 		t.Fatal(string(data), result, err)
 	}
 	info, _ := os.Stat(filepath.Join(root, rulePath))
 	files, _ := os.ReadDir(filepath.Join(root, "etc/systemd/network"))
-	if info.Mode().Perm() != 0640 || len(files) != 1 || backend.trial != nil || backend.restored != 0 {
+	if info.Mode().Perm() != 0640 || len(files) != 1 || (backend.trial != nil && !backend.trial.accepted) || backend.restored != 0 {
 		t.Fatal("rename changed metadata, created a duplicate rule or applied networking")
 	}
 	config, _ := os.ReadFile(filepath.Join(root, "etc/netplan/arbitrary-name.yaml"))
@@ -138,9 +138,20 @@ func TestRenameCreatesRuleOnlyWhenAbsentAndRejectsAmbiguousOrUntrustedRules(t *t
 			case "read-only":
 				p.Interfaces, p.AllowAllInterfaces = nil, false
 			}
-			result, err := callTest(m, "admin", []string{"network-operator"}, Request{Action: "rename", Interface: "ens19", NewName: name})
+			read, readErr := callTest(m, "admin", []string{"network-operator"}, Request{Action: "read"})
+			if readErr != nil {
+				if condition == "symlink" {
+					return
+				}
+				t.Fatal(readErr)
+			}
+			result, err := callTest(m, "admin", []string{"network-operator"}, Request{Action: "save", Version: read.View.Version, Changes: []Change{{Kind: "interface", Name: "ens19", Field: "name", Action: "set", Values: []string{name}}}})
 			if condition == "new" {
-				path := filepath.Join(root, "etc/systemd/network/10-001122334455-persistent-net.link")
+				if err == nil {
+					operatorCall(t, m, Request{Action: "apply"})
+					result = operatorCall(t, m, Request{Action: "confirm"})
+				}
+				path := filepath.Join(root, "etc/systemd/network/11-persistent-net.link")
 				if err != nil || !strings.Contains(result.Text, "next reboot") {
 					t.Fatal(result, err)
 				}
@@ -150,7 +161,7 @@ func TestRenameCreatesRuleOnlyWhenAbsentAndRejectsAmbiguousOrUntrustedRules(t *t
 			} else if err == nil {
 				t.Fatal("unsafe or ambiguous rename accepted", condition)
 			}
-			if backend.trial != nil || backend.restored != 0 {
+			if (backend.trial != nil && !backend.trial.accepted) || backend.restored != 0 {
 				t.Fatal("rename applied live networking")
 			}
 		})
@@ -183,7 +194,7 @@ func TestNamingRecoveryFinishesFullyWrittenRuleWithoutRunningNetplan(t *testing.
 	if !bytes.Equal(changed, restored) || backend.restored != 0 {
 		t.Fatal("recovery failed or ran live networking")
 	}
-	if _, err := callTest(m, "viewer", []string{"network-viewer"}, Request{Action: "rename", Interface: "ens19", NewName: "lan0"}); err == nil {
+	if _, err := callTest(m, "viewer", []string{"network-viewer"}, Request{Action: "save", Changes: []Change{{Kind: "interface", Name: "ens19", Field: "name", Action: "set", Values: []string{"lan0"}}}}); err == nil {
 		t.Fatal("read-only role renamed a NIC")
 	}
 }
@@ -244,4 +255,64 @@ func TestNamingSharedMACDropInsAndMetadataDoNotPermitSilentReplacement(t *testin
 	if _, err := selectLinkRule(root, "00:11:22:33:44:55", rules); err == nil {
 		t.Fatal("drop-in could silently override the new name")
 	}
+}
+
+func TestPersistentRenameAllocatesNumberedRulesAndReusesThem(t *testing.T) {
+	m, root, p, backend := managerTest(t)
+	p.AllowAllInterfaces, p.Files = true, nil
+	m.opts.Policy = func() (Policy, error) { return p, nil }
+	m.opts.Interfaces = func() map[string]string {
+		return map[string]string{"ens19": "00:11:22:33:44:55", "ens20": "00:11:22:33:44:66"}
+	}
+	persistNameTest(t, m, "ens19", "lan0")
+	persistNameTest(t, m, "ens20", "lan1")
+	persistNameTest(t, m, "ens19", "lan2")
+	for file, values := range map[string][]string{
+		"11-persistent-net.link": {"MACAddress=00:11:22:33:44:55", "Name=lan2"},
+		"12-persistent-net.link": {"MACAddress=00:11:22:33:44:66", "Name=lan1"},
+	} {
+		data, err := os.ReadFile(filepath.Join(root, "etc/systemd/network", file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, value := range values {
+			if !strings.Contains(string(data), value) {
+				t.Fatal("numbered rule lost its MAC or name", file, string(data))
+			}
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "etc/systemd/network"))
+	if err != nil || len(entries) != 2 || (backend.trial != nil && !backend.trial.accepted) || backend.restored != 0 {
+		t.Fatal("rename duplicated a rule or applied live networking", entries, err)
+	}
+}
+
+func TestNumberedLinkAllocationSkipsSystemRulesAndDropIns(t *testing.T) {
+	root := t.TempDir()
+	for _, path := range []string{
+		"etc/systemd/network/11-persistent-net.link",
+		"run/systemd/network/12-persistent-net.link",
+		"usr/lib/systemd/network/13-persistent-net.link",
+		"usr/local/lib/systemd/network/14-persistent-net.link.d/override.conf",
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, path)), 0755); err != nil {
+			t.Fatal(err)
+		}
+		writeTest(t, root, path, "# existing system configuration\n")
+	}
+	file, err := selectLinkRule(root, "00:11:22:33:44:55", nil)
+	if err != nil || file.Path != "etc/systemd/network/15-persistent-net.link" || !file.Missing {
+		t.Fatal("allocated filename shadows a rule or inherits a drop-in", file, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, file.Path)); !os.IsNotExist(err) {
+		t.Fatal("selecting a filename wrote a rule", err)
+	}
+}
+
+func persistNameTest(t *testing.T, m *Manager, current, future string) Reply {
+	t.Helper()
+	read := operatorCall(t, m, Request{Action: "read"})
+	operatorCall(t, m, Request{Action: "save", Version: read.View.Version, Changes: []Change{{Kind: "interface", Name: current, Field: "name", Action: "set", Values: []string{future}}}})
+	operatorCall(t, m, Request{Action: "apply"})
+	return operatorCall(t, m, Request{Action: "confirm"})
 }

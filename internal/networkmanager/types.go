@@ -63,15 +63,16 @@ func (p Policy) Validate() error {
 }
 
 type Interface struct {
-	Name          string   `json:"name"`
-	ID            string   `json:"id"`
-	DHCP4         bool     `json:"dhcp4"`
-	Addresses     []string `json:"addresses"`
-	DNS           []string `json:"dns"`
-	SearchDomains []string `json:"search_domains"`
-	MTU           *int     `json:"mtu,omitempty"`
-	Files         []string `json:"files"`
-	ReadOnly      string   `json:"read_only,omitempty"`
+	Name           string   `json:"name"`
+	PersistentName string   `json:"persistent_name,omitempty"`
+	ID             string   `json:"id"`
+	DHCP4          bool     `json:"dhcp4"`
+	Addresses      []string `json:"addresses"`
+	DNS            []string `json:"dns"`
+	SearchDomains  []string `json:"search_domains"`
+	MTU            *int     `json:"mtu,omitempty"`
+	Files          []string `json:"files"`
+	ReadOnly       string   `json:"read_only,omitempty"`
 }
 type Route struct {
 	Name        string  `json:"name"`
@@ -157,6 +158,11 @@ func Modify(v View, changes []Change) (View, error) {
 			}
 			var target *[]string
 			switch c.Field {
+			case "name":
+				if c.Action != "set" || len(c.Values) != 1 || !interfaceNamePattern.MatchString(c.Values[0]) || c.Values[0] == "lo" {
+					return v, fmt.Errorf("network: set name NAME; start with a letter, use letters/digits/_/-, at most 15 characters")
+				}
+				item.PersistentName = c.Values[0]
 			case "addresses":
 				for _, value := range c.Values {
 					if err := validateAddress(value); err != nil {
@@ -263,6 +269,9 @@ func ValidateView(v View) error {
 		return fmt.Errorf("network: excessive interfaces/routes")
 	}
 	for _, i := range v.Interfaces {
+		if i.PersistentName != "" && (!interfaceNamePattern.MatchString(i.PersistentName) || i.PersistentName == "lo") {
+			return fmt.Errorf("network: invalid persistent interface name %q", i.PersistentName)
+		}
 		if len(i.Addresses) > 64 || len(i.DNS) > 16 || len(i.SearchDomains) > 16 {
 			return fmt.Errorf("network: excessive interface values")
 		}

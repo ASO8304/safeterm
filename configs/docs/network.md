@@ -42,19 +42,36 @@ written before confirmation. Rollback removes a file created by that change.
 
 ## Persistent interface names
 
-Inspect the current name and MAC with `config network interface`, `edit NAME`,
-then `show`. Leave the editor, then use:
+Inspect and change a name inside the interface editor:
 
 ```text
-execute network rename ens192 lan0
+config network interface
+edit ens192
+show
+set name lan0
+diff
+save
+execute network apply
+execute network confirm
 ```
 
-This is a persistent, reboot/device-activation naming change. It does not rename
-an active NIC, trigger udev, apply Netplan, restart services or reboot. Names
-must start with a letter, contain letters/digits/underscore/hyphen, and be at
-most 15 characters. Current and requested names must be allowed by policy;
-`allow_all_interfaces` covers both. A saved network candidate must first be
-applied/confirmed or discarded so the naming change cannot stale an open draft.
+`set name` stages a persistent name alongside addresses, DHCP, DNS and MTU.
+The dirty prompt, `show` and `diff` display it. `exit` discards the selected
+item's unsaved edits; `next` keeps them staged; `cancel` discards the editor.
+`save` validates and stores the private candidate without changing Netplan or
+`.link` files. The existing timed apply/confirm flow commits Netplan and the
+naming rule together. Trial timeout or rollback leaves the original naming
+rule in place. A confirmed rollback restores both sources while the hardware
+names remain unchanged; after a reboot/name activation, administrator recovery
+is required before restoring an old naming rule.
+
+The requested name takes effect only on the next reboot/device activation.
+The live trial does not install a `.link` override or rename the active NIC.
+Names must start with a letter, contain letters/digits/underscore/hyphen, and
+be at most 15 characters. Current and requested names must be allowed by policy;
+`allow_all_interfaces` covers both. Conflicting live/persistent names and
+multiple interfaces requesting the same name are rejected. The old
+`execute network rename` command now directs operators to this editor flow.
 
 SafeTerm searches `/etc/systemd/network/*.link` for an existing single-MAC rule.
 For example, it updates the `Name=` in your existing `10-persistent-net.link`:
@@ -73,17 +90,23 @@ not override the requested name. Shared/multiple MAC matches, multiple matching
 files, advanced matches, symlinks, writable/untrusted files and drop-ins are
 rejected for administrator resolution rather than guessing.
 
-If no matching rule exists, SafeTerm creates a MAC-specific rule such as
-`/etc/systemd/network/10-000c29efe451-persistent-net.link`. It also binds the
+If no matching rule exists, SafeTerm uses the first available numbered filename,
+starting at `/etc/systemd/network/11-persistent-net.link`, then `12-`, `13-` and
+onward through `98-persistent-net.link`. It leaves `10-` for administrator rules.
+Occupied filenames and matching drop-in directories in `/etc`, `/run`,
+`/usr/lib` and `/usr/local/lib/systemd/network` are skipped. Existing matching
+files keep their names, including MAC-based files from v0.34.0. It also binds the
 Netplan definition to that MAC and removes conflicting `set-name` entries, so
 its IP settings continue matching after the interface changes name. Existing
 Netplan IDs and unrelated configuration remain intact. The detail view shows
 the persistent name and whether it differs from the current live name.
 
-The operation is authorized and audited by the dedicated network manager,
+The candidate is authorized and audited by the dedicated network manager,
 uses the lifecycle lock, validates Netplan in a temporary root, and journals
-persistent writes for crash recovery. Fully written changes are completed on
-recovery; partial changes are restored without applying live networking.
+persistent writes for crash recovery. Fully written naming commits are finalized on startup instead of undoing a name
+already consumed during reboot. Incomplete trials restore the old sources;
+changed hardware identities or external edits block automatic restoration and
+require a Linux administrator.
 Review local earlier-priority systemd rules and any initramfs copies when
 planning a reboot. See [systemd.link](https://www.freedesktop.org/software/systemd/man/systemd.link.html).
 

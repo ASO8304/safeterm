@@ -440,6 +440,14 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 			continue
 		}
 		values := map[string]*yaml.Node{}
+		if old.PersistentName != next.PersistentName {
+			mac, valid := normalizedMAC(s.View.MACs[name])
+			if !valid {
+				return nil, fmt.Errorf("network: persistent naming requires a valid Ethernet MAC address")
+			}
+			values["match"] = nodeFor(map[string]string{"macaddress": mac})
+			values["set-name"] = nil
+		}
 		if old.DHCP4 != next.DHCP4 {
 			values["dhcp4"] = nodeFor(next.DHCP4)
 		}

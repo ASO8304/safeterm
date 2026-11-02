@@ -38,6 +38,8 @@ type transaction struct {
 	Deadline                time.Time
 	Files                   []File
 	Changed                 map[string][]byte
+	LinkFiles               []File            `json:",omitempty"`
+	LinkChanged             map[string][]byte `json:",omitempty"`
 	OldNames, NewNames      map[string]string
 	Targets                 []string
 	Sources                 map[string]string
@@ -78,6 +80,14 @@ func New(opts Options) (*Manager, error) {
 		m.pending = &tx
 		if err := m.acquireTrialLock(); err != nil {
 			return nil, err
+		}
+		if complete, err := m.recoverCandidateNames(&tx); err != nil {
+			m.releaseTrialLock()
+			return nil, fmt.Errorf("network: persistent naming recovery failed: %w", err)
+		} else if complete {
+			m.pending = nil
+			m.releaseTrialLock()
+			return m, nil
 		}
 		if err := m.revertLocked(context.Background()); err != nil {
 			m.releaseTrialLock()
@@ -358,7 +368,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 	}
 	hasCandidate := cErr == nil
 	if r.Action == "rename" {
-		return m.nameInterface(ctx, req, r, p, s, hasCandidate)
+		return Reply{}, fmt.Errorf("network: use config network interface, edit NAME, set name NEW_NAME, then save")
 	}
 	if hasCandidate && c.Owner == owner(req) {
 		if c.Base != s.View.Version && r.Action != "discard" {
@@ -409,6 +419,9 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if _, err = s.Render(modified); err != nil {
 			return Reply{}, err
 		}
+		if _, _, err = m.planNames(s, modified, p); err != nil {
+			return Reply{}, err
+		}
 		if err = m.report(ctx, req, "preview-created", s.View.Version); err != nil {
 			return Reply{}, err
 		}
@@ -446,7 +459,11 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if err != nil {
 			return Reply{}, err
 		}
-		if len(changed) == 0 {
+		linkFiles, linkChanged, err := m.planNames(s, c.View, p)
+		if err != nil {
+			return Reply{}, err
+		}
+		if len(changed) == 0 && len(linkFiles) == 0 {
 			return Reply{}, fmt.Errorf("network: candidate has no changes")
 		}
 		if err = m.opts.Backend.Validate(ctx, s.Files, changed); err != nil {
@@ -460,6 +477,12 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 			return Reply{}, err
 		}
 		tx := &transaction{Owner: owner(req), RequestID: req.RequestID, Phase: "trial", Deadline: time.Now().Add(time.Duration(p.ConfirmSeconds+30) * time.Second), Changed: changed, OldNames: map[string]string{}, NewNames: map[string]string{}, Sources: map[string]string{}, PolicyHash: policyHash(p)}
+		tx.LinkFiles, tx.LinkChanged = linkFiles, linkChanged
+		if len(linkFiles) > 0 {
+			if err := prepareNamingDirectory(m.opts.Root); err != nil {
+				return Reply{}, err
+			}
+		}
 		if err = m.load("route-names.json", &tx.OldNames); err != nil && !os.IsNotExist(err) {
 			return Reply{}, err
 		}
@@ -546,6 +569,9 @@ func (m *Manager) confirm(ctx context.Context, req *contract.ExecutionRequest, p
 	if err := m.verifySources(tx, p); err != nil {
 		return Reply{}, err
 	}
+	if err := m.verifyLinkFiles(tx.LinkFiles); err != nil {
+		return Reply{}, err
+	}
 	for _, f := range tx.Files {
 		if f.Missing {
 			if _, err := os.Lstat(filepath.Join(m.opts.Root, f.Path)); !os.IsNotExist(err) {
@@ -569,6 +595,14 @@ func (m *Manager) confirm(ctx context.Context, req *contract.ExecutionRequest, p
 		if err := replaceFile(m.opts.Root, file, tx.Changed[file.Path]); err != nil {
 			recovery := m.revertLocked(context.Background())
 			return Reply{}, fmt.Errorf("network: commit: %v; recovery: %v", err, recovery)
+		}
+	}
+	// Commit persistent naming last. No .link override participates in the
+	// live trial; udev sees the new Name only at a future device activation.
+	for _, file := range tx.LinkFiles {
+		if err := replaceFile(m.opts.Root, file, tx.LinkChanged[file.Path]); err != nil {
+			recovery := m.revertLocked(context.Background())
+			return Reply{}, fmt.Errorf("network: commit persistent name: %v; recovery: %v", err, recovery)
 		}
 	}
 	if err := m.save("route-names.json", tx.NewNames); err != nil {
@@ -598,13 +632,17 @@ func (m *Manager) confirm(ctx context.Context, req *contract.ExecutionRequest, p
 	if err := m.report(ctx, req, "applied", "network-v1"); err != nil {
 		return Reply{}, fmt.Errorf("network: configuration confirmed, completion audit unavailable: %w", err)
 	}
-	return Reply{Text: "Network configuration confirmed and persisted to its original Netplan files."}, nil
+	text := "Network configuration confirmed and persisted to its original Netplan files."
+	if len(tx.LinkFiles) > 0 {
+		text += "\nPersistent names saved in /etc/systemd/network; take effect on next reboot/device activation."
+	}
+	return Reply{Text: text}, nil
 }
 func sameFile(a, b File) bool {
 	return a.Missing == b.Missing && bytes.Equal(a.Data, b.Data) && a.Mode == b.Mode && a.UID == b.UID && a.GID == b.GID && equal(a.Attrs, b.Attrs)
 }
 func validTransaction(tx *transaction) error {
-	if tx == nil || len(tx.Files) == 0 || len(tx.Files) > maxFiles || len(tx.Changed) != len(tx.Files) {
+	if tx == nil || len(tx.Files)+len(tx.LinkFiles) == 0 || len(tx.Files) > maxFiles || len(tx.Changed) != len(tx.Files) {
 		return fmt.Errorf("network: invalid recovery transaction")
 	}
 	for _, f := range tx.Files {
@@ -618,7 +656,7 @@ func validTransaction(tx *transaction) error {
 			return fmt.Errorf("network: missing replacement data")
 		}
 	}
-	return nil
+	return validLinkTransaction(tx.LinkFiles, tx.LinkChanged)
 }
 func (m *Manager) runtimePath(f File) string {
 	return filepath.Join(m.opts.Root, "run/netplan", filepath.Base(f.Path))
@@ -677,13 +715,16 @@ func (m *Manager) revertLocked(ctx context.Context) error {
 	if err := validTransaction(tx); err != nil {
 		return err
 	}
+	if len(tx.LinkFiles) > 0 && tx.Sources["@hardware"] != hardwareDigest(m.opts.Interfaces()) {
+		return fmt.Errorf("network: hardware names changed since the naming trial; a Linux administrator must resolve recovery before restoring an old naming rule")
+	}
 	if m.trial != nil {
 		_ = m.trial.Finish(false)
 	}
 	if err := m.removeOverrides(tx); err != nil {
 		return err
 	}
-	for _, file := range tx.Files {
+	for _, file := range append(append([]File(nil), tx.LinkFiles...), tx.Files...) {
 		current, err := readTrusted(m.opts.Root, file.Path)
 		if file.Missing && os.IsNotExist(err) {
 			continue
@@ -695,7 +736,7 @@ func (m *Manager) revertLocked(ctx context.Context) error {
 			continue
 		}
 		expected := file
-		expected.Data = tx.Changed[file.Path]
+		expected.Data = tx.changedData(file)
 		expected.Missing = false
 		if !sameFile(current, expected) {
 			return fmt.Errorf("network: external edit prevents recovery of %s", file.Path)
@@ -748,13 +789,13 @@ func (m *Manager) rollback(ctx context.Context, req *contract.ExecutionRequest, 
 			return Reply{}, fmt.Errorf("network: rollback interface is outside current policy")
 		}
 	}
-	for _, f := range tx.Files {
-		if len(p.Files) > 0 && !contains(p.Files, filepath.Base(f.Path)) {
+	for _, f := range append(append([]File(nil), tx.Files...), tx.LinkFiles...) {
+		if filepath.Dir(f.Path) == "etc/netplan" && len(p.Files) > 0 && !contains(p.Files, filepath.Base(f.Path)) {
 			return Reply{}, fmt.Errorf("network: rollback file is outside policy")
 		}
 		current, err := readTrusted(m.opts.Root, f.Path)
 		expected := f
-		expected.Data = tx.Changed[f.Path]
+		expected.Data = tx.changedData(f)
 		expected.Missing = false
 		if err != nil || !sameFile(current, expected) {
 			return Reply{}, fmt.Errorf("network: files changed since confirmation; refusing rollback")
@@ -785,7 +826,7 @@ func Diff(a, b View) string {
 		for _, pair := range []struct {
 			key  string
 			a, b any
-		}{{"dhcp4", old.DHCP4, next.DHCP4}, {"addresses", old.Addresses, next.Addresses}, {"dns", old.DNS, next.DNS}, {"search-domains", old.SearchDomains, next.SearchDomains}, {"mtu", old.MTU, next.MTU}} {
+		}{{"name", old.PersistentName, next.PersistentName}, {"dhcp4", old.DHCP4, next.DHCP4}, {"addresses", old.Addresses, next.Addresses}, {"dns", old.DNS, next.DNS}, {"search-domains", old.SearchDomains, next.SearchDomains}, {"mtu", old.MTU, next.MTU}} {
 			if !equal(pair.a, pair.b) {
 				av, _ := json.Marshal(pair.a)
 				bv, _ := json.Marshal(pair.b)

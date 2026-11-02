@@ -13,7 +13,6 @@ var networkActionDescriptions = map[string]string{
 	"confirm":  "Confirm your live trial and persist its Netplan changes",
 	"rollback": "Reject the live trial, or restore the last confirmed network change",
 	"discard":  "Discard your saved candidate; leave active networking unchanged",
-	"rename":   "Persist a MAC-bound name for next reboot/device activation; use rename CURRENT NEW",
 }
 var networkEditorDescriptions = map[string]string{
 	"edit":     "Select an existing item to edit",
@@ -31,6 +30,7 @@ var networkEditorDescriptions = map[string]string{
 	"delete":   "Remove a route by ID; default routes are protected",
 }
 var networkInterfaceFields = map[string]string{
+	"name":           "Persistent interface name for next reboot/device activation; save, apply and confirm to persist",
 	"addresses":      "set addresses <cidr>... - Replace all IP addresses (e.g., 10.0.0.1/24)",
 	"dhcp4":          "Enable or disable DHCP for IPv4; static addresses are kept",
 	"dns":            "DNS server IP addresses; multiple values allowed",
@@ -49,9 +49,7 @@ func (s *Shell) networkHelpRow(name, description string) {
 }
 func (s *Shell) networkActionHelp(fields []string) error {
 	if len(fields) > 0 && fields[0] == "rename" {
-		s.networkHelpRow("CURRENT NEW", "Example: execute network rename ens192 lan0")
-		s.networkHelpRow("effect", "Update the matching .link rule and Netplan MAC match; no live rename or reboot")
-		s.networkHelpRow("policy", "Current and future names must be allowed; discard/apply any saved candidate first")
+		s.networkHelpRow("set name NEW_NAME", "Use config network interface, edit NAME; save, apply and confirm to persist")
 		return nil
 	}
 	if len(fields) == 0 {
@@ -166,7 +164,7 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 			if command == "append" || command == "unselect" {
 				return name == "addresses" || name == "dns" || name == "search-domains"
 			}
-			return command != "unset" || name != "dhcp4"
+			return command != "unset" || (name != "dhcp4" && name != "name")
 		}
 		if len(fields) == 1 {
 			names := []string{}
@@ -214,7 +212,7 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 			}
 			return nil
 		}
-		placeholders := map[string]string{"addresses": "<cidr>...", "dns": "<IP> [...]", "search-domains": "<domain> [...]", "mtu": "<576..65535>", "destination": "<network/CIDR>", "gateway": "<IP>", "metric": "<0..4294967295>"}
+		placeholders := map[string]string{"name": "<NAME>", "addresses": "<cidr>...", "dns": "<IP> [...]", "search-domains": "<domain> [...]", "mtu": "<576..65535>", "destination": "<network/CIDR>", "gateway": "<IP>", "metric": "<0..4294967295>"}
 		s.networkHelpRow(placeholders[fields[1]], desc)
 		return nil
 	default:

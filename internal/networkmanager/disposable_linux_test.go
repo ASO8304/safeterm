@@ -149,7 +149,7 @@ func TestDisposableNetplanTrial(t *testing.T) {
 	if err := os.WriteFile(rulePath, []byte(rule), 0640); err != nil {
 		t.Fatal(err)
 	}
-	operatorCall(t, m, Request{Action: "rename", Interface: "host0", NewName: "vmnic0"})
+	persistNameTest(t, m, "host0", "vmnic0")
 	if _, err := net.InterfaceByName("host0"); err != nil || !hasAddress("192.0.2.10") {
 		t.Fatal("persistent rename changed the live connection", err)
 	}

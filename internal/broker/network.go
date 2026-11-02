@@ -26,7 +26,7 @@ func (s *Shell) networkCall(ctx context.Context, r networkmanager.Request) (netw
 	return s.network.Call(ctx, contract.Metadata{BrokerType: s.principal.BrokerType, UserID: s.principal.UserID, ConsoleSession: s.principal.ConsoleSession, ClaimedRoles: append([]string(nil), s.principal.Roles...), ReceivedAt: time.Now().UTC()}, r)
 }
 
-var networkActions = []string{"status", "diff", "apply", "confirm", "rollback", "discard", "rename"}
+var networkActions = []string{"status", "diff", "apply", "confirm", "rollback", "discard"}
 
 func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	if len(f) < 2 || f[1] != "network" || (f[0] != "execute" && f[0] != "config") {
@@ -44,10 +44,7 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 		}
 		request := networkmanager.Request{}
 		if len(f) >= 3 && f[2] == "rename" {
-			if len(f) != 5 {
-				return true, fmt.Errorf("usage: execute network rename CURRENT_NAME NEW_NAME; persists for next reboot/device activation")
-			}
-			request = networkmanager.Request{Action: "rename", Interface: f[3], NewName: f[4]}
+			return true, fmt.Errorf("use config network interface, edit NAME, set name NEW_NAME, then save; apply and confirm persist the future name")
 		} else if len(f) != 3 {
 			return true, fmt.Errorf("usage: execute network ACTION")
 		} else {
@@ -64,7 +61,7 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 		return true, nil
 	}
 	if len(f) == 3 && f[2] == "?" {
-		s.writeTerminalData([]byte("interface    Addresses, DHCP, DNS and MTU\nroute        Static routes\n"))
+		s.writeTerminalData([]byte("interface    Persistent name, addresses, DHCP, DNS and MTU\nroute        Static routes\n"))
 		return true, nil
 	}
 	if len(f) == 4 && f[3] == "?" && (f[2] == "interface" || f[2] == "route") {
@@ -309,6 +306,9 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 				if len(f) == 1 {
 					if e.kind == "interface" {
 						values = []string{"dhcp4", "addresses", "dns", "search-domains", "mtu"}
+						if f[0] == "set" {
+							values = append(values, "name")
+						}
 						if f[0] == "append" || f[0] == "unselect" {
 							values = []string{"addresses", "dns", "search-domains"}
 						}

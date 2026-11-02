@@ -125,11 +125,32 @@ func selectLinkRule(root, mac string, rules []linkRule) (File, error) {
 		}
 		return rule.file, nil
 	}
-	path := "etc/systemd/network/10-" + strings.ReplaceAll(mac, ":", "") + "-persistent-net.link"
-	if _, err := os.Lstat(filepath.Join(root, path)); !os.IsNotExist(err) {
-		return File{}, fmt.Errorf("network: reserved link rule path already exists: %s", path)
+	// Reserve 10 for the administrator's original rule. Skip occupied names
+	// and drop-in directories across systemd's configuration search paths so
+	// a new local file cannot shadow another rule or inherit its overrides.
+	for number := 11; number < 99; number++ {
+		base := fmt.Sprintf("%02d-persistent-net.link", number)
+		available := true
+		for _, rule := range rules {
+			if filepath.Base(rule.file.Path) == base {
+				available = false
+			}
+		}
+		for _, directory := range []string{"etc", "run", "usr/lib", "usr/local/lib"} {
+			for _, suffix := range []string{"", ".d"} {
+				path := filepath.Join(root, directory, "systemd/network", base+suffix)
+				if _, err := os.Lstat(path); err == nil {
+					available = false
+				} else if !os.IsNotExist(err) {
+					return File{}, err
+				}
+			}
+		}
+		if available {
+			return File{Path: "etc/systemd/network/" + base, Mode: 0600, UID: uint32(os.Geteuid()), GID: uint32(os.Getegid()), Attrs: map[string][]byte{}, Missing: true}, nil
+		}
 	}
-	return File{Path: path, Mode: 0600, UID: uint32(os.Geteuid()), GID: uint32(os.Getegid()), Attrs: map[string][]byte{}, Missing: true}, nil
+	return File{}, fmt.Errorf("network: no free persistent link rule number (11..98); a Linux administrator must free a filename")
 }
 
 func renameLink(file File, mac, name string) []byte {

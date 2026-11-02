@@ -169,7 +169,11 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 		}
 	}
 	row("MAC Address", "Unknown", e.view.MACs[name])
-	if persistent := e.view.Names[name]; persistent != "" {
+	persistent := item.PersistentName
+	if persistent == "" {
+		persistent = e.view.Names[name]
+	}
+	if persistent != "" {
 		if persistent != name {
 			persistent += " (next reboot/device activation)"
 		}

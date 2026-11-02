@@ -61,7 +61,7 @@ func TestTabOffersDomainItemsInsteadOfControlCommands(t *testing.T) {
 	check([]string{"ip0", "ip1"})
 	editorCommands(t, s, "ip1")
 	check(nil)
-	if got := s.completionCandidates(context.Background(), "set ", ""); len(got) != 5 {
+	if got := s.completionCandidates(context.Background(), "set ", ""); len(got) != 6 {
 		t.Fatal("set fields missing", got)
 	}
 	editorCommands(t, s, "cancel", "config options")
