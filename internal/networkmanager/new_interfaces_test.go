@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestUnknownInterfaceNeedsExplicitPolicyAndCreatesMACMatchedSource(t *testing.T) {
+func TestUnknownInterfaceNeedsExplicitPolicyAndUsesExistingSource(t *testing.T) {
 	root, p := testTree(t)
 	names := map[string]string{"ens19": "00:11:22:33:44:55", "ens20": "00:11:22:33:44:66"}
 	view, err := Discover(root, p, names)
@@ -25,20 +25,20 @@ func TestUnknownInterfaceNeedsExplicitPolicyAndCreatesMACMatchedSource(t *testin
 		t.Fatal(err)
 	}
 	changed, err := snapshot.Render(modified)
-	if err != nil || !strings.Contains(string(changed[managedInterfaces]), "macaddress: 00:11:22:33:44:66") || !strings.Contains(string(changed[managedInterfaces]), "dhcp4: true") {
+	if err != nil || !strings.Contains(string(changed["etc/netplan/arbitrary-name.yaml"]), "macaddress: 00:11:22:33:44:66") || !strings.Contains(string(changed["etc/netplan/arbitrary-name.yaml"]), "dhcp4: true") {
 		t.Fatal("new definition was not MAC matched", changed, err)
 	}
 	if _, err := os.Stat(filepath.Join(root, managedInterfaces)); !os.IsNotExist(err) {
 		t.Fatal("preview wrote a persistent source", err)
 	}
-	p.Files = []string{"arbitrary-name.yaml"}
+	p.Files = []string{"denied.yaml"}
 	blocked, err := Discover(root, p, names)
 	if err != nil || !strings.Contains(blocked.View.Interfaces["ens20"].ReadOnly, "source filename") {
 		t.Fatal("wildcard bypassed file policy", blocked, err)
 	}
 }
 
-func TestNewInterfaceTrialPersistsOnlyOnConfirmAndRollbackRemovesOnlyCreatedFile(t *testing.T) {
+func TestNewInterfaceTrialPersistsOnlyOnConfirmAndRollbackRestoresExistingFile(t *testing.T) {
 	root, p := testTree(t)
 	p.AllowAllInterfaces = true
 	backend := &fakeBackend{}
@@ -53,11 +53,11 @@ func TestNewInterfaceTrialPersistsOnlyOnConfirmAndRollbackRemovesOnlyCreatedFile
 	read := operatorCall(t, m, Request{Action: "read"})
 	operatorCall(t, m, Request{Action: "save", Version: read.View.Version, Changes: []Change{{Kind: "interface", Name: "ens20", Action: "set", Field: "dhcp4", Values: []string{"enable"}}}})
 	operatorCall(t, m, Request{Action: "apply"})
-	if _, err := os.Stat(filepath.Join(root, managedInterfaces)); !os.IsNotExist(err) {
-		t.Fatal("trial wrote persistent new-interface file", err)
+	if data, err := os.ReadFile(filepath.Join(root, "etc/netplan/arbitrary-name.yaml")); err != nil || !bytes.Equal(data, before) {
+		t.Fatal("trial changed the persistent source", err)
 	}
 	operatorCall(t, m, Request{Action: "confirm"})
-	if data, err := os.ReadFile(filepath.Join(root, managedInterfaces)); err != nil || !strings.Contains(string(data), "safeterm-001122334466:") {
+	if data, err := os.ReadFile(filepath.Join(root, "etc/netplan/arbitrary-name.yaml")); err != nil || !strings.Contains(string(data), "safeterm-001122334466:") {
 		t.Fatal("confirmed definition missing", err, string(data))
 	}
 	operatorCall(t, m, Request{Action: "rollback"})

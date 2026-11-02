@@ -144,7 +144,7 @@ func TestNetworkTextDiffAndDetailShowStagingWithoutRPC(t *testing.T) {
 	}
 	out.Reset()
 	editorCommands(t, s, "show")
-	for _, want := range []string{"Interface: ip1 (Editing Allowed)", "* Unsaved edits staged", "DHCP4:          on (staged)", "Addresses:      10.0.0.5/24 (staged)", "DNS Servers:    System default", "Search Domains: System default", "/etc/netplan/01-netcfg.yaml"} {
+	for _, want := range []string{"Interface: ip1 (Editing Allowed)", "* Unsaved edits staged", "DHCP4:           on (staged)", "Addresses:       10.0.0.5/24 (staged)", "DNS Servers:     System default", "Search Domains:  System default", "/etc/netplan/01-netcfg.yaml"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, out)
 		}

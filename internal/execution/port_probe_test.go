@@ -112,10 +112,10 @@ func TestNetcatTCPConnectsAndClosesWithoutApplicationData(t *testing.T) {
 
 func TestPortProbeRefusalCancellationTimeoutAndInvalidInputs(t *testing.T) {
 	e, _ := probeFixture(t, probeDelegate(func(context.Context, string, []string) (string, string, int, error) {
-		return "", "nc: connect failed: Connection refused", 1, errors.New("exit status 1")
+		return "", "nc: connect failed: Connection refused", 1, errors.New("execution: command /proc/self/fd/7 exited with code 1: exit status 1")
 	}))
 	out, _, code, err := e.Execute(context.Background(), "telnet", []string{"127.0.0.1", "23"})
-	if err == nil || code != 1 || !strings.Contains(out, "Connection refused") {
+	if err == nil || code != 1 || !strings.Contains(out, "Connection refused") || err.Error() != "Connection refused." {
 		t.Fatal(out, code, err)
 	}
 	for _, operation := range []string{"telnet", "udp-test"} {

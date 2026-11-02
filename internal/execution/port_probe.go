@@ -20,6 +20,16 @@ type portProbe struct {
 	timeout int
 }
 
+// Keep process/integrity details available to errors.Is/As without exposing
+// pinned descriptor paths or nested executor errors in the terminal status.
+type probeFailure struct {
+	message string
+	cause   error
+}
+
+func (e *probeFailure) Error() string { return e.message }
+func (e *probeFailure) Unwrap() error { return e.cause }
+
 // PortProbeExecutor builds fixed outbound-only nc argv from signed probe
 // definitions. Its delegate must retain the executable integrity boundary.
 // Operators cannot supply flags, ranges, stdin, listen or proxy modes.
@@ -151,7 +161,7 @@ func (e *PortProbeExecutor) Execute(ctx context.Context, command string, args []
 		return output, "", ExitCodeUnavailable, err
 	}
 	if resultErr != nil {
-		return output, "", resultCode, fmt.Errorf("execution: port probe: %s: %w", message, resultErr)
+		return output, "", resultCode, &probeFailure{message: message, cause: resultErr}
 	}
 	return output, "", 0, nil
 }

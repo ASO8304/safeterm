@@ -413,6 +413,21 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 	if err := ValidateView(v); err != nil {
 		return nil, err
 	}
+	working, normalized, err := s.normalizeEditedFlowSources(v)
+	if err != nil {
+		return nil, err
+	}
+	changed, err := working.render(v)
+	if err != nil {
+		return nil, err
+	}
+	for path, data := range changed {
+		normalized[path] = data
+	}
+	return normalized, nil
+}
+
+func (s *Snapshot) render(v View) (map[string][]byte, error) {
 	patches := map[int][]textPatch{}
 	newNodes := map[int]map[string]*yaml.Node{}
 	for name, old := range s.View.Interfaces {
@@ -429,7 +444,10 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 		}
 		fragments := s.fragments[name]
 		if len(fragments) == 0 {
-			index := s.managedSourceIndex()
+			index := -1
+			if len(next.Files) == 1 {
+				index = s.sourceIndex(next.Files[0])
+			}
 			if index < 0 {
 				return nil, fmt.Errorf("network: missing interface source")
 			}
@@ -565,7 +583,12 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 func (s *Snapshot) renderPatches(patches map[int][]textPatch) (map[string][]byte, error) {
 	result := map[string][]byte{}
 	for index, list := range patches {
-		sort.SliceStable(list, func(i, j int) bool { return list[i].start > list[j].start })
+		sort.SliceStable(list, func(i, j int) bool {
+			if list[i].start == list[j].start {
+				return list[i].indent < list[j].indent
+			}
+			return list[i].start > list[j].start
+		})
 		data := append([]byte(nil), s.Files[index].Data...)
 		previous := len(data) + 1
 		for _, p := range list {
@@ -630,6 +653,7 @@ func setChild(n *yaml.Node, key string, value *yaml.Node) {
 
 type textPatch struct {
 	start, end int
+	indent     int
 	data       []byte
 }
 
@@ -716,7 +740,7 @@ func fieldPatch(f File, mapping *yaml.Node, key string, value *yaml.Node) (textP
 	if start > 0 && !strings.HasSuffix(lines[start-1], "\n") && out != "" {
 		out = newline + out
 	}
-	return textPatch{start: offsets[start], end: offsets[end], data: []byte(out)}, nil
+	return textPatch{start: offsets[start], end: offsets[end], indent: indent, data: []byte(out)}, nil
 }
 func stripComments(n *yaml.Node) {
 	n.HeadComment = ""

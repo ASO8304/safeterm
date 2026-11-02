@@ -120,23 +120,41 @@ func TestDisposableNetplanTrial(t *testing.T) {
 	}
 	hardware["future0"] = nic.HardwareAddr.String()
 	p.AllowAllInterfaces = true
-	p.Files = append(p.Files, filepath.Base(managedInterfaces))
 	v := operatorCall(t, m, Request{Action: "read"})
 	operatorCall(t, m, Request{Action: "save", Version: v.View.Version, Changes: []Change{{Kind: "interface", Name: "future0", Field: "addresses", Action: "set", Values: []string{"198.51.100.10/24"}}}})
 	operatorCall(t, m, Request{Action: "apply"})
+	if data, err := os.ReadFile(source); err != nil || string(data) != original {
+		t.Fatal("new hardware trial changed the existing source", string(data), err)
+	}
 	if _, err := os.Stat("/" + managedInterfaces); !os.IsNotExist(err) {
 		t.Fatal("new hardware trial wrote persistent files", err)
 	}
 	operatorCall(t, m, Request{Action: "confirm"})
-	if data, err := os.ReadFile("/" + managedInterfaces); err != nil || !strings.Contains(string(data), nic.HardwareAddr.String()) {
-		t.Fatal("confirmed MAC-matched source missing", string(data), err)
+	if data, err := os.ReadFile(source); err != nil || !strings.Contains(string(data), nic.HardwareAddr.String()) {
+		t.Fatal("confirmed MAC-matched entry missing in existing source", string(data), err)
 	}
 	operatorCall(t, m, Request{Action: "rollback"})
 	if _, err := os.Stat("/" + managedInterfaces); !os.IsNotExist(err) {
-		t.Fatal("rollback did not remove the created source", err)
+		t.Fatal("created an unexpected separate source", err)
 	}
 	if data, err := command(context.Background(), "/usr/sbin/ip", "-j", "address", "show", "dev", "future0"); err != nil || strings.Contains(data, `"local":"198.51.100.10"`) {
 		t.Fatal("new-interface rollback retained the trial address", data, err)
+	}
+	// Exercise the reported inline shape with the real Netplan generator and
+	// timed trial, retaining its exact original bytes for confirmed rollback.
+	inline := "# Existing inline configuration\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets: {host0: {dhcp4: false, addresses: [192.0.2.10/24], match: {macaddress: '" + hardware["host0"] + "'}}}\n"
+	if err := os.WriteFile(source, []byte(inline), 0640); err != nil {
+		t.Fatal(err)
+	}
+	save("192.0.2.20/24")
+	operatorCall(t, m, Request{Action: "apply"})
+	operatorCall(t, m, Request{Action: "confirm"})
+	if !hasAddress("192.0.2.20") {
+		t.Fatal("inline configuration edit was not applied")
+	}
+	operatorCall(t, m, Request{Action: "rollback"})
+	if data, err := os.ReadFile(source); err != nil || string(data) != inline || !hasAddress("192.0.2.10") {
+		t.Fatal("inline rollback did not restore file and address", string(data), err)
 	}
 
 	// Exercise persistent naming under the production filesystem restrictions,

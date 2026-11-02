@@ -27,7 +27,8 @@ type Policy struct {
 	Version             int      `json:"version"`
 	Interfaces          []string `json:"interfaces"`
 	AllowAllInterfaces  bool     `json:"allow_all_interfaces,omitempty"`
-	Files               []string `json:"files,omitempty"` // basenames; empty discovers all /etc files
+	Files               []string `json:"files,omitempty"`              // basenames; empty discovers all /etc files
+	NewInterfaceFile    string   `json:"new_interface_file,omitempty"` // existing /etc/netplan basename
 	ReadRoles           []string `json:"read_roles"`
 	EditRoles           []string `json:"edit_roles"`
 	ConfirmSeconds      int      `json:"confirm_seconds"`
@@ -58,6 +59,9 @@ func (p Policy) Validate() error {
 		if !strings.HasSuffix(file, ".yaml") {
 			return fmt.Errorf("network: policy files must be exact .yaml basenames")
 		}
+	}
+	if p.NewInterfaceFile != "" && (!namePattern.MatchString(p.NewInterfaceFile) || !strings.HasSuffix(p.NewInterfaceFile, ".yaml")) {
+		return fmt.Errorf("network: new_interface_file must be an existing .yaml basename in /etc/netplan")
 	}
 	return nil
 }

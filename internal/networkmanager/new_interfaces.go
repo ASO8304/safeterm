@@ -3,7 +3,6 @@ package networkmanager
 import (
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -20,13 +19,73 @@ func normalizedMAC(value string) (string, bool) {
 	return mac.String(), true
 }
 
-func (s *Snapshot) managedSourceIndex() int {
+func (s *Snapshot) sourceIndex(path string) int {
 	for index, file := range s.Files {
-		if file.Path == managedInterfaces {
+		if file.Path == path {
 			return index
 		}
 	}
 	return -1
+}
+
+// New hardware joins an existing administrator-owned source. Never invent a
+// second Netplan file; ambiguous destinations require an explicit policy choice.
+func (s *Snapshot) newInterfaceDestination(p Policy) (string, string) {
+	candidates := []string{}
+	reasons := []string{}
+	for _, file := range s.Files {
+		if filepath.Dir(file.Path) != "etc/netplan" {
+			continue
+		}
+		base := filepath.Base(file.Path)
+		if p.NewInterfaceFile != "" && base != p.NewInterfaceFile {
+			continue
+		}
+		reason := ""
+		network := child(file.doc.Content[0], "network")
+		if r := scalar(child(network, "renderer")); r != "" && r != "networkd" {
+			reason = "Interface controlled by unsupported Netplan renderer (" + r + ")."
+		}
+		if s.sourceIndex("run/netplan/"+base) >= 0 {
+			reason = "new-interface source is shadowed by /run/netplan"
+		}
+		if len(p.Files) > 0 && !contains(p.Files, base) {
+			reason = "source filename " + base + " is outside administrator policy"
+		}
+		lower := strings.ToLower(string(file.Data))
+		if !p.AllowGeneratedFiles && (strings.Contains(lower, "cloud-init") || strings.Contains(lower, "cloud_init")) {
+			reason = "cloud-init generated file requires explicit administrator ownership acknowledgement"
+		}
+		if ether := child(network, "ethernets"); ether != nil && ether.Kind != yaml.MappingNode {
+			reason = "new-interface source requires a Netplan ethernets mapping"
+		}
+		if reason != "" {
+			reasons = append(reasons, reason)
+			continue
+		}
+		candidates = append(candidates, file.Path)
+	}
+	if p.NewInterfaceFile == "" && len(candidates) > 1 {
+		primary := []string{}
+		for _, path := range candidates {
+			if path != managedInterfaces {
+				primary = append(primary, path)
+			}
+		}
+		if len(primary) > 0 {
+			candidates = primary
+		}
+	}
+	if len(candidates) == 1 {
+		return candidates[0], ""
+	}
+	if len(candidates) > 1 {
+		return "", "multiple eligible Netplan files; a Linux administrator must select new_interface_file in " + PolicyPath
+	}
+	if len(reasons) == 1 {
+		return "", reasons[0]
+	}
+	return "", "no eligible existing Netplan file; a Linux administrator must select an existing new_interface_file in " + PolicyPath
 }
 
 func (s *Snapshot) includeUnconfigured(root string, p Policy, names map[string]string) error {
@@ -36,24 +95,13 @@ func (s *Snapshot) includeUnconfigured(root string, p Policy, names map[string]s
 			unknown = append(unknown, name)
 		}
 	}
-	runtimeManaged := false
-	for _, file := range s.Files {
-		runtimeManaged = runtimeManaged || file.Path == "run/netplan/"+filepath.Base(managedInterfaces)
-	}
-	if len(unknown) == 0 && !runtimeManaged {
+	if len(unknown) == 0 {
 		return nil
 	}
-	reason := ""
+	destination, reason := s.newInterfaceDestination(p)
 	for _, file := range s.Files {
-		network := child(file.doc.Content[0], "network")
-		if renderer := scalar(child(network, "renderer")); renderer != "" && renderer != "networkd" {
+		if renderer := scalar(child(child(file.doc.Content[0], "network"), "renderer")); renderer != "" && renderer != "networkd" {
 			reason = "Interface controlled by unsupported Netplan renderer (" + renderer + ")."
-		}
-		if file.Path == "run/netplan/"+filepath.Base(managedInterfaces) {
-			reason = "new-interface source is shadowed by /run/netplan"
-		}
-		if file.Path == "lib/netplan/"+filepath.Base(managedInterfaces) {
-			reason = "new-interface source filename conflicts with a vendor Netplan definition"
 		}
 	}
 	for _, item := range s.View.Interfaces {
@@ -61,30 +109,11 @@ func (s *Snapshot) includeUnconfigured(root string, p Policy, names map[string]s
 			reason = "existing Netplan matches must resolve uniquely before adding interface definitions"
 		}
 	}
-	if len(p.Files) > 0 && !contains(p.Files, filepath.Base(managedInterfaces)) {
-		reason = "source filename 90-safeterm-interfaces.yaml is outside administrator policy"
-	}
-	index := s.managedSourceIndex()
-	if index == -1 {
-		file := File{Path: managedInterfaces, Data: []byte("# Managed by SafeTerm for newly discovered interfaces.\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n"), Mode: 0600, UID: uint32(os.Geteuid()), GID: uint32(os.Getegid()), Attrs: map[string][]byte{}, Missing: true}
-		// Use an explicit mapping while retaining block style for later patches.
-		file.Data = append(file.Data, []byte("    # Interface definitions are added after a confirmed trial.\n    {}\n")...)
-		if err := parseFile(&file); err != nil {
-			return err
-		}
-		s.Files = append(s.Files, file)
-	} else {
-		lower := strings.ToLower(string(s.Files[index].Data))
-		if !p.AllowGeneratedFiles && (strings.Contains(lower, "cloud-init") || strings.Contains(lower, "cloud_init")) {
-			reason = "cloud-init generated file requires explicit administrator ownership acknowledgement"
-		}
-		network := child(s.Files[index].doc.Content[0], "network")
-		if ether := child(network, "ethernets"); ether == nil || ether.Kind != yaml.MappingNode {
-			reason = "new-interface source requires a Netplan ethernets mapping"
-		}
-	}
 	for _, name := range unknown {
-		item := Interface{Name: name, ID: name, Files: []string{managedInterfaces}, ReadOnly: reason}
+		item := Interface{Name: name, ID: name, ReadOnly: reason}
+		if destination != "" {
+			item.Files = []string{destination}
+		}
 		if !p.AllowsInterface(name) {
 			item.ReadOnly = fmt.Sprintf("interface is outside administrator policy; allow %q or enable allow_all_interfaces in %s, then reopen config network interface", name, PolicyPath)
 		}
@@ -135,5 +164,7 @@ func interfaceNode(item Interface, mac string, routes []Route) *yaml.Node {
 		}
 		value["routes"] = entries
 	}
-	return nodeFor(value)
+	node := nodeFor(value)
+	blockYAML(node)
+	return node
 }

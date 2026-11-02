@@ -12,6 +12,7 @@ The root-owned policy is `/etc/safeterm/network/policy.json`. An empty `interfac
   "interfaces": ["ens160", "ens192"],
   "allow_all_interfaces": false,
   "files": [],
+  "new_interface_file": "",
   "read_roles": ["netops", "network-viewer", "network-operator"],
   "edit_roles": ["netops", "network-operator"],
   "confirm_seconds": 120,
@@ -34,11 +35,31 @@ and unsupported-configuration restrictions still apply.
 
 The interface table and detail view display the kernel MAC address so an admin
 can compare it with the VM/hypervisor hardware settings. Newly discovered NICs
-appear even when they do not yet have a Netplan entry. After edits are saved,
-trialled and confirmed, their MAC-matched definitions are created in
-`/etc/netplan/90-safeterm-interfaces.yaml`. If `files` is restricted, this basename
-must be allowed. Existing source files are preserved; no persistent new file is
-written before confirmation. Rollback removes a file created by that change.
+appear even when they do not yet have a Netplan entry. Their definitions are added
+to an existing eligible file in `/etc/netplan`; SafeTerm does not create a separate
+Netplan file. The save/apply/confirm flow is unchanged. Existing sources remain
+untouched until confirmation, and rollback restores their original bytes.
+
+If only one eligible administrator-owned source exists, SafeTerm selects it.
+If several exist, choose an existing basename in `/etc/safeterm/network/policy.json`:
+
+```json
+"new_interface_file": "01-netcfg.yaml"
+```
+
+Replace `01-netcfg.yaml` with your actual existing filename. An empty value uses
+automatic selection. The selected file must also pass `files`, renderer,
+cloud-init ownership and source-trust checks. Missing or ambiguous destinations
+are read-only with an explanation; terminal users cannot supply arbitrary paths.
+A legacy `90-safeterm-interfaces.yaml` is excluded from automatic selection when
+another eligible source exists. Existing entries keep their original source,
+including legacy files; sources are not silently moved or deleted.
+
+Inline YAML mappings such as `ethernets: { ... }` are supported. When a changed
+source needs it, SafeTerm converts that file to ordinary indented block YAML in
+the candidate, retaining comments and unknown properties. Confirmation commits
+the formatted source; rollback restores the exact original bytes. Newly inserted
+interface definitions use block style so they remain editable after reopening.
 
 ## Persistent interface names
 

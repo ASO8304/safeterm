@@ -3,6 +3,7 @@
   "interfaces": [],
   "allow_all_interfaces": false,
   "files": [],
+  "new_interface_file": "",
   "read_roles": [
     "netops",
     "network-viewer",

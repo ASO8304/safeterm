@@ -157,7 +157,7 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 			if i == 0 {
 				key = label + ":"
 			}
-			s.writeStyled(styleCommand, fmt.Sprintf("%-16s", key))
+			s.writeStyled(styleCommand, fmt.Sprintf("%-17s", key))
 			style := ""
 			if label == "Source" {
 				style = stylePath
