@@ -23,6 +23,7 @@ type File struct {
 	Mode     uint32
 	UID, GID uint32
 	Attrs    map[string][]byte
+	Missing  bool `json:"Missing,omitempty"`
 	doc      *yaml.Node
 }
 type fragment struct {
@@ -342,7 +343,7 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			}
 		}
 		item.Name = actual
-		if !contains(p.Interfaces, actual) {
+		if !p.AllowsInterface(actual) {
 			item.ReadOnly = fmt.Sprintf("interface is outside administrator policy; a Linux administrator must add %q to interfaces in %s, then reopen config network interface", actual, PolicyPath)
 		}
 		if _, exists := names[actual]; !exists {
@@ -372,8 +373,15 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 	}
 	s.View.Interfaces = mappedInterfaces
 	s.fragments = mappedFragments
+	if err := s.includeUnconfigured(root, p, names); err != nil {
+		return nil, err
+	}
+	s.View.MACs = map[string]string{}
+	for name := range s.View.Interfaces {
+		s.View.MACs[name] = names[name]
+	}
 	hash := sha256.New()
-	for _, f := range files {
+	for _, f := range s.Files {
 		data, _ := json.Marshal(struct {
 			Path     string
 			Data     []byte
@@ -385,6 +393,8 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 	}
 	policy, _ := json.Marshal(p)
 	hash.Write(policy)
+	hardware, _ := json.Marshal(names)
+	hash.Write(hardware)
 	s.View.Version = hex.EncodeToString(hash.Sum(nil))
 	return s, nil
 }
@@ -404,6 +414,7 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 		return nil, err
 	}
 	patches := map[int][]textPatch{}
+	newNodes := map[int]map[string]*yaml.Node{}
 	for name, old := range s.View.Interfaces {
 		next, exists := v.Interfaces[name]
 		if !exists {
@@ -418,7 +429,15 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 		}
 		fragments := s.fragments[name]
 		if len(fragments) == 0 {
-			return nil, fmt.Errorf("network: missing interface source")
+			index := s.managedSourceIndex()
+			if index < 0 {
+				return nil, fmt.Errorf("network: missing interface source")
+			}
+			if newNodes[index] == nil {
+				newNodes[index] = map[string]*yaml.Node{}
+			}
+			newNodes[index][next.ID] = interfaceNode(next, s.View.MACs[name], nextRoutes)
+			continue
 		}
 		values := map[string]*yaml.Node{}
 		if old.DHCP4 != next.DHCP4 {
@@ -504,6 +523,38 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 			}
 		}
 	}
+	for index, nodes := range newNodes {
+		network := child(s.Files[index].doc.Content[0], "network")
+		ethernet := child(network, "ethernets")
+		ids := []string{}
+		for id := range nodes {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		if ethernet == nil || len(ethernet.Content) == 0 {
+			mapping := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+			for _, id := range ids {
+				setChild(mapping, id, nodes[id])
+			}
+			patch, err := fieldPatch(s.Files[index], network, "ethernets", mapping)
+			if err != nil {
+				return nil, err
+			}
+			patches[index] = append(patches[index], patch)
+		} else {
+			for _, id := range ids {
+				patch, err := fieldPatch(s.Files[index], ethernet, id, nodes[id])
+				if err != nil {
+					return nil, err
+				}
+				patches[index] = append(patches[index], patch)
+			}
+		}
+	}
+	return s.renderPatches(patches)
+}
+
+func (s *Snapshot) renderPatches(patches map[int][]textPatch) (map[string][]byte, error) {
 	result := map[string][]byte{}
 	for index, list := range patches {
 		sort.SliceStable(list, func(i, j int) bool { return list[i].start > list[j].start })

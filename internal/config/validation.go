@@ -169,12 +169,12 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 		if !exists {
 			return nil, fmt.Errorf("config: operation %q: unknown runner profile %q", op.Name, op.RunnerProfile)
 		}
-		if op.ExecutorKind != profile.ExecutorKind && !(op.ExecutorKind == ExecutorTCPProbe && profile.ExecutorKind == ExecutorProcess && (profile.Name == ProfileNetworkObserver || profile.Template == ProfileNetworkObserver)) {
+		if op.ExecutorKind != profile.ExecutorKind && !(IsPortProbe(op.ExecutorKind) && profile.ExecutorKind == ExecutorProcess && (profile.Name == ProfileNetworkObserver || profile.Template == ProfileNetworkObserver)) {
 			return nil, fmt.Errorf("config: operation %q: executor kind %q conflicts with profile %q kind %q", op.Name, op.ExecutorKind, op.RunnerProfile, profile.ExecutorKind)
 		}
 		switch op.ExecutorKind {
 		case ExecutorProcess:
-			if op.ExecutableRef == "" || op.Systemd != nil || op.TCPProbe != nil {
+			if op.ExecutableRef == "" || op.Systemd != nil || op.TCPProbe != nil || op.UDPProbe != nil {
 				return nil, fmt.Errorf("config: process operation %q requires executable_ref and no systemd definition", op.Name)
 			}
 			executable, exists := executables[op.ExecutableRef]
@@ -185,7 +185,7 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 			if op.LongRunning {
 				return nil, fmt.Errorf("config: systemd operation %q cannot be long-running", op.Name)
 			}
-			if op.ExecutableRef != "" || len(op.ArgsTemplate) != 0 || len(op.ArgumentGroups) != 0 || len(op.RequiredAny) != 0 || len(op.ArgumentGroupSeparator) != 0 || op.Systemd == nil || op.TCPProbe != nil {
+			if op.ExecutableRef != "" || len(op.ArgsTemplate) != 0 || len(op.ArgumentGroups) != 0 || len(op.RequiredAny) != 0 || len(op.ArgumentGroupSeparator) != 0 || op.Systemd == nil || op.TCPProbe != nil || op.UDPProbe != nil {
 				return nil, fmt.Errorf("config: systemd operation %q requires only a typed systemd definition", op.Name)
 			}
 			if len(op.Parameters) != 0 {
@@ -195,16 +195,35 @@ func validateOperations(ops []OperationDefinition, profiles map[RunnerProfile]Pr
 				return nil, fmt.Errorf("config: systemd operation %q: %w", op.Name, err)
 			}
 
-		case ExecutorTCPProbe:
-			if op.TCPProbe == nil || op.TCPProbe.TimeoutSeconds < 1 || op.TCPProbe.TimeoutSeconds > 60 || !op.LongRunning || op.ExecutableRef != "" || op.Systemd != nil || len(op.ArgsTemplate) != 0 || len(op.ArgumentGroups) != 0 || len(op.RequiredAny) != 0 || len(op.ArgumentGroupSeparator) != 0 {
-				return nil, fmt.Errorf("config: TCP probe %q requires a streaming typed tcp_probe with timeout_seconds 1..60 and no executable/templates", op.Name)
+		case ExecutorTCPProbe, ExecutorUDPProbe:
+			timeout := 0
+			if op.ExecutorKind == ExecutorTCPProbe && op.TCPProbe != nil && op.UDPProbe == nil {
+				timeout = op.TCPProbe.TimeoutSeconds
+			}
+			if op.ExecutorKind == ExecutorUDPProbe && op.UDPProbe != nil && op.TCPProbe == nil {
+				timeout = op.UDPProbe.TimeoutSeconds
+			}
+			if timeout < 1 || timeout > 60 || !op.LongRunning || op.Systemd != nil || len(op.ArgsTemplate) != 0 || len(op.ArgumentGroups) != 0 || len(op.RequiredAny) != 0 || len(op.ArgumentGroupSeparator) != 0 {
+				return nil, fmt.Errorf("config: port probe %q requires a streaming typed probe with timeout_seconds 1..60 and no templates", op.Name)
+			}
+			executable, exists := executables[ProbeExecutableRef(op)]
+			expectedPath := "/usr/bin/nc.openbsd"
+			// Older signed catalogs used a native TCP probe with no executable.
+			// They must remain readable for upgrade identity checks and rollback
+			// baselines. The runtime executor still requires an approved tool.
+			legacyTCP := op.ExecutorKind == ExecutorTCPProbe && op.ExecutableRef == "" && !exists
+			if !legacyTCP && (!exists || executable.Path != expectedPath || !containsProfile(executable.AllowedProfiles, op.RunnerProfile)) {
+				return nil, fmt.Errorf("config: port probe %q requires approved %s for its profile", op.Name, expectedPath)
 			}
 			if len(op.Parameters) != 2 {
-				return nil, fmt.Errorf("config: TCP probe %q requires host and port parameters", op.Name)
+				return nil, fmt.Errorf("config: port probe %q requires host and port parameters", op.Name)
 			}
 			host, port := op.Parameters[0], op.Parameters[1]
-			if host.Name != "host" || host.Type != ParamTypeString || !host.Required || host.Default != "" || len(host.Aliases) != 0 || len(host.ValueMap) != 0 || port.Name != "port" || port.Type != ParamTypeInt || port.Required || port.Default == "" || port.Min == nil || *port.Min < 1 || port.Max == nil || *port.Max > 65535 || len(port.Aliases) != 0 || len(port.ValueMap) != 0 {
-				return nil, fmt.Errorf("config: TCP probe %q requires a literal host and optional bounded port with an explicit default", op.Name)
+			if host.Name != "host" || host.Type != ParamTypeString || !host.Required || host.Default != "" || len(host.Aliases) != 0 || len(host.ValueMap) != 0 || port.Name != "port" || port.Type != ParamTypeInt || port.Min == nil || *port.Min < 1 || port.Max == nil || *port.Max > 65535 || len(port.Aliases) != 0 || len(port.ValueMap) != 0 {
+				return nil, fmt.Errorf("config: port probe %q requires a literal host and bounded port", op.Name)
+			}
+			if op.ExecutorKind == ExecutorTCPProbe && (port.Required || port.Default == "") || op.ExecutorKind == ExecutorUDPProbe && (!port.Required || port.Default != "") {
+				return nil, fmt.Errorf("config: port probe %q requires an optional TCP port with a default, or a required UDP port without a default", op.Name)
 			}
 		default:
 			return nil, fmt.Errorf("config: operation %q: unsupported executor kind %q", op.Name, op.ExecutorKind)

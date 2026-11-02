@@ -77,6 +77,11 @@ func (b *Netplan) Validate(ctx context.Context, files []File, changed map[string
 	}
 	defer os.RemoveAll(stage)
 	for _, file := range files {
+		if file.Missing {
+			if _, changed := changed[file.Path]; !changed {
+				continue
+			}
+		}
 		path := filepath.Join(stage, file.Path)
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			return err
@@ -204,7 +209,17 @@ func PhysicalInterfaces() map[string]string {
 	out := map[string]string{}
 	entries, _ := os.ReadDir("/sys/class/net")
 	for _, entry := range entries {
-		if entry.Name() == "lo" {
+		if entry.Name() == "lo" || !namePattern.MatchString(entry.Name()) {
+			continue
+		}
+		// Ethernet hardware, including VM NICs, has a device link. Bridges,
+		// veths, loopback and tunnel devices are not new physical LAN modules.
+		base := filepath.Join("/sys/class/net", entry.Name())
+		if _, err := os.Stat(filepath.Join(base, "device")); err != nil {
+			continue
+		}
+		kind, err := os.ReadFile(filepath.Join(base, "type"))
+		if err != nil || strings.TrimSpace(string(kind)) != "1" {
 			continue
 		}
 		data, err := os.ReadFile(filepath.Join("/sys/class/net", entry.Name(), "address"))

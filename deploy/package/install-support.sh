@@ -62,7 +62,7 @@ safeterm_find_missing() {
   for tool in stty install find awk grep sed tar date realpath cmp flock useradd usermod groupadd getent systemctl ssh-keygen visudo; do
     command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
   done
-  for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo /usr/bin/ping /usr/bin/free /usr/bin/df; do
+  for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo /usr/bin/ping /usr/bin/free /usr/bin/df /usr/bin/nc.openbsd; do
     [ -x "$executable" ] || missing="$missing $executable"
   done
 }
@@ -89,7 +89,7 @@ safeterm_dependencies() {
   DEBIAN_FRONTEND=noninteractive apt-get update || { echo "APT repository access failed; provision prerequisites offline and rerun install.sh." >&2; return 1; }
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-upgrade ca-certificates coreutils findutils gawk grep gzip \
     libc-bin openssh-client passwd sed sudo systemd tar tcpdump util-linux \
-    iputils-ping procps || {
+    iputils-ping procps netcat-openbsd || {
       echo "OS package installation failed. For an offline server provision prerequisites from your internal mirror/media and rerun install.sh." >&2
       return 1
     }

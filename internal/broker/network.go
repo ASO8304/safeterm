@@ -26,7 +26,7 @@ func (s *Shell) networkCall(ctx context.Context, r networkmanager.Request) (netw
 	return s.network.Call(ctx, contract.Metadata{BrokerType: s.principal.BrokerType, UserID: s.principal.UserID, ConsoleSession: s.principal.ConsoleSession, ClaimedRoles: append([]string(nil), s.principal.Roles...), ReceivedAt: time.Now().UTC()}, r)
 }
 
-var networkActions = []string{"status", "diff", "apply", "confirm", "rollback", "discard"}
+var networkActions = []string{"status", "diff", "apply", "confirm", "rollback", "discard", "rename"}
 
 func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	if len(f) < 2 || f[1] != "network" || (f[0] != "execute" && f[0] != "config") {
@@ -42,10 +42,18 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 		if len(f) > 3 && f[len(f)-1] == "?" {
 			return true, s.networkActionHelp(f[2 : len(f)-1])
 		}
-		if len(f) != 3 {
+		request := networkmanager.Request{}
+		if len(f) >= 3 && f[2] == "rename" {
+			if len(f) != 5 {
+				return true, fmt.Errorf("usage: execute network rename CURRENT_NAME NEW_NAME; persists for next reboot/device activation")
+			}
+			request = networkmanager.Request{Action: "rename", Interface: f[3], NewName: f[4]}
+		} else if len(f) != 3 {
 			return true, fmt.Errorf("usage: execute network ACTION")
+		} else {
+			request.Action = f[2]
 		}
-		r, err := s.networkCall(ctx, networkmanager.Request{Action: f[2]})
+		r, err := s.networkCall(ctx, request)
 		if err == nil {
 			s.writeTerminalData([]byte(r.Text + "\n"))
 		}

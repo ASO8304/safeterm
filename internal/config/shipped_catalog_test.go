@@ -18,7 +18,7 @@ func TestShippedCatalogIncludesDiagnostics(t *testing.T) {
 		operations[operation.Name] = operation
 	}
 	for _, name := range []string{
-		"ping",
+		"ping", "telnet", "udp-test",
 		"system_info", "memory_info", "disk_usage", "capture",
 	} {
 		if _, ok := operations[name]; !ok {

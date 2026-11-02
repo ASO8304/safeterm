@@ -21,6 +21,7 @@ AmbientCapabilities=
 ProtectSystem=strict
 ReadWritePaths=/run /var/lib/safeterm
 ReadWritePaths=-/etc/netplan
+ReadWritePaths=-/etc/systemd/network
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes

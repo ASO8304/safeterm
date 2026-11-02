@@ -138,6 +138,12 @@ func readAttrs(fd int) (map[string][]byte, error) {
 	return attrs, nil
 }
 func replaceFile(root string, old File, data []byte) error {
+	if old.Missing {
+		if old.Mode != 0600 || len(old.Attrs) != 0 {
+			return fmt.Errorf("network: invalid new-file metadata")
+		}
+		return writeNew(root, filepath.Join(root, old.Path), data)
+	}
 	current, err := readTrusted(root, old.Path)
 	if err != nil {
 		return err
@@ -190,6 +196,23 @@ func replaceFile(root string, old File, data []byte) error {
 	}
 	defer directory.Close()
 	return directory.Sync()
+}
+
+func removeTrusted(root string, old File) error {
+	current, err := readTrusted(root, old.Path)
+	if err != nil || !sameFile(current, old) {
+		return fmt.Errorf("network: file changed before removal: %s", old.Path)
+	}
+	path := filepath.Join(root, old.Path)
+	if err := os.Remove(path); err != nil {
+		return err
+	}
+	dir, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+	return dir.Sync()
 }
 func privateWrite(path string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {

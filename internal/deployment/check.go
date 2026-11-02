@@ -157,6 +157,9 @@ func Check(options CheckOptions) (Report, error) {
 	if err != nil {
 		return Report{}, err
 	}
+	if err := config.ValidateRuntimeProbes(cfg); err != nil {
+		return Report{}, err
+	}
 	if err := integrity.VerifyCatalogFiles(cfg, filepath.Join(adminDir, "trust", "catalog-ed25519.pub"), filepath.Join(configDir, "catalog.sig")); err != nil {
 		return Report{}, err
 	}

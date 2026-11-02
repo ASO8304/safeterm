@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 # Never snapshot/replace a daemon while a network trial is awaiting confirmation.
+if [ -e /var/lib/safeterm/network/naming-pending.json ]; then
+ echo "Persistent naming recovery pending: restart safeterm-network-manager before installation/update/rollback" >&2
+ exit 1
+fi
 if [ -e /var/lib/safeterm/network/pending.json ]; then
  echo "Network trial pending: execute network confirm or execute network rollback before installation/update/rollback" >&2
  exit 1

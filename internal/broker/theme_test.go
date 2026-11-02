@@ -91,7 +91,7 @@ func TestThemeKeepsNetworkTableLayoutAndDistinguishesStatuses(t *testing.T) {
 	if themeSGR.ReplaceAllString(colored, "") != plain {
 		t.Fatalf("table columns changed:\n%s", colored)
 	}
-	for _, want := range []string{"\x1b[32mup", "\x1b[33mdown", "\x1b[33mRead-only (Policy restricted)", "\x1b[32mAllowed", "\x1b[33m *\x1b[0m"} {
+	for _, want := range []string{"\x1b[32mup", "\x1b[33mdown", "\x1b[33mRead-only", "\x1b[32mAllowed", "\x1b[33m *\x1b[0m"} {
 		if !strings.Contains(colored, want) {
 			t.Fatalf("missing %q in %q", want, colored)
 		}

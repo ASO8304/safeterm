@@ -103,6 +103,10 @@ func cloneServiceOperation(operation config.OperationDefinition) config.Operatio
 		copy := *operation.TCPProbe
 		operation.TCPProbe = &copy
 	}
+	if operation.UDPProbe != nil {
+		copy := *operation.UDPProbe
+		operation.UDPProbe = &copy
+	}
 	if operation.Systemd != nil {
 		systemd := *operation.Systemd
 		systemd.Units = append([]string(nil), systemd.Units...)

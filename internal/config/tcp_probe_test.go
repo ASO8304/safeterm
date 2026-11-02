@@ -32,3 +32,43 @@ func TestTCPProbeDefinitionIsBoundedAndProfileScoped(t *testing.T) {
 		})
 	}
 }
+
+func TestLegacyNativeTCPRegistryRemainsReadableButCannotDeployWithoutNetcat(t *testing.T) {
+	cfg, err := LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ops := cfg.Operations[:0]
+	for _, op := range cfg.Operations {
+		if op.Name == "udp-test" {
+			continue
+		}
+		if op.Name == "telnet" {
+			op.ExecutableRef = ""
+		}
+		ops = append(ops, op)
+	}
+	cfg.Operations = ops
+	executables := cfg.Executables[:0]
+	for _, executable := range cfg.Executables {
+		if executable.ID != "netcat" {
+			executables = append(executables, executable)
+		}
+	}
+	cfg.Executables = executables
+	for i := range cfg.Policies {
+		operations := []string{}
+		for _, operation := range cfg.Policies[i].Operations {
+			if operation != "udp-test" {
+				operations = append(operations, operation)
+			}
+		}
+		cfg.Policies[i].Operations = operations
+	}
+	if err := ValidateConfig(cfg); err != nil {
+		t.Fatal("legacy catalog cannot be verified for upgrade", err)
+	}
+	if err := ValidateRuntimeProbes(cfg); err == nil {
+		t.Fatal("legacy native-only definition was considered deployable")
+	}
+}

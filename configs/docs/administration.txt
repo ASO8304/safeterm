@@ -326,7 +326,7 @@ System diagnostics use `execute system_info host`, `execute system_info memory` 
 
 Service targets are registered exclusively by administrator `resources.d` definitions in a fresh installation. Packaged service roles and the isolated service-manager remain available, but have no default service operations or sudo grants. Manage SafeTerm itself from the Linux administrator shell with `sudo termctl service`. Existing explicit `commands/operations.d`/`access/policies.d` overrides remain administrator-owned and must be reviewed if they refer to removed packaged service operation IDs.
 
-Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. The TCP probe sends no application data and does not provide an interactive login. See `docs/network-diagnostics.txt` for full details.
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. TCP uses netcat without application data or an interactive login. `execute udp-test IP PORT` uses netcat UDP probes; silence is inconclusive. See `docs/network-diagnostics.txt` for full details.
 
 ## Navigation and help
 

@@ -1,4 +1,4 @@
-# Ping and TCP port tests
+# Ping, TCP and UDP port tests
 
 The restricted terminal exposes these commands to `netops` by default. Other
 roles need explicit operation grants. Catalog request fields remain typed `host`,
@@ -37,8 +37,9 @@ The first argument is a literal unicast IPv4/IPv6 address. DNS hostnames, scoped
 IPv6 addresses, unspecified/multicast targets and shell/option strings are not
 accepted. Port is 1–65535; omitted port defaults to 23.
 
-This is a TCP connection test, not an interactive Telnet protocol client. It
-sends no application data and immediately closes a successful connection:
+SafeTerm runs the approved OpenBSD netcat executable with fixed
+`-n -v -z -d -w TIMEOUT -- IP PORT` arguments. This makes a TCP connection
+without an interactive session or application data and closes it immediately:
 
 ```text
 Trying 192.0.2.10:443...
@@ -52,24 +53,52 @@ application health, authenticate or negotiate a Telnet session.
 The signed operation has `executor_kind: "tcp-probe"` and
 `"tcp_probe": {"timeout_seconds": 5}`. Administrators can override that typed
 setting in `commands/operations.d` and run `sudo termctl check` then `sudo termctl apply`.
-The supported timeout range is 1–60 seconds. No external telnet/nc package,
-additional service account, sudo grant or general stdin channel is introduced.
+The supported timeout range is 1–60 seconds, plus bounded process cleanup.
+The OS prerequisite is `netcat-openbsd`, specifically `/usr/bin/nc.openbsd`;
+SafeTerm does not use whichever binary the `nc` alternatives link selects.
+The package installer checks this dependency before stopping services and can
+provision it through `--install-dependencies`, or it can be provisioned offline.
+No additional service account, sudo grant or general stdin channel is introduced.
+
+## UDP port test
+
+```text
+execute udp-test 192.0.2.10 53
+execute udp-test ::1 123
+execute udp-test ?
+```
+
+Both IP and port are required. The same literal-IP and single-port restrictions
+apply. SafeTerm runs fixed netcat `-n -v -z -d -w TIMEOUT -u -- IP PORT`
+arguments, with a default timeout of 5 seconds. A signed `udp-probe` definition
+uses `udp_probe.timeout_seconds` (1–60). No Nmap dependency is introduced.
+
+Unlike the TCP connection test, netcat's UDP scan sends probe datagrams. A zero
+exit status from `nc -zu` does not verify an application response. SafeTerm
+therefore reports **inconclusive**, with exit code 2, and suppresses netcat's
+potentially misleading “succeeded” message. A failed scan returns a nonzero
+result without claiming the port is definitively open or closed. Use a
+protocol-specific application test when service health must be verified.
+See the [netcat manual caveat](https://man.openbsd.org/nc#CAVEATS).
 
 Ctrl+C cancels an in-progress connection attempt and returns to the SafeTerm
 prompt. Ctrl+] retains its global emergency exit behavior. Both Console and SSH
 use the same syntax and session-control path.
 
 The probe runs in the existing network Runner, after request validation,
-authorization and translation. The native executor accepts only names bound to
-signed typed probe definitions and validates the IP/port again before dialing.
+authorization and translation. The typed executor accepts only names bound to
+signed probe definitions and validates the IP/port again before constructing
+fixed argv. Netcat crosses the same executable-hash and pinned-file-descriptor
+integrity gate as other process operations.
 All ordinary process operations still pass through the executable-integrity
 boundary. Existing session limits and audit handling remain in force.
 
 Regression tests cover argument syntax, count caps, default/custom TCP ports,
-request authorization, rejection before dialing, successful connection/close
-without data, refusal, bounded timeout, cancellation, completion/help and
+request authorization, rejection before dialing, successful netcat connection/close
+without data, bounded UDP probes and inconclusive results, refusal, timeout,
+cancellation, completion/help and
 continued use of SafeTerm after Ctrl+C. The disposable systemd Console test runs
-real loopback ping and TCP probes through the production Runner.
+real loopback ping, TCP and UDP probes through the production Runner.
 
 `execute telnet IP [PORT]` remains a deprecated alias. It prints
 `Use 'execute tcp-test' for port probing`, then runs the same authorized probe.

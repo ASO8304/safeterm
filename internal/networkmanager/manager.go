@@ -64,6 +64,15 @@ func New(opts Options) (*Manager, error) {
 		return nil, err
 	}
 	m := &Manager{opts: opts}
+	if _, err := os.Lstat(filepath.Join(opts.State, "naming-pending.json")); err == nil {
+		if err := m.acquireTrialLock(); err != nil {
+			return nil, err
+		}
+		defer m.releaseTrialLock()
+	}
+	if err := m.recoverNaming(); err != nil {
+		return nil, fmt.Errorf("network: persistent naming recovery failed: %w", err)
+	}
 	var tx transaction
 	if err := m.load("pending.json", &tx); err == nil {
 		m.pending = &tx
@@ -238,6 +247,11 @@ func (m *Manager) snapshot(p Policy) (*Snapshot, error) {
 			delete(s.routeNodes, old)
 		}
 	}
+	rules, err := readLinkRules(m.opts.Root)
+	if err != nil {
+		return nil, err
+	}
+	addPersistentNames(s, rules)
 	return s, nil
 }
 func (m *Manager) report(ctx context.Context, req *contract.ExecutionRequest, outcome, version string) error {
@@ -304,6 +318,17 @@ func (m *Manager) Handle(ctx context.Context, req *contract.ExecutionRequest) (*
 	return &contract.ExecutionResponse{RequestID: req.RequestID, Result: contract.ResultSuccess, Stdout: string(encoded), ExitCode: 0, StartedAt: now, EndedAt: now}, nil
 }
 func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, r Request, p Policy) (Reply, error) {
+	if _, err := os.Lstat(filepath.Join(m.opts.State, "naming-pending.json")); !os.IsNotExist(err) {
+		return Reply{}, fmt.Errorf("network: persistent naming recovery is pending; a Linux administrator must restart safeterm-network-manager")
+	}
+	allowedNames := append([]string(nil), p.Interfaces...)
+	if p.AllowAllInterfaces {
+		allowedNames = nil
+		for name := range m.opts.Interfaces() {
+			allowedNames = append(allowedNames, name)
+		}
+		sort.Strings(allowedNames)
+	}
 	if r.Action == "confirm" {
 		return m.confirm(ctx, req, p)
 	}
@@ -314,7 +339,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if r.Action == "read" || r.Action == "status" {
 			view := View{Interfaces: map[string]Interface{}, Routes: map[string]Route{}, Pending: true, Owner: m.pending.Owner, Deadline: m.pending.Deadline.UTC().Format(time.RFC3339)}
 			if r.Action == "status" {
-				text, err := m.opts.Backend.Status(ctx, p.Interfaces)
+				text, err := m.opts.Backend.Status(ctx, allowedNames)
 				return Reply{View: &view, Text: text}, err
 			}
 			return Reply{View: &view, Text: "A network trial is pending confirmation."}, nil
@@ -332,6 +357,9 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		return Reply{}, cErr
 	}
 	hasCandidate := cErr == nil
+	if r.Action == "rename" {
+		return m.nameInterface(ctx, req, r, p, s, hasCandidate)
+	}
 	if hasCandidate && c.Owner == owner(req) {
 		if c.Base != s.View.Version && r.Action != "discard" {
 			return Reply{}, fmt.Errorf("network: Netplan sources or policy changed; execute network discard before editing")
@@ -339,6 +367,8 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		view = cloneView(c.View)
 		view.Version = c.Revision
 		view.States = s.View.States
+		view.MACs = s.View.MACs
+		view.Names = s.View.Names
 	}
 	switch r.Action {
 	case "read":
@@ -347,7 +377,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		return Reply{View: &view}, nil
 	case "status":
-		text, err := m.opts.Backend.Status(ctx, p.Interfaces)
+		text, err := m.opts.Backend.Status(ctx, allowedNames)
 		return Reply{Text: text}, err
 	case "diff":
 		return Reply{Text: Diff(s.View, view)}, nil
@@ -388,6 +418,8 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		// Display metadata must not change the persisted candidate format. This
 		// also lets an older manager read the candidate after package rollback.
 		c.View.States = nil
+		c.View.MACs = nil
+		c.View.Names = nil
 		if err = m.save("candidate.json", c); err != nil {
 			return Reply{}, err
 		}
@@ -440,6 +472,12 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 				tx.Files = append(tx.Files, file)
 			}
 		}
+		tx.Sources["@hardware"] = hardwareDigest(m.opts.Interfaces())
+		rules, err := readLinkRules(m.opts.Root)
+		if err != nil {
+			return Reply{}, err
+		}
+		tx.Sources["@link-rules"] = namingRulesDigest(rules)
 		for name, old := range s.View.Interfaces {
 			if !equal(old, c.View.Interfaces[name]) || !equal(routesFor(s.View, name), routesFor(c.View, name)) {
 				tx.Targets = append(tx.Targets, name)
@@ -509,6 +547,12 @@ func (m *Manager) confirm(ctx context.Context, req *contract.ExecutionRequest, p
 		return Reply{}, err
 	}
 	for _, f := range tx.Files {
+		if f.Missing {
+			if _, err := os.Lstat(filepath.Join(m.opts.Root, f.Path)); !os.IsNotExist(err) {
+				return Reply{}, fmt.Errorf("network: new source appeared during trial: %s", f.Path)
+			}
+			continue
+		}
 		current, err := readTrusted(m.opts.Root, f.Path)
 		if err != nil || !sameFile(current, f) {
 			return Reply{}, fmt.Errorf("network: original file changed during trial: %s", f.Path)
@@ -557,7 +601,7 @@ func (m *Manager) confirm(ctx context.Context, req *contract.ExecutionRequest, p
 	return Reply{Text: "Network configuration confirmed and persisted to its original Netplan files."}, nil
 }
 func sameFile(a, b File) bool {
-	return bytes.Equal(a.Data, b.Data) && a.Mode == b.Mode && a.UID == b.UID && a.GID == b.GID && equal(a.Attrs, b.Attrs)
+	return a.Missing == b.Missing && bytes.Equal(a.Data, b.Data) && a.Mode == b.Mode && a.UID == b.UID && a.GID == b.GID && equal(a.Attrs, b.Attrs)
 }
 func validTransaction(tx *transaction) error {
 	if tx == nil || len(tx.Files) == 0 || len(tx.Files) > maxFiles || len(tx.Changed) != len(tx.Files) {
@@ -566,6 +610,9 @@ func validTransaction(tx *transaction) error {
 	for _, f := range tx.Files {
 		if filepath.Dir(f.Path) != "etc/netplan" || !namePattern.MatchString(filepath.Base(f.Path)) || !strings.HasSuffix(f.Path, ".yaml") {
 			return fmt.Errorf("network: invalid recovery path")
+		}
+		if f.Missing && (f.Path != managedInterfaces || f.Mode != 0600 || len(f.Attrs) != 0) {
+			return fmt.Errorf("network: invalid new recovery file")
 		}
 		if _, ok := tx.Changed[f.Path]; !ok {
 			return fmt.Errorf("network: missing replacement data")
@@ -638,6 +685,9 @@ func (m *Manager) revertLocked(ctx context.Context) error {
 	}
 	for _, file := range tx.Files {
 		current, err := readTrusted(m.opts.Root, file.Path)
+		if file.Missing && os.IsNotExist(err) {
+			continue
+		}
 		if err != nil {
 			return err
 		}
@@ -646,8 +696,15 @@ func (m *Manager) revertLocked(ctx context.Context) error {
 		}
 		expected := file
 		expected.Data = tx.Changed[file.Path]
+		expected.Missing = false
 		if !sameFile(current, expected) {
 			return fmt.Errorf("network: external edit prevents recovery of %s", file.Path)
+		}
+		if file.Missing {
+			if err := removeTrusted(m.opts.Root, current); err != nil {
+				return err
+			}
+			continue
 		}
 		if err := replaceFile(m.opts.Root, current, file.Data); err != nil {
 			return err
@@ -687,7 +744,7 @@ func (m *Manager) rollback(ctx context.Context, req *contract.ExecutionRequest, 
 		return Reply{}, err
 	}
 	for _, name := range tx.Targets {
-		if !contains(p.Interfaces, name) {
+		if !p.AllowsInterface(name) {
 			return Reply{}, fmt.Errorf("network: rollback interface is outside current policy")
 		}
 	}
@@ -698,6 +755,7 @@ func (m *Manager) rollback(ctx context.Context, req *contract.ExecutionRequest, 
 		current, err := readTrusted(m.opts.Root, f.Path)
 		expected := f
 		expected.Data = tx.Changed[f.Path]
+		expected.Missing = false
 		if err != nil || !sameFile(current, expected) {
 			return Reply{}, fmt.Errorf("network: files changed since confirmation; refusing rollback")
 		}
@@ -767,6 +825,12 @@ func policyHash(p Policy) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
+
+func hardwareDigest(names map[string]string) string {
+	data, _ := json.Marshal(names)
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
 func (m *Manager) verifySources(tx *transaction, p Policy) error {
 	if tx.PolicyHash != policyHash(p) {
 		return fmt.Errorf("network: policy changed during trial")
@@ -776,6 +840,19 @@ func (m *Manager) verifySources(tx *transaction, p Policy) error {
 		return err
 	}
 	count := 0
+	if digest, exists := tx.Sources["@hardware"]; exists {
+		if digest != hardwareDigest(m.opts.Interfaces()) {
+			return fmt.Errorf("network: interface hardware changed during trial")
+		}
+		count++
+	}
+	if digest, exists := tx.Sources["@link-rules"]; exists {
+		rules, err := readLinkRules(m.opts.Root)
+		if err != nil || digest != namingRulesDigest(rules) {
+			return fmt.Errorf("network: persistent naming rules changed during trial")
+		}
+		count++
+	}
 	overrides := map[string]bool{}
 	for _, f := range tx.Files {
 		overrides["run/netplan/"+filepath.Base(f.Path)] = true

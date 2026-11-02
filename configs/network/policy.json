@@ -1,6 +1,7 @@
 {
   "version": 1,
   "interfaces": [],
+  "allow_all_interfaces": false,
   "files": [],
   "read_roles": [
     "netops",

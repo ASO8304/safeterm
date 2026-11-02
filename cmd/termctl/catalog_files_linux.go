@@ -177,6 +177,9 @@ func catalogSecureDirectory(path string) error {
 }
 
 func catalogLock(inherited bool) (func(), error) {
+	if _, err := os.Lstat("/var/lib/safeterm/network/naming-pending.json"); !os.IsNotExist(err) {
+		return nil, fmt.Errorf("catalog: persistent naming recovery is pending; restart safeterm-network-manager before applying catalog changes")
+	}
 	return catalogLockAt("/run/lock/safeterm-lifecycle.lock", inherited)
 }
 

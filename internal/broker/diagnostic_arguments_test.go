@@ -21,6 +21,8 @@ func TestDiagnosticPositionalSyntaxAndCountBounds(t *testing.T) {
 		{"ping", []string{"-c", "1000", "192.0.2.1"}, map[string]string{"host": "192.0.2.1", "count": "1000"}},
 		{"telnet", []string{"192.0.2.1"}, map[string]string{"host": "192.0.2.1"}},
 		{"telnet", []string{"::1", "443"}, map[string]string{"host": "::1", "port": "443"}},
+		{"udp-test", []string{"192.0.2.1", "53"}, map[string]string{"host": "192.0.2.1", "port": "53"}},
+		{"udp-test", []string{"::1", "123"}, map[string]string{"host": "::1", "port": "123"}},
 	} {
 		got, err := parseOperationArguments(config.OperationDefinition{Name: tc.name}, tc.fields)
 		if err != nil || !reflect.DeepEqual(got, tc.want) {
@@ -34,6 +36,50 @@ func TestDiagnosticPositionalSyntaxAndCountBounds(t *testing.T) {
 	}
 	if _, err := parseOperationArguments(config.OperationDefinition{Name: "ping"}, []string{"192.0.2.1", "-c", "1100"}); err == nil || !strings.Contains(err.Error(), "between 1 and 1000") {
 		t.Fatal(err)
+	}
+}
+
+func TestUDPDiagnosticUsesRequiredPortAndAuthorizedNetcatOperation(t *testing.T) {
+	cfg, err := config.LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := NewCatalog(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	client := &fakeGateway{}
+	out := &bytes.Buffer{}
+	s, _ := NewShell(client, catalog, Principal{UserID: "alice", Roles: []string{"netops"}}, strings.NewReader(""), out)
+	if got := s.completionCandidates(context.Background(), "execute udp", "udp"); !reflect.DeepEqual(got, []string{"udp-test"}) {
+		t.Fatal(got)
+	}
+	editorCommands(t, s, "execute udp-test ?")
+	for _, want := range []string{"nc -zu", "Required UDP port", "inconclusive", "5 seconds"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatal("UDP help missing", want, out)
+		}
+	}
+	if len(client.requests) != 0 {
+		t.Fatal("UDP help executed a scan")
+	}
+	for _, args := range []string{"127.0.0.1", "example.com 53", "127.0.0.1 1-65535", "127.0.0.1 53 --script=all", "127.0.0.1 0", "127.0.0.1 65536"} {
+		if _, err := s.executeLine(context.Background(), "execute udp-test "+args, nil); err == nil || len(client.requests) != 0 {
+			t.Fatal("invalid UDP input reached gateway", args, err)
+		}
+	}
+	input := make(chan byte, 1)
+	input <- 0x03
+	if exit, err := s.executeLine(context.Background(), "execute udp-test 127.0.0.1 53", input); exit || err != nil || len(client.terminated) != 1 {
+		t.Fatal("UDP Ctrl+C did not stop only the operation", exit, err)
+	}
+	if client.requests[0].Command != "udp-test" || client.requests[0].Arguments["port"] != "53" {
+		t.Fatal(client.requests)
+	}
+	editorCommands(t, s, "whoami")
+	viewer, _ := NewShell(client, catalog, Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader(""), &bytes.Buffer{})
+	if _, err := viewer.executeLine(context.Background(), "execute udp-test 127.0.0.1 53", nil); err == nil || len(client.requests) != 1 {
+		t.Fatal("viewer ran a UDP scan", err)
 	}
 }
 func TestDiagnosticHelpIsReadOnlyAndRoleFiltered(t *testing.T) {

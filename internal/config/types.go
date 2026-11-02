@@ -1,5 +1,7 @@
 package config
 
+import "fmt"
+
 // ParameterType restricts what kind of value a parameter may hold.
 // This only describes the SHAPE of a parameter; actually checking a real
 // user-supplied value against these rules is the job of the Validation
@@ -29,6 +31,7 @@ const (
 	ExecutorProcess  ExecutorKind = "process"
 	ExecutorSystemd  ExecutorKind = "systemd"
 	ExecutorTCPProbe ExecutorKind = "tcp-probe"
+	ExecutorUDPProbe ExecutorKind = "udp-probe"
 )
 
 // ParameterDefinition describes one argument an Operation accepts.
@@ -72,6 +75,7 @@ type OperationDefinition struct {
 	ArgsTemplate           []string                    `json:"args_template,omitempty"`
 	Systemd                *SystemdOperationDefinition `json:"systemd,omitempty"`
 	TCPProbe               *TCPProbeDefinition         `json:"tcp_probe,omitempty"`
+	UDPProbe               *UDPProbeDefinition         `json:"udp_probe,omitempty"`
 	Parameters             []ParameterDefinition       `json:"parameters"`
 	LongRunning            bool                        `json:"long_running"`
 }
@@ -134,7 +138,47 @@ type Config struct {
 	Policies    []PolicyDefinition
 }
 
-// TCPProbeDefinition configures a single literal-IP TCP connect attempt, without application data.
+// TCPProbeDefinition configures a bounded netcat TCP connect test.
 type TCPProbeDefinition struct {
 	TimeoutSeconds int `json:"timeout_seconds"`
+}
+
+// UDPProbeDefinition configures a bounded netcat UDP scan. A successful scan
+// does not confirm that the remote port is open.
+type UDPProbeDefinition struct {
+	TimeoutSeconds int `json:"timeout_seconds"`
+}
+
+func IsPortProbe(kind ExecutorKind) bool {
+	return kind == ExecutorTCPProbe || kind == ExecutorUDPProbe
+}
+
+// ProbeExecutableRef keeps existing TCP definitions with no executable_ref
+// compatible while routing every probe through an approved executable.
+func ProbeExecutableRef(op OperationDefinition) string {
+	if op.ExecutableRef == "" {
+		return "netcat"
+	}
+	return op.ExecutableRef
+}
+
+// ValidateRuntimeProbes distinguishes deployable catalogs from readable legacy
+// catalogs retained solely for upgrade identity and rollback verification.
+func ValidateRuntimeProbes(cfg *Config) error {
+	if cfg == nil {
+		return fmt.Errorf("config: nil runtime catalog")
+	}
+	for _, op := range cfg.Operations {
+		if !IsPortProbe(op.ExecutorKind) {
+			continue
+		}
+		found := false
+		for _, executable := range cfg.Executables {
+			found = found || executable.ID == ProbeExecutableRef(op)
+		}
+		if !found {
+			return fmt.Errorf("config: probe %q requires its approved netcat executable before deployment", op.Name)
+		}
+	}
+	return nil
 }

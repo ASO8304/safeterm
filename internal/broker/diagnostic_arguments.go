@@ -10,13 +10,15 @@ import (
 )
 
 func positionalDiagnostic(op config.OperationDefinition) bool {
-	return op.Name == "ping" || op.Name == "telnet" || op.Name == "tcp-test"
+	return op.Name == "ping" || op.Name == "telnet" || op.Name == "tcp-test" || op.Name == "udp-test"
 }
 func parseDiagnosticArguments(op config.OperationDefinition, fields []string) (map[string]string, error) {
 	result := map[string]string{}
 	usage := "usage: execute tcp-test IP [PORT]"
 	if op.Name == "ping" {
 		usage = "usage: execute ping IP [-c COUNT]"
+	} else if op.Name == "udp-test" {
+		usage = "usage: execute udp-test IP PORT"
 	}
 	for i := 0; i < len(fields); i++ {
 		token := fields[i]
@@ -41,7 +43,7 @@ func parseDiagnosticArguments(op config.OperationDefinition, fields []string) (m
 		}
 		if result["host"] == "" {
 			ip, err := netip.ParseAddr(token)
-			if err != nil || ip.Zone() != "" || ip.IsUnspecified() || ip.IsMulticast() || (op.Name == "ping" && !ip.Is4()) {
+			if err != nil || ip.Zone() != "" || ip.Unmap().IsUnspecified() || ip.Unmap().IsMulticast() || (op.Name == "ping" && !ip.Is4()) {
 				return nil, fmt.Errorf("%s; supply a literal %sIP address", usage, map[bool]string{true: "IPv4 ", false: ""}[op.Name == "ping"])
 			}
 			result["host"] = ip.String()
@@ -50,7 +52,7 @@ func parseDiagnosticArguments(op config.OperationDefinition, fields []string) (m
 		if op.Name != "ping" && result["port"] == "" {
 			n, err := strconv.Atoi(token)
 			if err != nil || n < 1 || n > 65535 {
-				return nil, fmt.Errorf("tcp-test: port must be between 1 and 65535")
+				return nil, fmt.Errorf("%s; port must be between 1 and 65535", usage)
 			}
 			result["port"] = strconv.Itoa(n)
 			continue
@@ -59,6 +61,9 @@ func parseDiagnosticArguments(op config.OperationDefinition, fields []string) (m
 	}
 	if result["host"] == "" {
 		return nil, fmt.Errorf("%s; IP is required", usage)
+	}
+	if op.Name == "udp-test" && result["port"] == "" {
+		return nil, fmt.Errorf("%s; PORT is required", usage)
 	}
 	return result, nil
 }
@@ -92,6 +97,13 @@ func (s *Shell) diagnosticHelp(op config.OperationDefinition, args []string) {
 		s.networkHelpRow("-c COUNT", "Optional number of requests, 1..1000; default 1000; before or after IP")
 		if len(args) > 0 && args[len(args)-1] == "-c" {
 			s.networkHelpRow("<1..1000>", "Number of requests; larger values are rejected")
+		}
+	} else if op.Name == "udp-test" {
+		s.networkHelpRow("IP", "Required literal IPv4 or IPv6 address")
+		s.networkHelpRow("PORT", "Required UDP port, 1..65535")
+		s.networkHelpRow("result", "Uses nc -zu; a sent probe is inconclusive, not proof of an open port")
+		if op.UDPProbe != nil {
+			s.networkHelpRow("timeout", fmt.Sprintf("Probe ends after at most %d seconds, plus process cleanup", op.UDPProbe.TimeoutSeconds))
 		}
 	} else {
 		defaultPort := "23"

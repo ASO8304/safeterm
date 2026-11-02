@@ -13,6 +13,7 @@ var networkActionDescriptions = map[string]string{
 	"confirm":  "Confirm your live trial and persist its Netplan changes",
 	"rollback": "Reject the live trial, or restore the last confirmed network change",
 	"discard":  "Discard your saved candidate; leave active networking unchanged",
+	"rename":   "Persist a MAC-bound name for next reboot/device activation; use rename CURRENT NEW",
 }
 var networkEditorDescriptions = map[string]string{
 	"edit":     "Select an existing item to edit",
@@ -47,6 +48,12 @@ func (s *Shell) networkHelpRow(name, description string) {
 	s.helpRow(name, description)
 }
 func (s *Shell) networkActionHelp(fields []string) error {
+	if len(fields) > 0 && fields[0] == "rename" {
+		s.networkHelpRow("CURRENT NEW", "Example: execute network rename ens192 lan0")
+		s.networkHelpRow("effect", "Update the matching .link rule and Netplan MAC match; no live rename or reboot")
+		s.networkHelpRow("policy", "Current and future names must be allowed; discard/apply any saved candidate first")
+		return nil
+	}
 	if len(fields) == 0 {
 		for _, name := range networkActions {
 			s.networkHelpRow(name, networkActionDescriptions[name])

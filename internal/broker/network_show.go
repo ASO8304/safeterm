@@ -29,13 +29,13 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 	sort.Strings(names)
 	var table bytes.Buffer
 	writer := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(writer, "NAME\tSTATE\tDHCP4\tADDRESSES\tEDITING")
+	fmt.Fprintln(writer, "NAME\tMAC ADDRESS\tSTATE\tDHCP4\tADDRESSES\tEDITING")
 	readOnly, changed := []string{}, false
 	for _, name := range names {
 		item := e.view.Interfaces[name]
 		editing := "Allowed"
 		if item.ReadOnly != "" {
-			editing = "Read-only (" + interfaceRestrictionLabel(item.ReadOnly) + ")"
+			editing = "Read-only"
 			readOnly = append(readOnly, name)
 		}
 		label := name
@@ -54,9 +54,13 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		if state == "" {
 			state = "unknown"
 		}
-		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", label, state, dhcp, addresses[0], editing)
+		mac := e.view.MACs[name]
+		if mac == "" {
+			mac = "Unknown"
+		}
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", label, mac, state, dhcp, addresses[0], editing)
 		for _, address := range addresses[1:] {
-			fmt.Fprintf(writer, "\t\t\t%s\t\n", address)
+			fmt.Fprintf(writer, "\t\t\t\t%s\t\n", address)
 		}
 	}
 	_ = writer.Flush()
@@ -163,6 +167,13 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 			}
 			s.writeStyled(style, value+"\n")
 		}
+	}
+	row("MAC Address", "Unknown", e.view.MACs[name])
+	if persistent := e.view.Names[name]; persistent != "" {
+		if persistent != name {
+			persistent += " (next reboot/device activation)"
+		}
+		row("Persistent Name", "", persistent)
 	}
 	row("DHCP4", "", onOff(item.DHCP4))
 	row("Addresses", "None", item.Addresses...)

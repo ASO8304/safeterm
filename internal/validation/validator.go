@@ -53,15 +53,15 @@ func (v *Validator) Validate(req *contract.ExecutionRequest) error {
 		return fmt.Errorf("validation: unknown operation %q", req.Command)
 	}
 
-	if op.ExecutorKind == config.ExecutorTCPProbe {
+	if config.IsPortProbe(op.ExecutorKind) {
 		addr, err := netip.ParseAddr(req.Arguments["host"])
-		if err != nil || addr.Zone() != "" || addr.IsUnspecified() || addr.IsMulticast() {
-			return fmt.Errorf("validation: TCP probe requires a literal unicast IP address")
+		if err != nil || addr.Zone() != "" || addr.Unmap().IsUnspecified() || addr.Unmap().IsMulticast() {
+			return fmt.Errorf("validation: port probe requires a literal unicast IP address")
 		}
 	}
 	if op.Name == "ping" {
 		ip, err := netip.ParseAddr(req.Arguments["host"])
-		if err != nil || !ip.Is4() || ip.IsUnspecified() || ip.IsMulticast() {
+		if err != nil || !ip.Is4() || ip.Unmap().IsUnspecified() || ip.Unmap().IsMulticast() {
 			return fmt.Errorf("validation: ping requires a literal IPv4 host address")
 		}
 		count := req.Arguments["count"]

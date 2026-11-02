@@ -404,6 +404,9 @@ func operationExample(operation config.OperationDefinition) string {
 	if operation.Name == "ping" {
 		return "execute ping 192.0.2.1 -c 5"
 	}
+	if operation.Name == "udp-test" {
+		return "execute udp-test 192.0.2.1 53"
+	}
 	if operation.Name == "telnet" {
 		return "execute tcp-test 192.0.2.1 443"
 	}

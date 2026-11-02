@@ -78,13 +78,27 @@
   },
   {
     "name": "telnet",
-    "description": "Test a TCP port with a bounded connection attempt; no login or application data.",
+    "description": "Test a TCP port with netcat; bounded connection attempt without login or application data.",
     "runner_profile": "network-observer",
     "executor_kind": "tcp-probe",
+    "executable_ref": "netcat",
     "tcp_probe": { "timeout_seconds": 5 },
     "parameters": [
       { "name": "host", "type": "string", "required": true },
       { "name": "port", "type": "int", "required": false, "default": "23", "min": 1, "max": 65535 }
+    ],
+    "long_running": true
+  },
+  {
+    "name": "udp-test",
+    "description": "Test a UDP port with netcat; silence is inconclusive and does not prove the port is open.",
+    "runner_profile": "network-observer",
+    "executor_kind": "udp-probe",
+    "executable_ref": "netcat",
+    "udp_probe": { "timeout_seconds": 5 },
+    "parameters": [
+      { "name": "host", "type": "string", "required": true },
+      { "name": "port", "type": "int", "required": true, "min": 1, "max": 65535 }
     ],
     "long_running": true
   }

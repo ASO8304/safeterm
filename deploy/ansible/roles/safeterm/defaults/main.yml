@@ -27,6 +27,7 @@ safeterm_required_packages:
   - systemd
   - tar
   - tcpdump
+  - netcat-openbsd
   - util-linux
 
 safeterm_signing_mode: local

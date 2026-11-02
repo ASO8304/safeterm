@@ -10,6 +10,7 @@ The root-owned policy is `/etc/safeterm/network/policy.json`. An empty `interfac
 {
   "version": 1,
   "interfaces": ["ens160", "ens192"],
+  "allow_all_interfaces": false,
   "files": [],
   "read_roles": ["netops", "network-viewer", "network-operator"],
   "edit_roles": ["netops", "network-operator"],
@@ -21,6 +22,70 @@ The root-owned policy is `/etc/safeterm/network/policy.json`. An empty `interfac
 `files` optionally restricts writable sources to exact `.yaml` basenames. An empty list discovers `/etc/netplan` filenames automatically; it does not assume `00-installer-config.yaml`, `50-cloud-init.yaml`, or any other filename. The daemon reads the policy on each request; no catalog signing or daemon restart is necessary for a policy edit. Keep it root-owned and without group/world write access. Grant the relevant SafeTerm identity the `network-viewer` or `network-operator` role using `termctl user` in addition to its existing roles. The `netops` role has network read/edit privileges by default, restricted to the interfaces/files explicitly permitted by policy.
 
 A cloud-init marker makes an interface read-only by default. Setting `allow_generated_files` acknowledges that the administrator has arranged for cloud-init or another provisioning system not to overwrite that configuration on the next boot. SafeTerm does not disable cloud-init itself.
+
+## Current and future hardware
+
+Set `"allow_all_interfaces": true` to allow the configured edit roles to manage
+all present and future supported Ethernet NICs, including VM NICs and newly
+attached LAN modules. The default remains false. This setting permits current
+interfaces outside the exact `interfaces` list as well; it is not limited to
+hardware added after installation. Role, renderer, source-file, generated-file
+and unsupported-configuration restrictions still apply.
+
+The interface table and detail view display the kernel MAC address so an admin
+can compare it with the VM/hypervisor hardware settings. Newly discovered NICs
+appear even when they do not yet have a Netplan entry. After edits are saved,
+trialled and confirmed, their MAC-matched definitions are created in
+`/etc/netplan/90-safeterm-interfaces.yaml`. If `files` is restricted, this basename
+must be allowed. Existing source files are preserved; no persistent new file is
+written before confirmation. Rollback removes a file created by that change.
+
+## Persistent interface names
+
+Inspect the current name and MAC with `config network interface`, `edit NAME`,
+then `show`. Leave the editor, then use:
+
+```text
+execute network rename ens192 lan0
+```
+
+This is a persistent, reboot/device-activation naming change. It does not rename
+an active NIC, trigger udev, apply Netplan, restart services or reboot. Names
+must start with a letter, contain letters/digits/underscore/hyphen, and be at
+most 15 characters. Current and requested names must be allowed by policy;
+`allow_all_interfaces` covers both. A saved network candidate must first be
+applied/confirmed or discarded so the naming change cannot stale an open draft.
+
+SafeTerm searches `/etc/systemd/network/*.link` for an existing single-MAC rule.
+For example, it updates the `Name=` in your existing `10-persistent-net.link`:
+
+```ini
+[Match]
+MACAddress=00:0c:29:ef:e4:51
+
+[Link]
+Name=lan0
+```
+
+It preserves comments, unrelated settings, permissions, ownership and supported
+extended attributes. `NamePolicy=` is cleared so a configured naming policy does
+not override the requested name. Shared/multiple MAC matches, multiple matching
+files, advanced matches, symlinks, writable/untrusted files and drop-ins are
+rejected for administrator resolution rather than guessing.
+
+If no matching rule exists, SafeTerm creates a MAC-specific rule such as
+`/etc/systemd/network/10-000c29efe451-persistent-net.link`. It also binds the
+Netplan definition to that MAC and removes conflicting `set-name` entries, so
+its IP settings continue matching after the interface changes name. Existing
+Netplan IDs and unrelated configuration remain intact. The detail view shows
+the persistent name and whether it differs from the current live name.
+
+The operation is authorized and audited by the dedicated network manager,
+uses the lifecycle lock, validates Netplan in a temporary root, and journals
+persistent writes for crash recovery. Fully written changes are completed on
+recovery; partial changes are restored without applying live networking.
+Review local earlier-priority systemd rules and any initramfs copies when
+planning a reboot. See [systemd.link](https://www.freedesktop.org/software/systemd/man/systemd.link.html).
 
 ## Read, edit and save a candidate
 

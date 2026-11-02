@@ -26,6 +26,7 @@ func ValidItemName(name string) bool { return namePattern.MatchString(name) }
 type Policy struct {
 	Version             int      `json:"version"`
 	Interfaces          []string `json:"interfaces"`
+	AllowAllInterfaces  bool     `json:"allow_all_interfaces,omitempty"`
 	Files               []string `json:"files,omitempty"` // basenames; empty discovers all /etc files
 	ReadRoles           []string `json:"read_roles"`
 	EditRoles           []string `json:"edit_roles"`
@@ -35,6 +36,10 @@ type Policy struct {
 
 func DefaultPolicy() Policy {
 	return Policy{Version: 1, Interfaces: []string{}, ReadRoles: []string{"netops", "network-viewer", "network-operator"}, EditRoles: []string{"netops", "network-operator"}, ConfirmSeconds: 120}
+}
+
+func (p Policy) AllowsInterface(name string) bool {
+	return p.AllowAllInterfaces || contains(p.Interfaces, name)
 }
 func (p Policy) Validate() error {
 	if p.Version != 1 || p.ConfirmSeconds < 10 || p.ConfirmSeconds > 300 || len(p.Interfaces) > 64 || len(p.Files) > 64 || len(p.ReadRoles) == 0 || len(p.EditRoles) == 0 {
@@ -98,6 +103,8 @@ type View struct {
 	Version string `json:"version"`
 	// Link states are display metadata, excluded from configuration identity.
 	States     map[string]string    `json:"states,omitempty"`
+	MACs       map[string]string    `json:"mac_addresses,omitempty"`
+	Names      map[string]string    `json:"persistent_names,omitempty"`
 	Interfaces map[string]Interface `json:"interfaces"`
 	Routes     map[string]Route     `json:"routes"`
 	Pending    bool                 `json:"pending"`
@@ -112,9 +119,11 @@ type Change struct {
 	Values []string `json:"values,omitempty"`
 }
 type Request struct {
-	Action  string   `json:"action"`
-	Version string   `json:"version,omitempty"`
-	Changes []Change `json:"changes,omitempty"`
+	Action    string   `json:"action"`
+	Version   string   `json:"version,omitempty"`
+	Changes   []Change `json:"changes,omitempty"`
+	Interface string   `json:"interface,omitempty"`
+	NewName   string   `json:"new_name,omitempty"`
 }
 type Reply struct {
 	View *View  `json:"view,omitempty"`
@@ -326,6 +335,8 @@ func metricValue(p *uint32) string {
 func cloneView(v View) View {
 	result := v
 	result.States = maps.Clone(v.States)
+	result.MACs = maps.Clone(v.MACs)
+	result.Names = maps.Clone(v.Names)
 	result.Interfaces = map[string]Interface{}
 	result.Routes = map[string]Route{}
 	for k, i := range v.Interfaces {

@@ -1,6 +1,10 @@
 #!/bin/sh
 set -eu
 # Never snapshot/replace a daemon while a network trial is awaiting confirmation.
+if [ -e /var/lib/safeterm/network/naming-pending.json ]; then
+ echo "Persistent naming recovery pending: restart safeterm-network-manager before installation/update/rollback" >&2
+ exit 1
+fi
 if [ -e /var/lib/safeterm/network/pending.json ]; then
  echo "Network trial pending: execute network confirm or execute network rollback before installation/update/rollback" >&2
  exit 1
@@ -110,6 +114,7 @@ if ! grep -qxF /usr/local/bin/safeterm-console /etc/shells; then
   echo /usr/local/bin/safeterm-console >>/etc/shells
 fi
 install -d -o root -g root -m 0755 /etc/safeterm /var/lib/safeterm /var/lib/safeterm/generated
+install -d -o root -g root -m 0755 /etc/systemd/network /etc/netplan
 "$bundle/bin/safeterm-preflight" --bundle "$bundle" --prior-identity-catalog "$prior_identity_catalog" --install-configuration
 chown root:safeterm-broker /etc/safeterm/access/ssh/ssh_host_ed25519_key /etc/safeterm/access/ssh/users.json
 chmod 0640 /etc/safeterm/access/ssh/ssh_host_ed25519_key /etc/safeterm/access/ssh/users.json

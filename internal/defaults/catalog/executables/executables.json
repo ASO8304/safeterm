@@ -46,5 +46,11 @@
     "path": "/usr/bin/tail",
     "sha256": "03806be6481b4232405b9a16cb6d2a615977f12b2fd49fc6eabcefc6c6abbbdc",
     "allowed_profiles": ["log-reader"]
+  },
+  {
+    "id": "netcat",
+    "path": "/usr/bin/nc.openbsd",
+    "sha256": "2a6fac3d98e090468962ef18003cb8b89fbffa7219917ca12567d5e42b156948",
+    "allowed_profiles": ["network-observer"]
   }
 ]

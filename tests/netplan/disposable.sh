@@ -16,7 +16,7 @@ cleanup() {
 }
 trap cleanup EXIT
 debootstrap --variant=minbase --include=systemd-sysv,dbus,netplan.io,iproute2,systemd-resolved noble "$work/root" http://archive.ubuntu.com/ubuntu
-install -d -m 0755 "$work/root/etc/netplan"
+install -d -m 0755 "$work/root/etc/netplan" "$work/root/etc/systemd/network"
 systemctl --root="$work/root" enable systemd-networkd.service systemd-resolved.service
 install -m 0755 "$binary" "$work/root/opt/network.test"
 systemd-nspawn --quiet --directory="$work/root" --machine="$machine" --boot --network-veth >"$work/guest.log" 2>&1 &
@@ -31,7 +31,7 @@ $ready || { cat "$work/guest.log"; echo 'guest did not boot'; exit 1; }
 # Match the production manager's main filesystem/capability restrictions.
 systemd-run --machine="$machine" --wait --pipe --service-type=exec \
   --property=NoNewPrivileges=yes --property=ProtectSystem=strict \
-  --property='ReadWritePaths=/run /etc/netplan /var/lib' \
+  --property='ReadWritePaths=/run /etc/netplan /etc/systemd/network /var/lib' \
   --property=PrivateTmp=yes --property=PrivateDevices=yes \
   --property='CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_CHOWN CAP_FOWNER' \
   --property='RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6' \

@@ -35,20 +35,25 @@ func (g *stalledGateway) Terminate(_ context.Context, _ contract.ControlRequest)
 }
 
 func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
-	for _, operation := range []string{"system_info", "capture", "telnet"} {
+	for _, operation := range []string{"system_info", "capture", "telnet", "udp-test"} {
 		t.Run(operation, func(t *testing.T) {
 			cfg := brokerTestConfig()
-			if operation == "telnet" {
+			if operation == "telnet" || operation == "udp-test" {
 				source, err := config.LoadConfig("../defaults/catalog")
 				if err != nil {
 					t.Fatal(err)
 				}
 				for _, op := range source.Operations {
-					if op.Name == "telnet" {
+					if op.Name == operation {
 						cfg.Operations = append(cfg.Operations, op)
+						for _, executable := range source.Executables {
+							if executable.ID == op.ExecutableRef {
+								cfg.Executables = append(cfg.Executables, executable)
+							}
+						}
 					}
 				}
-				cfg.Policies[1].Operations = append(cfg.Policies[1].Operations, "telnet")
+				cfg.Policies[1].Operations = append(cfg.Policies[1].Operations, operation)
 			}
 			catalog, _ := NewCatalog(cfg)
 			g := &stalledGateway{started: make(chan struct{})}
@@ -67,6 +72,9 @@ func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
 			command := "execute system_info host\r"
 			if operation == "telnet" {
 				command = "execute telnet 127.0.0.1 23\r"
+			}
+			if operation == "udp-test" {
+				command = "execute udp-test 127.0.0.1 53\r"
 			}
 			if operation == "capture" {
 				command = "execute capture host=127.0.0.1 port=999\r"

@@ -4,6 +4,7 @@ package networkmanager
 
 import (
 	"context"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -41,7 +42,14 @@ func TestDisposableNetplanTrial(t *testing.T) {
 	p.Files = []string{filepath.Base(source)}
 	p.ConfirmSeconds = 10
 	backend := &Netplan{Root: "/"}
-	m, err := New(Options{Root: "/", State: StatePath, Policy: func() (Policy, error) { return p, nil }, Interfaces: PhysicalInterfaces, Backend: backend})
+	mac, err := os.ReadFile("/sys/class/net/host0/address")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The isolated guest deliberately models hardware with veths. Production
+	// discovery excludes virtual links; inject this explicit test hardware set.
+	hardware := map[string]string{"host0": strings.TrimSpace(string(mac))}
+	m, err := New(Options{Root: "/", State: StatePath, Policy: func() (Policy, error) { return p, nil }, Interfaces: func() map[string]string { return hardware }, Backend: backend})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,4 +104,56 @@ func TestDisposableNetplanTrial(t *testing.T) {
 		t.Fatal("timeout changed persistent source")
 	}
 	operatorCall(t, m, Request{Action: "discard"})
+
+	// Hotplug an additional simulated LAN module in this guest only. Confirm
+	// that its persistent file is created only after a successful live trial.
+	if _, err := command(context.Background(), "/usr/sbin/ip", "link", "add", "future0", "type", "veth", "peer", "name", "future-peer"); err != nil {
+		t.Fatal(err)
+	}
+	defer command(context.Background(), "/usr/sbin/ip", "link", "delete", "future0")
+	if _, err := command(context.Background(), "/usr/sbin/ip", "link", "set", "future-peer", "up"); err != nil {
+		t.Fatal(err)
+	}
+	nic, err := net.InterfaceByName("future0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hardware["future0"] = nic.HardwareAddr.String()
+	p.AllowAllInterfaces = true
+	p.Files = append(p.Files, filepath.Base(managedInterfaces))
+	v := operatorCall(t, m, Request{Action: "read"})
+	operatorCall(t, m, Request{Action: "save", Version: v.View.Version, Changes: []Change{{Kind: "interface", Name: "future0", Field: "addresses", Action: "set", Values: []string{"198.51.100.10/24"}}}})
+	operatorCall(t, m, Request{Action: "apply"})
+	if _, err := os.Stat("/" + managedInterfaces); !os.IsNotExist(err) {
+		t.Fatal("new hardware trial wrote persistent files", err)
+	}
+	operatorCall(t, m, Request{Action: "confirm"})
+	if data, err := os.ReadFile("/" + managedInterfaces); err != nil || !strings.Contains(string(data), nic.HardwareAddr.String()) {
+		t.Fatal("confirmed MAC-matched source missing", string(data), err)
+	}
+	operatorCall(t, m, Request{Action: "rollback"})
+	if _, err := os.Stat("/" + managedInterfaces); !os.IsNotExist(err) {
+		t.Fatal("rollback did not remove the created source", err)
+	}
+	if data, err := command(context.Background(), "/usr/sbin/ip", "-j", "address", "show", "dev", "future0"); err != nil || strings.Contains(data, `"local":"198.51.100.10"`) {
+		t.Fatal("new-interface rollback retained the trial address", data, err)
+	}
+
+	// Exercise persistent naming under the production filesystem restrictions,
+	// reusing an administrator's existing MAC rule without renaming host0 live.
+	if err := prepareNamingDirectory("/"); err != nil {
+		t.Fatal(err)
+	}
+	rulePath := "/etc/systemd/network/10-persistent-net.link"
+	rule := "# Keep this comment\n[Match]\nMACAddress=" + hardware["host0"] + "\n\n[Link]\nName=host0\n"
+	if err := os.WriteFile(rulePath, []byte(rule), 0640); err != nil {
+		t.Fatal(err)
+	}
+	operatorCall(t, m, Request{Action: "rename", Interface: "host0", NewName: "vmnic0"})
+	if _, err := net.InterfaceByName("host0"); err != nil || !hasAddress("192.0.2.10") {
+		t.Fatal("persistent rename changed the live connection", err)
+	}
+	if data, err := os.ReadFile(rulePath); err != nil || !strings.Contains(string(data), "Name=vmnic0") || !strings.Contains(string(data), "# Keep this comment") {
+		t.Fatal("existing rule was not updated in place", string(data), err)
+	}
 }

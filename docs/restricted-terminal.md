@@ -218,7 +218,7 @@ raw systemctl output or physical unit names. An error stops the sequence without
 automatic recovery; consult the administrator and protected Audit record for
 physical-unit diagnostics. See the resource guide for group definitions.
 
-Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. The TCP probe sends no application data and does not provide an interactive login. See [network diagnostics](network-diagnostics.md).
+Network diagnostics use `execute ping IP [-c COUNT]` (default/max 1000) and `execute tcp-test IP [PORT]` (TCP connection test, default port 23, timeout 5 seconds). Ctrl+C cancels the operation; Ctrl+] exits SafeTerm. TCP uses netcat without application data or an interactive login. `execute udp-test IP PORT` uses netcat UDP probes; silence is inconclusive. See [network diagnostics](network-diagnostics.md).
 
 ## Navigation and help
 

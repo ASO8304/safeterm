@@ -53,6 +53,10 @@ func (s *Snapshot) Operation(name string) (config.OperationDefinition, bool) {
 		copy := *operation.TCPProbe
 		operation.TCPProbe = &copy
 	}
+	if operation.UDPProbe != nil {
+		copy := *operation.UDPProbe
+		operation.UDPProbe = &copy
+	}
 	if operation.Systemd != nil {
 		copy := *operation.Systemd
 		copy.Units = append([]string(nil), copy.Units...)

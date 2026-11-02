@@ -94,12 +94,27 @@ try:
             listener.settimeout(5)
             result = command('execute tcp-test 127.0.0.1 ' + str(listener.getsockname()[1]))
             if b'TCP port is open' not in result or b'result: success' not in result:
-                raise RuntimeError('native TCP test failed')
+                raise RuntimeError('netcat TCP test failed')
             conn, _ = listener.accept()
             with conn:
                 conn.settimeout(2)
                 if conn.recv(1) != b'':
                     raise RuntimeError('TCP probe sent application data')
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.settimeout(8)
+            port = str(listener.getsockname()[1])
+            os.write(fd, ('execute udp-test 127.0.0.1 ' + port + '\r').encode('ascii'))
+            result = expect(b'\nsafeterm::ci-admin> ')
+            if b'inconclusive' not in result or b'UDP port is open' in result:
+                raise RuntimeError('netcat UDP result overstated what a scan proves')
+            listener.recvfrom(1024)
+            os.write(fd, ('execute udp-test 127.0.0.1 ' + port + '\r').encode('ascii'))
+            expect(('Trying 127.0.0.1:' + port).encode('ascii'))
+            os.write(fd, b'\x03')
+            expect(b'\nsafeterm::ci-admin> ')
+            if b'user: ci-admin' not in command('whoami'):
+                raise RuntimeError('UDP Ctrl+C closed SafeTerm instead of only the probe')
         # Delay only this disposable loopback destination so Ctrl+C crosses the
         # real Console -> Gateway -> Runner -> native dial cancellation path.
         firewall = shutil.which('iptables')

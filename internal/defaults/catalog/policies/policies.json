@@ -1,6 +1,6 @@
 [
   {"role": "viewer", "operations": ["system_info", "memory_info", "disk_usage"]},
-  {"role": "netops", "operations": ["system_info", "capture", "ping", "telnet"]},
+  {"role": "netops", "operations": ["system_info", "capture", "ping", "telnet", "udp-test"]},
   {"role": "log-viewer", "operations": []},
   {"role": "service-viewer", "operations": []},
   {"role": "service-operator", "operations": []}

@@ -93,7 +93,7 @@ func run(configDir string, profileName config.RunnerProfile, gatewayUser string,
 	var executor agent.Executor
 	switch profile.ExecutorKind {
 	case config.ExecutorProcess:
-		executor, err = execution.NewTCPProbeExecutor(profileConfig, verifiedRunner)
+		executor, err = execution.NewPortProbeExecutor(profileConfig, verifiedRunner)
 		if err != nil {
 			return err
 		}

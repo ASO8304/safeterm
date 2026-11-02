@@ -30,3 +30,19 @@ func TestTCPProbeTranslationUsesTypedOperationAndDefaultPort(t *testing.T) {
 		}
 	}
 }
+
+func TestUDPProbeTranslationPreservesRequiredIPAndSinglePort(t *testing.T) {
+	cfg, err := config.LoadConfig("../defaults/catalog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, _ := contract.NewExecutionRequest("udp-test", map[string]string{"host": "::1", "port": "53"}, contract.Metadata{})
+	command, args, err := tr.Translate(req)
+	if err != nil || command != "udp-test" || !reflect.DeepEqual(args, []string{"::1", "53"}) {
+		t.Fatal(command, args, err)
+	}
+}

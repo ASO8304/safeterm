@@ -152,7 +152,7 @@ func TestNetworkTextDiffAndDetailShowStagingWithoutRPC(t *testing.T) {
 	editorCommands(t, s, "next")
 	out.Reset()
 	editorCommands(t, s, "show")
-	for _, want := range []string{"NAME", "STATE", "DHCP4", "ADDRESSES", "EDITING", "ip1 *", "up", "down", "Read-only (Policy restricted)", "Allowed"} {
+	for _, want := range []string{"NAME", "STATE", "DHCP4", "ADDRESSES", "EDITING", "ip1 *", "up", "down", "Read-only", "Allowed"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q: %s", want, out)
 		}
