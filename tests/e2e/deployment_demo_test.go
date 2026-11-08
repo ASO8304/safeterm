@@ -197,10 +197,13 @@ func deployedDataPath(t *testing.T, passwordOnly bool) {
 		}
 	}
 	output := runRestrictedShell(t, listener.Addr().String(), clientConfig, "whoami\rexecute ?\rsystem_info host\rexit\r")
-	for _, expected := range []string{"Authenticated as alice", "roles: viewer", "system", "result: success", "Linux"} {
+	for _, expected := range []string{"Authenticated as alice", "roles: viewer", "system", "Linux"} {
 		if !strings.Contains(output, expected) {
 			t.Fatalf("terminal output missing %q:\n%s", expected, output)
 		}
+	}
+	if strings.Contains(output, "result:") {
+		t.Fatal("production terminal exposed debug summary", output)
 	}
 
 	entries, err := audit.ReadFile(filepath.Join(directory, "audit.jsonl"))

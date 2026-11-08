@@ -1,4 +1,5 @@
 {
   "name": "safeterm",
-  "prompt": "{brand}::{user}{context}{dirty}> "
+  "prompt": "{brand}::{user}{context}{dirty}> ",
+  "show_result": false
 }

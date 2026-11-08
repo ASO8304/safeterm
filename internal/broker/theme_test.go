@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"safeterm/internal/contract"
+	"safeterm/internal/terminalconfig"
 )
 
 var themeSGR = regexp.MustCompile(`\x1b\[[0-9;]*m`)
@@ -126,7 +127,7 @@ func TestThemeKeepsHelpInputAndSecretEntryBehavior(t *testing.T) {
 func TestThemeTrustBoundaryIncludesPlainAndResponseMessages(t *testing.T) {
 	for _, color := range []bool{false, true} {
 		var out bytes.Buffer
-		s := &Shell{color: color, output: &out}
+		s := &Shell{color: color, output: &out, presentation: terminalconfig.Config{ShowResult: true}}
 		s.writeResponse(&contract.ExecutionResponse{Result: contract.ResultSuccess, ExitCode: 0, Message: "message\x1b[2J\x07"})
 		plain := themeSGR.ReplaceAllString(out.String(), "")
 		if strings.ContainsAny(plain, "\x1b\x07") || !strings.Contains(plain, "message�[2J�") {

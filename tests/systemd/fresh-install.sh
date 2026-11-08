@@ -53,6 +53,18 @@ wait_ready() {
   echo 'required SafeTerm sockets never became ready' >&2; return 1
 }
 wait_ready
+python3 "$repo/tests/systemd/console-smoke.py" production
+# Enable summaries explicitly for the remaining debugging/compatibility checks.
+python3 - <<'PY'
+import json
+path = '/etc/safeterm/terminal.json'
+with open(path) as source:
+    settings = json.load(source)
+settings['show_result'] = True
+with open(path, 'w') as destination:
+    json.dump(settings, destination)
+PY
+termctl check
 python3 "$repo/tests/systemd/console-smoke.py" empty
 # A per-person Linux login enters SafeTerm without its own password prompt.
 useradd --create-home --shell /usr/local/bin/safeterm-console --groups safeterm-clients,safeterm-gateway ci-linux

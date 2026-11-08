@@ -16,7 +16,7 @@ if os.geteuid() != 0 or os.environ.get('SAFETERM_DISPOSABLE_HOST') != '1':
     raise SystemExit('requires disposable root CI VM')
 
 mode = sys.argv[1]
-if mode not in ('empty', 'configured', 'site', 'logical', 'logs', 'services', 'linux'):
+if mode not in ('empty', 'configured', 'site', 'logical', 'logs', 'services', 'linux', 'production'):
     raise SystemExit('expected empty, configured, site, logical, logs or services')
 pid, fd = pty.fork()
 if pid == 0:
@@ -80,6 +80,13 @@ try:
         command('config network interface', b'\nsafeterm::ci-admin(network/interface)> ')
         command('show', b'\nsafeterm::ci-admin(network/interface)> ')
         command('cancel')
+    if mode == 'production':
+        with socket.socket() as listener:
+            listener.bind(('127.0.0.1', 0))
+            listener.listen(1)
+            result = command('execute tcp-test 127.0.0.1 ' + str(listener.getsockname()[1]))
+            if b'TCP port is open' not in result or b'result:' in result:
+                raise RuntimeError('production stream hid command output or exposed result metadata')
     if mode == 'empty':
         entered = command('config network', b'\nsafeterm::ci-admin(network)> ')
         if b'Choose an interface' in entered or b'Show available commands' in entered:
@@ -158,7 +165,10 @@ try:
     command('config', b'\nsafeterm::ci-admin(config)> ')
     command('exit')
     result = command('execute system_info disk')
-    if b'result: success' not in result:
+    if mode == 'production':
+        if b'Filesystem' not in result or b'result:' in result:
+            raise RuntimeError('production unary command hid output or exposed result metadata')
+    elif b'result: success' not in result:
         raise RuntimeError('Gateway/Runner execution failed')
     if mode == 'logs':
         os.write(fd, b'execute logs fresh-log main\r')

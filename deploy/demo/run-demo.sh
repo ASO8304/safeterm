@@ -55,8 +55,9 @@ printf 'whoami\rexecute ?\rexecute system_info host\rexecute system_info memory\
   -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" alice@127.0.0.1 >"$output"
 grep -q 'Authenticated as alice' "$output"
 grep -q 'system' "$output"
-grep -q 'result: success' "$output"
-[ "$(grep -c 'result: success exit=0' "$output")" -eq 2 ] || { cat "$output"; echo "system info or memory smoke test failed" >&2; exit 1; }
+grep -q 'Linux' "$output"
+grep -q 'Mem:' "$output"
+if grep -q 'Error:' "$output"; then cat "$output"; echo "system info or memory smoke test failed" >&2; exit 1; fi
 grep -q 'demo' "$output"
 /usr/local/bin/safeterm-preflight --installed
 cat "$output"

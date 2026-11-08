@@ -82,7 +82,7 @@ func TestRestrictedShellRoutesAuthenticatedIdentityThroughGateway(t *testing.T) 
 	if runner.request == nil || runner.request.Metadata.UserID != "alice" || runner.request.Metadata.BrokerType != "ssh" || strings.Join(runner.request.Metadata.ClaimedRoles, ",") != "viewer" {
 		t.Fatalf("authenticated metadata was not routed: %+v", runner.request)
 	}
-	if !strings.Contains(terminal.String(), "safe host") || !strings.Contains(terminal.String(), "result: success") {
+	if !strings.Contains(terminal.String(), "safe host") || strings.Contains(terminal.String(), "result:") {
 		t.Fatalf("unexpected terminal output: %q", terminal.String())
 	}
 }

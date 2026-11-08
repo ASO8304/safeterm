@@ -549,7 +549,11 @@ func (s *Shell) prompt() string {
 
 func (s *Shell) writeResponse(response *contract.ExecutionResponse) {
 	if response == nil {
-		s.writeStyled(styleError, "result: invalid response\n")
+		if s.presentation.ShowResult {
+			s.writeStyled(styleError, "result: invalid response\n")
+		} else {
+			s.writeStyled(styleError, "Error: Invalid command response.\n")
+		}
 		return
 	}
 	if response.Stdout != "" {
@@ -563,6 +567,21 @@ func (s *Shell) writeResponse(response *contract.ExecutionResponse) {
 		if !strings.HasSuffix(response.Stderr, "\n") {
 			fmt.Fprint(s.output, "\r\n")
 		}
+	}
+	if !s.presentation.ShowResult {
+		// Keep failures visible without exposing execution/debug metadata. A
+		// rejection's message explains what the operator needs to correct.
+		if response.Result != contract.ResultSuccess || response.ExitCode != 0 {
+			message := "Command failed."
+			if response.Result == contract.ResultRejected {
+				message = "Command rejected."
+				if response.Message != "" {
+					message = response.Message
+				}
+			}
+			s.writeStyled(styleError, "Error: "+message+"\n")
+		}
+		return
 	}
 	style := styleError
 	if response.Result == contract.ResultSuccess && response.ExitCode == 0 {

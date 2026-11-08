@@ -13,8 +13,9 @@ import (
 const Path = "/etc/safeterm/terminal.json"
 
 type Config struct {
-	Name   string `json:"name"`
-	Prompt string `json:"prompt"`
+	Name       string `json:"name"`
+	Prompt     string `json:"prompt"`
+	ShowResult bool   `json:"show_result"`
 }
 
 func (c Config) WithDefaults() Config {

@@ -280,7 +280,7 @@ func TestOperatorDemoExercisesPublicWorkflowAndReportsPass(t *testing.T) {
 	for _, required := range []string{
 		"ssh-keygen", "ssh-keyscan", "StrictHostKeyChecking=yes",
 		"whoami", "execute ?", "execute system_info host", "config ?",
-		"result: success", "safeterm-preflight --installed",
+		"Mem:", "safeterm-preflight --installed",
 		"SafeTerm end-to-end demo: PASS",
 	} {
 		if !strings.Contains(demo, required) {
