@@ -256,11 +256,19 @@ func Modify(v View, changes []Change) (View, error) {
 				}
 				r.Destination = c.Values[0]
 			case "gateway":
+				if c.Values[0] == "" || c.Values[0] == "direct" || c.Values[0] == "none" || c.Values[0] == "-" {
+					r.Gateway = ""
+					break
+				}
 				if problem := routeGatewayProblem(c.Values[0]); problem != "" {
 					return v, routeIssue(r, "gateway", problem)
 				}
 				r.Gateway = c.Values[0]
 			case "metric":
+				if c.Values[0] == "auto" || c.Values[0] == "automatic" {
+					r.Metric = nil
+					break
+				}
 				var n uint64
 				if _, err := fmt.Sscanf(c.Values[0], "%d", &n); err != nil || fmt.Sprint(n) != c.Values[0] || n > 4294967295 {
 					return v, fmt.Errorf("network: invalid route metric")

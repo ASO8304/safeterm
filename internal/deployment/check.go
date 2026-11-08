@@ -22,11 +22,12 @@ import (
 var RuntimeBinaries = []string{
 	"safeterm-audit", "safeterm-config-manager", "safeterm-config-writer", "safeterm-gateway",
 	"safeterm-console", "safeterm-runner", "safeterm-ssh-broker", "safeterm-preflight",
-	"safeterm-termctl", "safeterm-identity", "safeterm-network-manager",
+	"safeterm-termctl", "safeterm-identity", "safeterm-network-manager", "safeterm-password-manager",
 }
 
 var SystemdUnits = []string{
 	"safeterm-network-manager.service",
+	"safeterm-password-manager.service",
 	"safeterm-audit.service", "safeterm-identity.service", "safeterm-config-writer.service",
 	"safeterm-config-manager-application.service",
 	"safeterm-config-manager-database.service",

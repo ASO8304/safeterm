@@ -114,7 +114,7 @@ func (s *Shell) readLine(ctx context.Context, input <-chan byte, prompt string, 
 					fmt.Fprint(s.output, prompt, string(line))
 					continue
 				}
-				if useHistory && value != "" && len(strings.Fields(value)) > 0 && strings.Fields(value)[0] != "set" && strings.Fields(value)[0] != "append" && strings.Fields(value)[0] != "unselect" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
+				if useHistory && value != "" && len(strings.Fields(value)) > 0 && strings.Fields(value)[0] != "set" && strings.Fields(value)[0] != "append" && strings.Fields(value)[0] != "unselect" && strings.Fields(value)[0] != "passwd" && strings.Fields(value)[0] != "change_pass" && (len(s.history) == 0 || s.history[len(s.history)-1] != value) {
 					s.history = append(s.history, value)
 					if len(s.history) > maxShellHistory {
 						s.history = s.history[len(s.history)-maxShellHistory:]
@@ -269,7 +269,7 @@ func (s *Shell) completionCandidates(ctx context.Context, before, prefix string)
 	}
 	fields := strings.Fields(before)
 	if len(fields) == 0 || (len(fields) == 1 && !strings.HasSuffix(before, " ")) {
-		return matching([]string{"?", "clear", "config", "execute", "whoami", "exit"}, prefix)
+		return matching([]string{"clear", "config", "execute", "passwd", "exit"}, prefix)
 	}
 	if fields[0] == "config" {
 		return s.configCompletion(ctx, before, prefix)
@@ -285,7 +285,7 @@ func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix s
 		index++
 	}
 	if index <= 0 {
-		return matching([]string{"clear", "config", "exit", "help", "execute", "whoami"}, prefix)
+		return matching([]string{"clear", "config", "exit", "help", "execute", "passwd"}, prefix)
 	}
 	command := fields[0]
 	if (command == "execute" || command == "describe") && index == 1 {
@@ -306,6 +306,13 @@ func (s *Shell) legacyCompletionCandidates(ctx context.Context, before, prefix s
 		operation, ok := s.catalog.AuthorizedOperation(fields[1], s.principal.Roles)
 		if !ok {
 			return nil
+		}
+		if operation.Name == "capture" {
+			completed := fields[2:]
+			if !trailing && len(completed) > 0 {
+				completed = completed[:len(completed)-1]
+			}
+			return captureCompletion(operation, completed, prefix)
 		}
 		if positionalDiagnostic(operation) {
 			completed := fields[2:]

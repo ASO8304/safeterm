@@ -27,23 +27,24 @@ type GatewayClient interface {
 }
 
 type Shell struct {
-	presentation  terminalconfig.Config
-	color         bool
-	network       networkmanager.API
-	networkEdit   *networkEditSession
-	editing       *configEditSession
-	stagedLogical map[string]*configEditSession
-	configMenu    []string
-	consoleLogin  func(context.Context, string, []byte) (Principal, time.Time, error)
-	consoleLogout func(context.Context, Principal) error
-	client        GatewayClient
-	catalog       *Catalog
-	principal     Principal
-	input         io.Reader
-	output        io.Writer
-	configs       *ConfigBroker
-	skipLF        bool
-	history       []string
+	passwordChange PasswordChanger
+	presentation   terminalconfig.Config
+	color          bool
+	network        networkmanager.API
+	networkEdit    *networkEditSession
+	editing        *configEditSession
+	stagedLogical  map[string]*configEditSession
+	configMenu     []string
+	consoleLogin   func(context.Context, string, []byte) (Principal, time.Time, error)
+	consoleLogout  func(context.Context, Principal) error
+	client         GatewayClient
+	catalog        *Catalog
+	principal      Principal
+	input          io.Reader
+	output         io.Writer
+	configs        *ConfigBroker
+	skipLF         bool
+	history        []string
 }
 
 func NewAuthenticatedConsoleShell(client GatewayClient, catalog *Catalog, input io.Reader, output io.Writer, configs *ConfigBroker, login func(context.Context, string, []byte) (Principal, time.Time, error), logout func(context.Context, Principal) error) (*Shell, error) {
@@ -119,7 +120,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			defer func() {
 				cleanup, stop := context.WithTimeout(context.Background(), 3*time.Second)
 				defer stop()
-				_ = s.consoleLogout(cleanup, principal)
+				_ = s.consoleLogout(cleanup, s.principal)
 			}()
 			authenticated = true
 			break
@@ -190,6 +191,9 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	if len(fields) == 0 {
 		return false, nil
 	}
+	if fields[0] == "passwd" || fields[0] == "change_pass" {
+		return s.changePassword(ctx, fields, input)
+	}
 	if len(fields) == 1 && (fields[0] == "exit" || fields[0] == "quit" || fields[0] == "logout") && s.exitWouldDiscard() {
 		if !s.confirmDiscard(ctx, input) {
 			return false, nil
@@ -199,7 +203,7 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 		return exit, err
 	}
 	if s.networkEdit != nil {
-		return false, s.networkEditor(ctx, line)
+		return false, s.networkEditorInteractive(ctx, line, input)
 	}
 	if s.editing != nil {
 		return s.configEditor(ctx, line, input)
@@ -253,10 +257,9 @@ func (s *Shell) questionHelp(ctx context.Context, fields []string) error {
 	}
 	if len(fields) == 0 {
 		for _, item := range [][2]string{
-			{"?", "Show available commands; command ? shows contextual help and keeps your input"},
 			{"execute", "Execute an authorized command; use execute ?"},
 			{"config", "Select a configuration file; use config ?"},
-			{"whoami", "Show your identity and roles"},
+			{"passwd", "Change your own login password; current password required"},
 			{"clear", "Clear the screen"},
 			{"exit", "Close this session"},
 		} {
@@ -332,6 +335,9 @@ func (s *Shell) describe(operation config.OperationDefinition) {
 }
 
 func parseOperationArguments(operation config.OperationDefinition, fields []string) (map[string]string, error) {
+	if operation.Name == "capture" {
+		return parseCaptureArguments(operation, fields)
+	}
 	if positionalDiagnostic(operation) {
 		return parseDiagnosticArguments(operation, fields)
 	}
@@ -390,7 +396,7 @@ func parseOperationArguments(operation config.OperationDefinition, fields []stri
 func (s *Shell) writeHelp(topic string) error {
 	switch topic {
 	case "":
-		fmt.Fprint(s.output, "Commands\r\n  execute ?       List authorized operations\r\n  config ?        List registered configuration files\r\n  config RESOURCE Enter the configuration editor\r\n  whoami          Show identity and roles\r\n  exit            Close session\r\n\r\nTab completes; ? then Enter explains the current choices. Ctrl+C stops an operation; Ctrl+] closes the session.\r\n")
+		fmt.Fprint(s.output, "Commands\r\n  execute ?       List authorized operations\r\n  config ?        List registered configuration files\r\n  config RESOURCE Enter the configuration editor\r\n  passwd          Change your own login password\r\n  exit            Close session\r\n\r\nTab completes; ? then Enter explains the current choices. Ctrl+C stops an operation; Ctrl+] closes the session.\r\n")
 	case "config":
 		fmt.Fprint(s.output, "config RESOURCE -> edit SECTION -> set KEY VALUE -> diff -> save\r\nUse next to select another section, cancel to discard. Only save commits changes.\r\nFor secrets: set KEY prompts privately. Use - for the root section.\r\n")
 	case "execute":
@@ -408,6 +414,9 @@ func (s *Shell) writeHelp(topic string) error {
 }
 
 func operationExample(operation config.OperationDefinition) string {
+	if operation.Name == "capture" {
+		return "execute capture host 192.0.2.1 port 53 protocol udp"
+	}
 	if operation.Name == "ping" {
 		return "execute ping 192.0.2.1 -c 5"
 	}
@@ -451,7 +460,11 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 		if err != nil {
 			return err
 		}
-		s.writeResponse(response)
+		probeOutput := ""
+		if response != nil && (operation.TCPProbe != nil || operation.UDPProbe != nil) {
+			probeOutput = response.Stdout + response.Stderr
+		}
+		s.writeOperationResponse(response, false, probeOutput)
 		return nil
 	}
 	session, err := s.client.StartStream(ctx, request)
@@ -460,6 +473,8 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 	}
 	fmt.Fprintf(s.output, "session %s started; Ctrl+C stops the operation; Ctrl+] exits the session\r\n", session.ID)
 	terminating := false
+	cancelAccepted := false
+	probeOutput := ""
 	for {
 		select {
 		case <-ctx.Done():
@@ -478,7 +493,10 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 				if err != nil {
 					fmt.Fprintf(s.output, "\r\nterminate failed: %v\r\n", err)
 				} else {
-					fmt.Fprintf(s.output, "\r\nterminate: %s\r\n", result.Status)
+					cancelAccepted = result.Status == contract.ControlTerminating || result.Status == contract.ControlAlreadyTerminating
+					if s.presentation.ShowResult {
+						fmt.Fprintf(s.output, "\r\nterminate: %s\r\n", result.Status)
+					}
 				}
 			}
 		case frame, ok := <-session.Events:
@@ -488,9 +506,15 @@ func (s *Shell) runOperation(ctx context.Context, operation config.OperationDefi
 			switch frame.Type {
 			case contract.FrameStdout, contract.FrameStderr:
 				s.writeTerminalData(frame.Data)
+				if operation.TCPProbe != nil || operation.UDPProbe != nil {
+					probeOutput += string(frame.Data)
+					if len(probeOutput) > 4096 {
+						probeOutput = probeOutput[len(probeOutput)-4096:]
+					}
+				}
 			case contract.FrameSessionExited:
 				fmt.Fprint(s.output, "\r\n")
-				s.writeResponse(frame.Response)
+				s.writeOperationResponse(frame.Response, cancelAccepted, probeOutput)
 				return nil
 			}
 		}

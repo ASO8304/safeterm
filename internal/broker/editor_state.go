@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"slices"
-	"strings"
 
 	"safeterm/internal/configmanager"
 )
@@ -14,9 +13,8 @@ const exitDescription = "Move up one level; asks before discarding unsaved edits
 const nextDescription = "Move up (keeps unsaved edits staged)"
 
 var globalDescriptions = map[string]string{
-	"exit":   "Close session; asks before discarding unsaved drafts",
-	"clear":  "Clear the screen",
-	"whoami": "Show your identity and roles",
+	"exit":  "Close session; asks before discarding unsaved drafts",
+	"clear": "Clear the screen",
 }
 
 // Globals are resolved before editors, including help, so exit ? cannot exit.
@@ -24,9 +22,6 @@ func (s *Shell) globalCommand(ctx context.Context, fields []string) (handled, ex
 	command := fields[0]
 	if command == "logout" || command == "quit" {
 		command = "exit"
-	}
-	if command == "whoami" && !s.atRoot() {
-		return true, false, fmt.Errorf("whoami is available only at the main prompt; use exit to move up")
 	}
 	description, ok := globalDescriptions[command]
 	if !ok {
@@ -67,8 +62,6 @@ func (s *Shell) globalCommand(ctx context.Context, fields []string) (handled, ex
 		return true, true, nil
 	case "clear":
 		fmt.Fprint(s.output, "\x1b[2J\x1b[H")
-	case "whoami":
-		s.writeTerminalData([]byte(fmt.Sprintf("user: %s\nroles: %s\n", s.principal.UserID, strings.Join(s.principal.Roles, ", "))))
 	}
 	return true, false, nil
 }

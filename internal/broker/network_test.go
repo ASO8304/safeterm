@@ -127,7 +127,7 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 		{"execute network apply ?", "confirmation is required"},
 		{"execute network confirm ?", "persist its Netplan changes"},
 		{"config network interface ?", "Select an existing network interface"},
-		{"config network route ?", "use edit 1 or add to create a route"},
+		{"config network route ?", "Guided route creation"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)
@@ -175,7 +175,7 @@ func TestNetworkQuestionHelpDescribesContextsWithoutRequestsOrEdits(t *testing.T
 		{"set ?", "Destination network CIDR"},
 		{"set destination ?", "<network/CIDR>"},
 		{"set interface ?", "ens19                   Use this allowed outgoing interface"},
-		{"add ?", "Create a route draft with an automatic ID"},
+		{"add ?", "Guided route creation"},
 	} {
 		out.Reset()
 		editorCommands(t, s, tc.line)

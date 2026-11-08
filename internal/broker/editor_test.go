@@ -45,7 +45,7 @@ func TestEditorCompletesAuthorizedOperationsAndParameters(t *testing.T) {
 	if got := shell.completionCandidates(context.Background(), "execute cap", "cap"); len(got) != 1 || got[0] != "capture" {
 		t.Fatalf("operations=%v", got)
 	}
-	if got := shell.completionCandidates(context.Background(), "execute capture po", "po"); len(got) != 1 || got[0] != "port=" {
+	if got := shell.completionCandidates(context.Background(), "execute capture po", "po"); len(got) != 1 || got[0] != "port" {
 		t.Fatalf("parameters=%v", got)
 	}
 	viewer, _ := NewShell(&fakeGateway{}, catalog, Principal{UserID: "bob", Roles: []string{"viewer"}}, bytes.NewReader(nil), &bytes.Buffer{})
@@ -77,12 +77,12 @@ func TestTraceCompletionHasOnlyDynamicArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, tc := range []struct{ before, prefix, want string }{
-		{"execute capture ", "", "host=,port=,protocol="},
-		{"execute capture po", "po", "port="},
-		{"execute capture host=192.0.2.1 ", "", "port=,protocol="},
-		{"execute capture port=999 ", "", "host=,protocol="},
-		{"execute capture protocol=", "protocol=", "protocol=arp,protocol=icmp,protocol=ip,protocol=tcp,protocol=udp"},
-		{"execute capture port=999 protocol=t", "protocol=t", "protocol=tcp"},
+		{"execute capture ", "", "host,port,protocol"},
+		{"execute capture po", "po", "port"},
+		{"execute capture host=192.0.2.1 ", "", "port,protocol"},
+		{"execute capture port=999 ", "", "host,protocol"},
+		{"execute capture protocol ", "", "arp,icmp,ip,tcp,udp"},
+		{"execute capture port 999 protocol t", "t", "tcp"},
 	} {
 		if got := strings.Join(shell.completionCandidates(context.Background(), tc.before, tc.prefix), ","); got != tc.want {
 			t.Errorf("completion(%q)=%q, want %q", tc.before, got, tc.want)

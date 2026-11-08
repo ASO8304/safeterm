@@ -9,6 +9,7 @@
       - safeterm-config-writer.service
       - safeterm-network-manager.service
       - safeterm-identity.service
+      - safeterm-password-manager.service
       - safeterm-runner-diagnostics.service
       - safeterm-runner-network-observer.service
       - safeterm-runner-log-reader.service

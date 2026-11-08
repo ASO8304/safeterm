@@ -41,7 +41,11 @@ func editorFixture(t *testing.T) (*Shell, string, *bytes.Buffer) {
 func editorCommands(t *testing.T, s *Shell, commands ...string) {
 	t.Helper()
 	for _, c := range commands {
-		exit, err := s.executeLine(context.Background(), c, confirmYes())
+		var input <-chan byte
+		if c == "exit" || c == "cancel" {
+			input = confirmYes()
+		}
+		exit, err := s.executeLine(context.Background(), c, input)
 		if exit || err != nil {
 			t.Fatalf("%q: exit=%v err=%v", c, exit, err)
 		}
@@ -186,7 +190,7 @@ func TestRootDiscoveryUsesMinimalMenuAndConfigListsFiles(t *testing.T) {
 	s, _, out := editorFixture(t)
 	editorCommands(t, s, "?", "config ?")
 	text := out.String()
-	for _, name := range []string{"execute", "config", "whoami", "clear", "exit", "options"} {
+	for _, name := range []string{"execute", "config", "passwd", "clear", "exit", "options"} {
 		if !strings.Contains(text, name) {
 			t.Fatalf("missing %s", name)
 		}

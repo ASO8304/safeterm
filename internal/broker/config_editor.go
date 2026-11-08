@@ -351,7 +351,6 @@ func (s *Shell) editorHelp(fields []string) error {
 		s.helpRow(name, description)
 	}
 	if len(fields) == 0 {
-		row("?", "Show available commands; command ? keeps your input")
 		row("exit", exitDescription)
 		for _, r := range [][2]string{{"show", "Show values including staged changes; secrets are hidden"}, {"edit SECTION", "Select a registered section"}, {"set KEY VALUE", "Stage a value; omit VALUE for a secret"}, {"diff", "Show unsaved changes"}, {"next", nextDescription}, {"save", "Validate and commit all changes, then leave configuration"}, {"rollback", "Restore the latest file backup; asks for confirmation"}, {"cancel", "Discard unsaved changes and leave configuration"}, {"clear", globalDescriptions["clear"]}} {
 			if !e.inSection && (r[0] == "set KEY VALUE" || r[0] == "next") {
@@ -431,7 +430,7 @@ func (s *Shell) editorCompletion(before, prefix string) []string {
 		index++
 	}
 	if index <= 0 {
-		commands := []string{"?", "show", "set", "diff", "save", "cancel", "rollback", "next", "exit", "clear"}
+		commands := []string{"show", "set", "diff", "save", "cancel", "rollback", "next", "exit", "clear"}
 		if !s.editing.logical {
 			commands = append(commands, "edit")
 		}

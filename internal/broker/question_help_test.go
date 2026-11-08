@@ -46,11 +46,11 @@ func TestQuestionHelpFromEditorReturnsToPrompt(t *testing.T) {
 	catalog, _ := NewCatalog(brokerTestConfig())
 	var output bytes.Buffer
 	client := &fakeGateway{}
-	shell, _ := NewShell(client, catalog, Principal{UserID: "viewer", Roles: []string{"viewer"}}, strings.NewReader("execute ?\r\x15whoami\rexit\r"), &output)
+	shell, _ := NewShell(client, catalog, Principal{UserID: "viewer", Roles: []string{"viewer"}}, strings.NewReader("execute ?\r\x15clear\rexit\r"), &output)
 	if err := shell.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "System information") || !strings.Contains(output.String(), "user: viewer") || !strings.Contains(output.String(), "bye") {
+	if !strings.Contains(output.String(), "System information") || !strings.Contains(output.String(), "Authenticated as viewer") || !strings.Contains(output.String(), "bye") {
 		t.Fatalf("help did not return to prompt: %q", output.String())
 	}
 	if len(client.requests) != 0 {
@@ -63,9 +63,9 @@ func TestQuestionHelpRetainsEditablePrefixAndNeverDispatches(t *testing.T) {
 		{"execute ?\rsystem_info host\r", "execute system_info host"},
 		{"execute ?\r?\rsystem_info host\r\n", "execute system_info host"},
 		{"execute system_info ?\rhost\r", "execute system_info host"},
-		{"execute ?\r\n\x15whoami\r\n", "whoami"},
-		{"?\rwhoami\r", "whoami"},
-		{"execute forbidden ?\r\x15whoami\r", "whoami"},
+		{"execute ?\r\n\x15clear\r\n", "clear"},
+		{"?\rclear\r", "clear"},
+		{"execute forbidden ?\r\x15clear\r", "clear"},
 	} {
 		t.Run(tc.input, func(t *testing.T) {
 			catalog, _ := NewCatalog(brokerTestConfig())
@@ -122,7 +122,7 @@ func TestLoginShowsCommandMenuForSSH(t *testing.T) {
 		t.Fatal(err)
 	}
 	menu, _, _ := strings.Cut(out.String(), s.prompt())
-	for _, want := range []string{"?                        Show available commands", "execute                  Execute an authorized command", "config                   Select a configuration file"} {
+	for _, want := range []string{"passwd                   Change your own login password", "execute                  Execute an authorized command", "config                   Select a configuration file"} {
 		if !strings.Contains(menu, want) {
 			t.Fatalf("login missing %q: %s", want, menu)
 		}

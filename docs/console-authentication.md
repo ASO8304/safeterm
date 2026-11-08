@@ -54,6 +54,27 @@ sessions on their next verification; streams recheck within 15 seconds. A new
 Linux UID requires a coordinated service restart. Linux account names and UIDs
 should not be recycled while their SafeTerm mappings remain enabled.
 
+### Linux account restrictions are a separate boundary
+
+The mapping grants SafeTerm roles; it does not remove existing Linux authority.
+For an operator who must be restricted to SafeTerm, set the fixed Console login
+shell, remove sudo grants and unrelated privileged groups (including equivalents
+such as Docker/LXD access), and restrict other login/file-transfer entry points.
+An account that can already obtain root remains a Linux administrator regardless
+of its SafeTerm roles. Review sudoers, groups, SSH configuration and writable
+privileged files when provisioning the account. SafeTerm does not perform these
+changes automatically.
+
+Linux/PAM authenticates the account. `/etc/passwd` contains the account UID, home
+and shell; local password hashes normally live in `/etc/shadow`, not the SafeTerm
+mapping. Identity uses kernel UID/PID credentials and root-controlled role
+mappings, rather than trusting `USER`, environment variables or the prompt name.
+The Console runs without root, disables dumpability and enables no_new_privs.
+Execution/configuration services independently enforce authorized operations,
+parameter constraints, file boundaries and audit requirements. These controls
+reduce escalation paths; they are not an absolute guarantee against kernel,
+PAM or SafeTerm vulnerabilities, or against a compromised Linux administrator.
+
 Update and remove mappings with:
 
 ```sh
@@ -62,8 +83,13 @@ sudo termctl user del console --id alice --os-user alice
 sudo termctl user list
 ```
 
-Linux manages these users' passwords (`sudo passwd alice`); SafeTerm password
-commands apply to the separate legacy internal users. Package upgrades preserve
+At the root SafeTerm prompt, `passwd` (alias `change_pass`) verifies the current
+password and asks twice for the replacement without echo or history. For a mapped
+Console account it changes that account's Linux password through the system
+passwd/PAM policy. For a legacy internal Console account it updates only
+`access/console/users.json`; for SSH it updates only `access/ssh/users.json`.
+It cannot select another user, change roles or grant sudo. Linux administrators
+can still use `sudo passwd alice` outside SafeTerm. Package upgrades preserve
 both mapping and credential files. See [terminal presentation](../configs/docs/terminal.md)
 for branding, prompt formatting and confirmation before discarding drafts.
 
@@ -224,7 +250,7 @@ privileged verification-only IPC, stream authentication and operation cancellati
 at expiry. Existing SSH/public-boundary tests must remain green.
 
 On a disposable installed host, create two Console users with different roles,
-open two `sudo -iu safeterm` sessions, and verify `whoami`, `execute ?`, `config ?`
+open two `sudo -iu safeterm` sessions, and verify the login identity, `execute ?`, `config ?`
 and differing permissions. Enter an incorrect password, then reset one user's
 password from the administrator shell: its old session must fail subsequent
 requests, while the other session continues. Check that the shared account

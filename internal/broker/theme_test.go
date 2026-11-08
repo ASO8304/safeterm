@@ -107,11 +107,11 @@ func TestThemeKeepsHelpInputAndSecretEntryBehavior(t *testing.T) {
 	s, _, out := editorFixture(t)
 	s.SetTerminal("xterm-256color")
 	input := make(chan byte, 128)
-	for _, b := range []byte("execute ?\r\x15whoami\r") {
+	for _, b := range []byte("execute ?\r\x15clear\r") {
 		input <- b
 	}
 	line, err := s.readLine(context.Background(), input, s.prompt(), false, true)
-	if err != nil || line != "whoami" || !strings.Contains(out.String(), s.prompt()+"execute ") {
+	if err != nil || line != "clear" || !strings.Contains(out.String(), s.prompt()+"execute ") {
 		t.Fatal(line, err, out)
 	}
 	out.Reset()

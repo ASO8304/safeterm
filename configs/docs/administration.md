@@ -357,7 +357,7 @@ next leaves a selected item while keeping edits staged; save validates and
 commits the editor. Network save stores a candidate for the separate timed
 execute network apply flow. cancel discards the current editor and returns to
 root. Parent-menu exit discards retained logical drafts under that menu.
-whoami is available only at root. clear remains available in all contexts.
+passwd changes your own login password at root; clear remains available in all contexts.
 
 Choose a menu child by typing its name, or use edit with a relative path. From
 the config menu, edit network interface opens the interface list directly.
@@ -377,7 +377,7 @@ Logical contexts retain drafts in their parent menu; reopen the context to
 continue or save. Parent-menu exit discards drafts under that menu. Each logical
 context saves independently with its original version check.
 
-exit moves up one level; root exit closes the session. whoami is root-only,
+exit moves up one level; root exit closes the session. passwd is root-only,
 and clear works everywhere. Leaving a dirty item with exit asks for confirmation before discarding its edits. execute tcp-test IP [PORT] is the port
 probe; execute telnet remains an alias and prints a migration notice.
 
@@ -394,3 +394,21 @@ SSH broker process environment to disable colors. SSH reads TERM from the PTY
 request; arbitrary client environment variables are not accepted.
 
 Linux-account Console login without a second prompt is described in docs/console-authentication.md. Terminal branding and prompt templates live in terminal.json; see docs/terminal.md.
+
+
+## Self-service passwords and capture arguments
+
+At root, passwd (alias change_pass) verifies the current password and asks for
+a new password twice, with no echo or history. It changes only the current
+login: Linux/PAM for a mapped Console account, access/console/users.json for a
+legacy Console identity, or access/ssh/users.json for SSH. It cannot target
+another user or change roles. Key-only SSH users need an administrator to
+provision a password before this old-password-verified flow is available.
+The password service can be managed with termctl service status password-manager.
+
+Use execute capture host 192.0.2.10 port 443 protocol tcp. Host or port remains
+required; protocol is optional. Signed validators still constrain all values.
+Typed ? still opens help and preserves input; its help row and Tab entry are hidden.
+Intentional Ctrl+C stops are reported as stopped in production; typed port-probe
+diagnoses are shown without a redundant generic error. show_result=true retains
+the debugging result summaries.

@@ -50,7 +50,7 @@ done
 [ -s "$known_hosts" ] || { echo "SSH Broker did not become ready" >&2; exit 1; }
 
 output="$work_dir/demo-output.txt"
-printf 'whoami\rexecute ?\rexecute system_info host\rexecute system_info memory\rconfig ?\rexit\r' | \
+printf 'clear\rexecute ?\rexecute system_info host\rexecute system_info memory\rconfig ?\rexit\r' | \
   ssh -tt -p 2222 -i "$work_dir/secrets/alice_ed25519" -o IdentitiesOnly=yes \
   -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$known_hosts" alice@127.0.0.1 >"$output"
 grep -q 'Authenticated as alice' "$output"

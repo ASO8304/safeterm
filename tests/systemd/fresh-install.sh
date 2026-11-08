@@ -44,7 +44,7 @@ wait_ready() {
   for attempt in {1..30}; do
     ready=true
     for socket in /run/safeterm-gateway/gateway.sock /run/safeterm-log-reader/runner.sock /run/safeterm-config-writer/writer.sock \
-      /run/safeterm-config-{application,database,network}/manager.sock; do
+      /run/safeterm-config-{application,database,network}/manager.sock /run/safeterm-password-manager/manager.sock; do
       [[ -S $socket ]] || ready=false
     done
     if $ready && systemctl --quiet is-active safeterm-runner-log-reader.service; then return; fi
@@ -53,6 +53,8 @@ wait_ready() {
   echo 'required SafeTerm sockets never became ready' >&2; return 1
 }
 wait_ready
+python3 "$repo/tests/systemd/password-smoke.py" ssh
+python3 "$repo/tests/systemd/password-smoke.py" console
 python3 "$repo/tests/systemd/console-smoke.py" production
 # Enable summaries explicitly for the remaining debugging/compatibility checks.
 python3 - <<'PY'
@@ -68,9 +70,11 @@ termctl check
 python3 "$repo/tests/systemd/console-smoke.py" empty
 # A per-person Linux login enters SafeTerm without its own password prompt.
 useradd --create-home --shell /usr/local/bin/safeterm-console --groups safeterm-clients,safeterm-gateway ci-linux
+printf 'ci-linux:SmokeTest42\n' | chpasswd
 termctl user add console --id ci-admin --os-user ci-linux --roles viewer,netops,config-viewer,config-operator
 termctl service restart all
 wait_ready
+python3 "$repo/tests/systemd/password-smoke.py" linux
 python3 "$repo/tests/systemd/console-smoke.py" linux
 install -d -m 0755 /etc/safeterm-ci
 printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 8080 ; keep comment\n' >/etc/safeterm-ci/options.ini

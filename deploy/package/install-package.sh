@@ -53,7 +53,7 @@ start_services=true
 local_key_dir=/root/.config/safeterm
 transaction_root=/var/backups/safeterm-installer
 transaction=
-units='safeterm-network-manager.service safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
+units='safeterm-network-manager.service safeterm-audit.service safeterm-config-writer.service safeterm-identity.service safeterm-password-manager.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service'
 
 stop_units_if_present() {
   for unit in "$@"; do
@@ -173,6 +173,7 @@ create_install_transaction() {
 
   replace_paths='/usr/local/bin/safeterm-audit
 /usr/local/bin/safeterm-identity
+/usr/local/bin/safeterm-password-manager
 /usr/local/bin/safeterm-config-manager
 /usr/local/bin/safeterm-network-manager
 /usr/local/bin/safeterm-config-writer
@@ -195,6 +196,7 @@ create_install_transaction() {
 /etc/systemd/system/safeterm-config-writer.service.d
 /etc/systemd/system/safeterm-audit.service
 /etc/systemd/system/safeterm-identity.service
+/etc/systemd/system/safeterm-password-manager.service
 /etc/systemd/system/safeterm-runner-diagnostics.service
 /etc/systemd/system/safeterm-runner-network-observer.service
 /etc/systemd/system/safeterm-runner-log-reader.service
@@ -340,7 +342,7 @@ install -m 0644 "$payload/console/linux-users.json" "$work/config/access/console
 
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
-for name in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl password-hash identity; do
+for name in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl password-hash identity password-manager; do
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
@@ -390,6 +392,7 @@ if [ -f /etc/systemd/system/safeterm-ssh-broker.service ]; then
   stop_units_if_present safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   stop_units_if_present safeterm-network-manager.service
   stop_units_if_present safeterm-config-writer.service
+  stop_units_if_present safeterm-password-manager.service
   stop_units_if_present safeterm-identity.service
   stop_units_if_present safeterm-audit.service
 fi
@@ -412,16 +415,17 @@ else
 fi
 /usr/local/bin/safeterm-preflight --installed
 if [ "$start_services" = true ]; then
-  systemctl enable safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl enable safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-password-manager.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
   systemctl restart safeterm-audit.service
   systemctl restart safeterm-config-writer.service
   systemctl restart safeterm-identity.service
+  systemctl restart safeterm-password-manager.service
   systemctl restart safeterm-network-manager.service
   systemctl restart safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service
   systemctl restart safeterm-gateway.service
   systemctl restart safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service
   systemctl restart safeterm-ssh-broker.service
-  systemctl --quiet is-active safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
+  systemctl --quiet is-active safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-password-manager.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 safeterm_cleanup_legacy_managed /etc/safeterm-managed
 echo "SafeTerm package installation: PASS"

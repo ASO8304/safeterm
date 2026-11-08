@@ -281,7 +281,7 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 		f = f[:len(f)-1]
 	}
 	if e := s.networkEdit; e != nil {
-		values := []string{"?", "edit", "show", "diff", "save", "cancel", "exit", "clear"}
+		values := []string{"edit", "show", "diff", "save", "cancel", "exit", "clear"}
 		if e.kind == "route" {
 			values = append(values, "delete", "add")
 		}

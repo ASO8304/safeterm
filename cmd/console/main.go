@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"golang.org/x/sys/unix"
 	"os"
@@ -24,6 +25,7 @@ import (
 	"safeterm/internal/isolation"
 	"safeterm/internal/layout"
 	"safeterm/internal/networkmanager"
+	"safeterm/internal/passwordchange"
 	"safeterm/internal/terminalconfig"
 )
 
@@ -152,6 +154,25 @@ func run() error {
 	if err := shell.SetPresentation(presentation); err != nil {
 		return err
 	}
+	passwords := passwordchange.Client{Path: passwordchange.Socket, UID: 0}
+	shell.SetPasswordChanger(func(ctx context.Context, p broker.Principal, old, next []byte) (broker.Principal, error) {
+		err := passwords.Change(ctx, passwordchange.Request{BrokerType: p.BrokerType, UserID: p.UserID, Session: p.ConsoleSession, Current: old, New: next})
+		if errors.Is(err, passwordchange.ErrChanged) {
+			return p, broker.ErrPasswordChangedSignIn
+		}
+		if err != nil {
+			return p, err
+		}
+		if current.Username == "safeterm" {
+			session, err := identityClient.Login(ctx, p.UserID, next)
+			if err != nil {
+				return p, broker.ErrPasswordChangedSignIn
+			}
+			p.ConsoleSession = session.Token
+			p.Roles = session.Roles
+		}
+		return p, nil
+	})
 	shell.SetNetworkClient(networkClient)
 	return shell.Run(ctx)
 }

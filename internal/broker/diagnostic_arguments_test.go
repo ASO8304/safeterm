@@ -76,7 +76,7 @@ func TestUDPDiagnosticUsesRequiredPortAndAuthorizedNetcatOperation(t *testing.T)
 	if client.requests[0].Command != "udp-test" || client.requests[0].Arguments["port"] != "53" {
 		t.Fatal(client.requests)
 	}
-	editorCommands(t, s, "whoami")
+	editorCommands(t, s, "clear")
 	viewer, _ := NewShell(client, catalog, Principal{UserID: "alice", Roles: []string{"viewer"}}, strings.NewReader(""), &bytes.Buffer{})
 	if _, err := viewer.executeLine(context.Background(), "execute udp-test 127.0.0.1 53", nil); err == nil || len(client.requests) != 1 {
 		t.Fatal("viewer ran a UDP scan", err)
@@ -127,8 +127,8 @@ func TestTelnetCtrlCStopsOnlyOperation(t *testing.T) {
 	if err != nil || exit || len(gateway.terminated) != 1 {
 		t.Fatal(exit, err, gateway.terminated)
 	}
-	editorCommands(t, s, "whoami")
-	if !strings.Contains(out.String(), "user: alice") {
+	editorCommands(t, s, "clear")
+	if !strings.Contains(out.String(), "\x1b[2J\x1b[H") {
 		t.Fatal("SafeTerm prompt was not usable after Ctrl+C")
 	}
 	if gateway.requests[0].Command != "telnet" || gateway.requests[0].Arguments["host"] != "127.0.0.1" || gateway.requests[0].Arguments["port"] != "23" {

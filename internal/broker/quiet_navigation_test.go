@@ -72,11 +72,11 @@ func TestTabOffersDomainItemsInsteadOfControlCommands(t *testing.T) {
 
 func TestRootMenuPrintsOnceOnLoginAndHelpRemainsExplicit(t *testing.T) {
 	s, _, out := uxNetworkFixture(t)
-	s.input = strings.NewReader("config network\rinterface\redit ip1\rexit\rexit\rexit\rexit\rwhoami\rexit\r")
+	s.input = strings.NewReader("config network\rinterface\redit ip1\rexit\rexit\rexit\rexit\rclear\rexit\r")
 	if err := s.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if strings.Count(out.String(), "Show available commands;") != 1 || strings.Contains(out.String(), "Select an existing network interface") || !strings.Contains(out.String(), "user: alice") || !strings.Contains(out.String(), "bye") {
+	if strings.Count(out.String(), "Execute an authorized command;") != 1 || strings.Contains(out.String(), "Select an existing network interface") || !strings.Contains(out.String(), "Authenticated as alice") || !strings.Contains(out.String(), "bye") {
 		t.Fatal(out.String())
 	}
 

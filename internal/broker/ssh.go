@@ -19,17 +19,18 @@ var terminalPattern = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
 const maxSSHConnections = 128
 
 type SSHServer struct {
-	presentation terminalconfig.Config
-	network      networkmanager.API
-	address      string
-	config       *ssh.ServerConfig
-	client       GatewayClient
-	catalog      *Catalog
-	configs      *ConfigBroker
-	mu           sync.Mutex
-	active       map[net.Conn]bool
-	slots        chan struct{}
-	wg           sync.WaitGroup
+	passwordChange PasswordChanger
+	presentation   terminalconfig.Config
+	network        networkmanager.API
+	address        string
+	config         *ssh.ServerConfig
+	client         GatewayClient
+	catalog        *Catalog
+	configs        *ConfigBroker
+	mu             sync.Mutex
+	active         map[net.Conn]bool
+	slots          chan struct{}
+	wg             sync.WaitGroup
 }
 
 func NewSSHServer(address string, hostKey ssh.Signer, authenticator *SSHAuthenticator, client GatewayClient, catalog *Catalog) (*SSHServer, error) {
@@ -215,6 +216,7 @@ func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requ
 					} else {
 						_ = shell.SetPresentation(s.presentation)
 						shell.SetTerminal(terminal)
+						shell.SetPasswordChanger(s.passwordChange)
 						shell.SetNetworkClient(s.network)
 						go func() { shellDone <- shell.Run(ctx) }()
 					}

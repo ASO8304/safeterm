@@ -70,12 +70,12 @@ try:
     login_menu = expect(b'\nsafeterm::ci-admin> ')
     if b'\x1b[1;36msafeterm\x1b[0m::\x1b[32mci-admin\x1b[0m' not in transcript:
         raise RuntimeError('Console did not enable colors for the interactive terminal')
-    if b'Show available commands' not in login_menu or b'Show your identity and roles' not in login_menu:
+    if b'Execute an authorized command' not in login_menu or b'Change your own login password' not in login_menu:
         raise RuntimeError('login did not show the command menu')
     if mode == 'linux':
         if b'Username:' in login_menu or b'Password:' in login_menu:
             raise RuntimeError('Linux login asked for second authentication')
-        if b'user: ci-admin' not in command('whoami'):
+        if b'Change your current login' not in command('passwd ?'):
             raise RuntimeError('Linux mapping did not establish SafeTerm identity')
         command('config network interface', b'\nsafeterm::ci-admin(network/interface)> ')
         command('show', b'\nsafeterm::ci-admin(network/interface)> ')
@@ -129,7 +129,7 @@ try:
             expect(('Trying 127.0.0.1:' + port).encode('ascii'))
             os.write(fd, b'\x03')
             expect(b'\nsafeterm::ci-admin> ')
-            if b'user: ci-admin' not in command('whoami'):
+            if b'Change your current login' not in command('passwd ?'):
                 raise RuntimeError('UDP Ctrl+C closed SafeTerm instead of only the probe')
         # Delay only this disposable loopback destination so Ctrl+C crosses the
         # real Console -> Gateway -> Runner -> native dial cancellation path.
@@ -148,7 +148,7 @@ try:
                 expect(('Trying 127.0.0.1:' + port).encode('ascii'))
                 os.write(fd, b'\x03')
                 expect(b'\nsafeterm::ci-admin> ')
-                if b'user: ci-admin' not in command('whoami'):
+                if b'Change your current login' not in command('passwd ?'):
                     raise RuntimeError('Ctrl+C closed SafeTerm instead of only the probe')
             finally:
                 subprocess.run([firewall, '-w', '5', '-D', *rule], check=True)

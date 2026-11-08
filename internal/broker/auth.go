@@ -39,10 +39,11 @@ type SSHIdentityConfig struct {
 }
 
 type SSHAuthenticator struct {
-	byFingerprint map[string]Principal
-	byPassword    map[string]passwordIdentity
-	passwordSlots chan struct{}
-	dummyHash     []byte
+	passwordSource func() (*SSHAuthenticator, error)
+	byFingerprint  map[string]Principal
+	byPassword     map[string]passwordIdentity
+	passwordSlots  chan struct{}
+	dummyHash      []byte
 }
 
 func LoadSSHAuthenticator(path string, knownRoles map[string]bool) (*SSHAuthenticator, error) {
@@ -60,7 +61,29 @@ func LoadSSHAuthenticator(path string, knownRoles map[string]bool) (*SSHAuthenti
 	if err := decoder.Decode(&trailing); err != io.EOF {
 		return nil, fmt.Errorf("broker: SSH identity file has trailing data")
 	}
-	return NewSSHAuthenticator(config, knownRoles)
+	result, err := NewSSHAuthenticator(config, knownRoles)
+	if err != nil {
+		return nil, err
+	}
+	result.passwordSource = func() (*SSHAuthenticator, error) {
+		fresh, err := readSecurityFile(path, "SSH identity file", maxIdentityFileBytes, 0o027)
+		if err != nil {
+			return nil, err
+		}
+		defer clear(fresh)
+		var users SSHIdentityConfig
+		d := json.NewDecoder(bytes.NewReader(fresh))
+		d.DisallowUnknownFields()
+		if err := d.Decode(&users); err != nil {
+			return nil, err
+		}
+		var extra any
+		if d.Decode(&extra) != io.EOF {
+			return nil, fmt.Errorf("invalid SSH credentials")
+		}
+		return NewSSHAuthenticator(users, knownRoles)
+	}
+	return result, nil
 }
 
 func NewSSHAuthenticator(config SSHIdentityConfig, knownRoles map[string]bool) (*SSHAuthenticator, error) {
@@ -202,6 +225,13 @@ func (a *SSHAuthenticator) AuthenticatePassword(metadata ssh.ConnMetadata, passw
 	}
 	defer func() { <-a.passwordSlots }()
 	identity, exists := a.byPassword[metadata.User()]
+	if a.passwordSource != nil {
+		fresh, err := a.passwordSource()
+		if err != nil {
+			return nil, failed
+		}
+		identity, exists = fresh.byPassword[metadata.User()]
+	}
 	hash := a.dummyHash
 	if exists {
 		hash = identity.hash

@@ -26,7 +26,7 @@ var networkEditorDescriptions = map[string]string{
 	"exit":     exitDescription,
 	"save":     "Validate and commit the candidate, then exit; does not apply networking",
 	"cancel":   "Exit and discard unsaved editor changes; keep any previously saved candidate",
-	"add":      "Create a route draft with an automatic ID; then use set FIELD VALUE",
+	"add":      "Guided route creation: destination, gateway, interface and metric",
 	"delete":   "Remove a route by ID; default routes are protected",
 }
 var networkInterfaceFields = map[string]string{
@@ -40,8 +40,8 @@ var networkInterfaceFields = map[string]string{
 var networkRouteFields = map[string]string{
 	"interface":   "Allowed outgoing interface for this route",
 	"destination": "Destination network CIDR, e.g. 10.50.0.0/16 or 0.0.0.0/0",
-	"gateway":     "Gateway IP without a CIDR prefix, e.g. 192.168.222.1; same IP family as destination",
-	"metric":      "Route priority from 0 to 4294967295; lower values are preferred",
+	"gateway":     "Gateway IP without a CIDR prefix, or direct for no gateway; same IP family as destination",
+	"metric":      "Route priority from 0 to 4294967295, or auto; lower values are preferred",
 }
 
 func (s *Shell) networkHelpRow(name, description string) {
@@ -67,7 +67,7 @@ func (s *Shell) networkActionHelp(fields []string) error {
 	return fmt.Errorf("usage: execute network ? or execute network ACTION ?")
 }
 func (s *Shell) networkContextHelp(kind string, selected bool) {
-	values := []string{"?", "edit", "show", "diff", "save", "cancel", "exit", "clear"}
+	values := []string{"edit", "show", "diff", "save", "cancel", "exit", "clear"}
 	if kind == "route" {
 		values = append(values, "delete", "add")
 	}
@@ -90,7 +90,7 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 			if kind == "interface" {
 				desc = "Select an existing network interface"
 			} else {
-				desc = "Select an existing route by ID; use edit 1 or add to create a route"
+				desc = "Guided edit by ID, e.g. edit 1; Enter keeps current values; set commands remain available"
 			}
 		}
 		if name == "show" && kind == "route" {

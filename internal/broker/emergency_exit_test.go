@@ -77,7 +77,7 @@ func TestEmergencyExitCancelsStalledOperations(t *testing.T) {
 				command = "execute udp-test 127.0.0.1 53\r"
 			}
 			if operation == "capture" {
-				command = "execute capture host=127.0.0.1 port=999\r"
+				command = "execute capture port 999\r"
 			}
 			if _, err := io.WriteString(writer, command); err != nil {
 				t.Fatal(err)

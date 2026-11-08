@@ -36,7 +36,7 @@ mkdir -p "$staging/payload/bin" "$staging/payload/catalog-source" "$staging/payl
   "$staging/payload/console" "$staging/payload/systemd" \
   "$staging/payload/templates"
 
-for entry in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl catalog-prepare catalog-sign password-hash identity; do
+for entry in audit network-manager config-manager config-writer console gateway runner ssh-broker preflight termctl catalog-prepare catalog-sign password-hash identity password-manager; do
   (cd "$repo_dir" && CGO_ENABLED=0 GOOS=linux GOARCH="$target_arch" \
     go build -trimpath -o "$staging/payload/bin/safeterm-$entry" "./cmd/$entry")
   chmod 0555 "$staging/payload/bin/safeterm-$entry"

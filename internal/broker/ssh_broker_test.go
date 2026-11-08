@@ -228,7 +228,7 @@ func TestSSHServerProvidesPTYRestrictedShellAndRejectsExec(t *testing.T) {
 	if err := session.Shell(); err != nil {
 		t.Fatal(err)
 	}
-	_, _ = io.WriteString(stdin, "whoami\rexit\r")
+	_, _ = io.WriteString(stdin, "clear\rexit\r")
 	result, err := io.ReadAll(stdout)
 	if err != nil {
 		t.Fatal(err)
@@ -240,7 +240,7 @@ func TestSSHServerProvidesPTYRestrictedShellAndRejectsExec(t *testing.T) {
 	if !strings.Contains(text, "\x1b[1;36msafeterm\x1b[0m::\x1b[32malice\x1b[0m") {
 		t.Fatalf("PTY terminal type did not enable the prompt theme: %q", text)
 	}
-	if !strings.Contains(text, "SafeTerm restricted shell") || !strings.Contains(text, "user: alice") || !strings.Contains(text, "roles: netops") {
+	if !strings.Contains(text, "SafeTerm restricted shell") || !strings.Contains(text, "Authenticated as alice") {
 		t.Fatalf("unexpected terminal output: %q", text)
 	}
 	cancel()

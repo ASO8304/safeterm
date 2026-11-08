@@ -14,7 +14,7 @@ func TestConsoleLoginUsesInternalIdentityAndNeverEchoesPassword(t *testing.T) {
 	gateway := &fakeGateway{}
 	var out bytes.Buffer
 	logins, logouts := 0, 0
-	shell, err := NewAuthenticatedConsoleShell(gateway, catalog, strings.NewReader("alice\rGoodPassword42\rwhoami\rexit\r"), &out, nil, func(_ context.Context, user string, password []byte) (Principal, time.Time, error) {
+	shell, err := NewAuthenticatedConsoleShell(gateway, catalog, strings.NewReader("alice\rGoodPassword42\rclear\rexit\r"), &out, nil, func(_ context.Context, user string, password []byte) (Principal, time.Time, error) {
 		logins++
 		if user != "alice" || string(password) != "GoodPassword42" {
 			t.Fatal("wrong credentials")
@@ -27,10 +27,10 @@ func TestConsoleLoginUsesInternalIdentityAndNeverEchoesPassword(t *testing.T) {
 	if err = shell.Run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if logins != 1 || logouts != 1 || !strings.Contains(out.String(), "Authenticated as alice") || !strings.Contains(out.String(), "user: alice") {
+	if logins != 1 || logouts != 1 || !strings.Contains(out.String(), "Authenticated as alice") || !strings.Contains(out.String(), "Authenticated as alice") {
 		t.Fatalf("logins=%d logouts=%d output=%q", logins, logouts, out.String())
 	}
-	if !strings.Contains(out.String(), "?                        Show available commands") {
+	if !strings.Contains(out.String(), "execute                  Execute an authorized command") {
 		t.Fatal("Console login did not show the command menu")
 	}
 	if strings.Contains(out.String(), "GoodPassword42") || strings.Contains(out.String(), strings.Repeat("a", 64)) {

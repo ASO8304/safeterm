@@ -279,7 +279,7 @@ func TestOperatorDemoExercisesPublicWorkflowAndReportsPass(t *testing.T) {
 	demo := readText(t, filepath.Join(repository, "deploy", "demo", "run-demo.sh"))
 	for _, required := range []string{
 		"ssh-keygen", "ssh-keyscan", "StrictHostKeyChecking=yes",
-		"whoami", "execute ?", "execute system_info host", "config ?",
+		"clear", "execute ?", "execute system_info host", "config ?",
 		"Mem:", "safeterm-preflight --installed",
 		"SafeTerm end-to-end demo: PASS",
 	} {

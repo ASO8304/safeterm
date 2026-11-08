@@ -24,7 +24,6 @@ func (s *Shell) showConfigurationMenu(ctx context.Context) error {
 	}
 	s.networkHelpRow("edit PATH", "Open a child or relative path; typing the path directly also works")
 	s.networkHelpRow("exit", exitDescription)
-	s.networkHelpRow("?", "Show this menu; command ? keeps your input")
 	s.networkHelpRow("cancel", "Return to the main prompt")
 	s.networkHelpRow("clear", globalDescriptions["clear"])
 	return nil
@@ -42,7 +41,7 @@ func (s *Shell) showConfigurationChildren(ctx context.Context) error {
 
 func (s *Shell) configurationMenuCommand(ctx context.Context, fields []string) (bool, bool, error) {
 	command := fields[0]
-	if command == "config" || command == "execute" || command == "whoami" || command == "clear" || command == "exit" || command == "logout" || command == "quit" {
+	if command == "config" || command == "execute" || command == "clear" || command == "exit" || command == "logout" || command == "quit" {
 		return false, false, nil
 	}
 	help := fields[len(fields)-1] == "?"

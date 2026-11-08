@@ -316,7 +316,7 @@ next leaves a selected item while keeping edits staged; save validates and
 commits the editor. Network save stores a candidate for the separate timed
 execute network apply flow. cancel discards the current editor and returns to
 root. Parent-menu exit discards retained logical drafts under that menu.
-whoami is available only at root. clear remains available in all contexts.
+passwd changes your own login password at root; clear remains available in all contexts.
 
 Choose a menu child by typing its name, or use edit with a relative path. From
 the config menu, edit network interface opens the interface list directly.
@@ -333,6 +333,16 @@ lines. A bare IP is rejected immediately with Address/Prefix guidance.
 
 Use `save` to validate and commit the candidate, `cancel` to discard the editor,
 `exit` to move up while discarding edits to the item, and `next` to move up while
-keeping edits staged. `exit` moves up one level; `whoami` is root-only and `clear` works everywhere.
-Leaving a dirty item discards its edits. Saving a network candidate never applies
+keeping edits staged. `exit` moves up one level; `passwd` is root-only and `clear` works everywhere.
+Leaving a dirty item asks before discarding its edits. Saving a network candidate never applies
 networking; the confirmed trial still starts with `execute network apply`.
+
+
+## Guided route changes
+
+Use add to enter destination, gateway, interface and metric. Use edit ID to
+change an existing route with current values as defaults. Enter keeps the shown
+value; cancel or Ctrl+C leaves the guide without changing the original draft.
+Use direct for no gateway and auto for automatic metric. Manual set commands
+remain available after the guide. Review show and diff, then save the candidate;
+execute network apply and execute network confirm remain separate steps.

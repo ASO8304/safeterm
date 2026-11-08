@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -19,6 +20,7 @@ import (
 	"safeterm/internal/isolation"
 	"safeterm/internal/layout"
 	"safeterm/internal/networkmanager"
+	"safeterm/internal/passwordchange"
 	"safeterm/internal/terminalconfig"
 )
 
@@ -121,6 +123,14 @@ func run(configDir, listenAddress, hostKeyPath, identitiesPath, gatewaySocket, g
 		return err
 	}
 	server.SetNetworkClient(networkClient)
+	passwords := passwordchange.Client{Path: passwordchange.Socket, UID: 0}
+	server.SetPasswordChanger(func(ctx context.Context, p broker.Principal, old, next []byte) (broker.Principal, error) {
+		err := passwords.Change(ctx, passwordchange.Request{BrokerType: p.BrokerType, UserID: p.UserID, Current: old, New: next})
+		if errors.Is(err, passwordchange.ErrChanged) {
+			return p, broker.ErrPasswordChangedSignIn
+		}
+		return p, err
+	})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
