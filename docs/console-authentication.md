@@ -2,29 +2,39 @@
 
 ## Single login through an individual Linux account
 
-Console operators can use their existing Linux login, mapped explicitly to a
+Console operators use an individual Linux login, mapped explicitly to a
 SafeTerm identity and roles. After Linux authenticates the account, the Console
 opens without another Username/Password prompt. SSH authentication is unchanged.
 
-Provision an existing individual account from a normal Linux administrator shell:
+Create a new Console account from a normal Linux administrator shell:
 
 ```sh
-sudo usermod -a -G safeterm-clients,safeterm-gateway alice
-sudo termctl user add console --id alice --os-user alice --roles viewer,netops,config-viewer,config-operator
-sudo termctl service restart all
+sudo termctl user add console --os-user alice --roles viewer,netops,config-viewer,config-operator
 ```
 
-Use only roles appropriate for that operator. Group membership takes effect on
-a new Linux login. From that login, run `termctl` without sudo. For a restricted
-account that should enter SafeTerm immediately at Linux login, set its shell:
+Choose a username that does not already exist on the system. Existing users,
+same-name groups and existing home paths are refused without adoption or changes.
+The command asks for a new Linux password twice without echo, creates the account
+with its own primary group and the required SafeTerm socket groups, sets its
+login shell to `/usr/local/bin/safeterm-console`, writes its role mapping and
+restarts SafeTerm services to load the UID. Existing sessions must reconnect.
+It refuses provisioning while a network trial or another lifecycle action holds
+the lifecycle lock. The account stays password-locked until access is ready.
+Failure removes its new mapping and leaves the new account password-locked;
+existing accounts are never converted, and no home directory is deleted.
+
+`--id` is optional and defaults to `--os-user`; use it only when the SafeTerm
+display identity should differ. Select roles appropriate for that operator.
+Then log in to Linux as `alice` using the new Linux password. SafeTerm opens
+directly without another Username/Password prompt. To test entry as an administrator:
 
 ```sh
-sudo usermod --shell /usr/local/bin/safeterm-console alice
+sudo -iu alice
 ```
 
-SafeTerm does not create the account, set its Linux password, change its shell,
-or grant groups automatically. Keep a separate Linux maintenance account. The
-mapping is stored without secrets in
+No sudo or unrelated privileged groups are granted. Keep a separate Linux
+maintenance account. Existing pre-v0.42 mappings continue to work without
+changing their Linux accounts. The mapping is stored without secrets in
 `/etc/safeterm/access/console/linux-users.json`, root-owned mode 0644:
 
 ```json
@@ -199,8 +209,9 @@ password enables that record and removes its old credential-file OS mapping.
 A roles-only update does not enable a disabled record that already has a hash.
 The upgrade does not delete existing Linux accounts or change their passwords.
 Per-person Linux login is now supported through the separate `linux-users.json`
-mapping described above; `termctl user add console --os-user` explicitly provisions
-that mapping. Old credential-file `os_user` metadata does not grant access.
+mapping described above. `termctl user add console --os-user` now creates a new
+account and mapping; it never converts an existing Linux account. Old
+credential-file `os_user` metadata does not grant access.
 Review/removal of unrelated Linux accounts is an administrator decision.
 Keep an ordinary administrator session available
 while upgrading; old Console processes lose access to the new authenticated

@@ -1,26 +1,33 @@
 # Console login through Linux
 
-Map each operator's existing Linux login to a SafeTerm identity and roles. From
-an ordinary Linux administrator account:
+Create each operator's new Linux account from an ordinary Linux administrator
+shell with one command:
 
 ```sh
-sudo usermod -a -G safeterm-clients,safeterm-gateway alice
-sudo termctl user add console --id alice --os-user alice --roles viewer,netops,config-viewer,config-operator
-sudo termctl service restart all
+sudo termctl user add console --os-user alice --roles viewer,netops,config-viewer,config-operator
 ```
 
-Choose roles for the operator's responsibilities. Log out of Linux and log back
-in to load new group memberships, then run `termctl` without sudo. SafeTerm opens
-without a second login prompt. For a restricted account that enters SafeTerm
-directly, set its Linux shell explicitly:
+Choose an unused username. The command refuses existing users, same-name groups
+and existing home paths without adopting or changing them. It asks for the new
+Linux password twice without echo, creates the home/private primary group, grants
+only the SafeTerm socket groups, assigns the SafeTerm login shell and saves the
+requested role mapping. --id is optional and defaults to --os-user.
 
-```sh
-sudo usermod --shell /usr/local/bin/safeterm-console alice
-```
+SafeTerm services restart to load the new UID; active sessions must reconnect.
+Provisioning is blocked during an active network trial or lifecycle operation.
+The new account stays password-locked until access is ready. Failure removes its
+new mapping and leaves the new account locked; home data is never deleted.
 
-Keep a separate Linux maintenance account. SafeTerm does not create accounts,
-set Linux passwords or change groups/shells automatically. Linux manages the
-password with `passwd`.
+Log in to Linux as alice with that Linux password. SafeTerm opens directly,
+without a second login prompt. An administrator can test entry with sudo -iu alice.
+Keep a separate Linux maintenance account; no sudo or unrelated privileged groups
+are granted. Existing older Console mappings remain supported without changing
+their Linux accounts. passwd inside SafeTerm changes the current login password.
+
+The fresh installer enrolls SSH and Linux Console users in separate steps. It
+does not copy SSH passwords into a Console store. Console enrollment is optional
+and requires an unused Linux username. Upgrades preserve existing identities;
+unattended installs defer Console provisioning to the command above.
 
 Mappings live in `/etc/safeterm/access/console/linux-users.json`, root-owned mode
 0644. The default is an empty `users` array. A record has `os_user`, `user_id`,

@@ -4,6 +4,9 @@
 
 Accepted. Extends the offline package installer and ADR-027 configuration preservation.
 
+The shared initial SSH/Console enrollment described below is superseded by
+[ADR-056](ADR-056-new-console-account-provisioning-and-independent-enrollment.md).
+
 ## Context
 
 Separate prerequisite installation, password hashing, signing flags and Console

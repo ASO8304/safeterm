@@ -19,10 +19,10 @@ func TestInstallerGuidedEnrollmentAndUnattendedBoundary(t *testing.T) {
 		name, input, setup, want string
 		fail                     bool
 	}{
-		{"default user", "\n", "", "RESULT:admin:true:", false},
-		{"custom user", "demo_admin\n", "", "RESULT:demo_admin:true:", false},
+		{"default user", "\n", "", "RESULT:admin:false:", false},
+		{"custom user", "demo_admin\n", "", "RESULT:demo_admin:false:", false},
 		{"invalid user", "bad user\n", "", "Invalid SafeTerm username", true},
-		{"explicit user", "", "ssh_user=automated; ssh_user_set=true", "RESULT:automated:true:", false},
+		{"explicit user", "", "ssh_user=automated; ssh_user_set=true", "RESULT:automated:false:", false},
 		{"unattended missing credential", "", "non_interactive=true", "Fresh installation needs credentials", true},
 		{"redirected input", "", "safeterm_has_terminal() { return 1; }", "Fresh installation needs credentials", true},
 		{"provided hash", "", "non_interactive=true; ssh_password_hash_file=/secure/hash", "RESULT:admin:false:/secure/hash", false},
@@ -61,6 +61,40 @@ printf 'RESULT:%s:%s:%s\n' "$ssh_user" "$bootstrap_console" "$ssh_password_hash_
 			info, err := os.Stat(filepath.Join(work, "bootstrap.hash"))
 			if err != nil || info.Mode().Perm() != 0600 {
 				t.Fatalf("unsafe temporary hash: %v %v", info, err)
+			}
+		})
+	}
+}
+
+func TestInstallerConsoleEnrollmentIsIndependentAndCanSkipOrRetry(t *testing.T) {
+	support, err := filepath.Abs("../../deploy/package/install-support.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, input, setup, want string }{
+		{"independent username", "y\nconsole-operator\n", "", "CREATED:console-operator"},
+		{"default username", "\n\n", "", "CREATED:console-admin"},
+		{"existing username retry", "y\nexisting\ny\nnew-operator\n", "", "CREATED:new-operator"},
+		{"skip", "n\n", "", "CREATED:"},
+		{"unattended", "", "non_interactive=true", "CREATED:"},
+		{"deferred start", "", "start_services=false", "CREATED:"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			code := `set -eu
+. "$SUPPORT"
+non_interactive=false; start_services=true; ssh_user=ssh-admin; ssh_password_hash_file=/secure/ssh.hash
+safeterm_has_terminal() { return 0; }
+safeterm_console_add() { [ "$1" != existing ]; }
+` + tc.setup + `
+safeterm_enroll_console
+printf 'CREATED:%s\nSSH:%s:%s\n' "$console_created" "$ssh_user" "$ssh_password_hash_file"
+`
+			cmd := exec.Command("sh", "-c", code)
+			cmd.Env = append(os.Environ(), "SUPPORT="+support)
+			cmd.Stdin = strings.NewReader(tc.input)
+			out, err := cmd.CombinedOutput()
+			if err != nil || !strings.Contains(string(out), tc.want) || !strings.Contains(string(out), "SSH:ssh-admin:/secure/ssh.hash") {
+				t.Fatal(string(out), err)
 			}
 		})
 	}

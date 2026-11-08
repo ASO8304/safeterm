@@ -34,6 +34,11 @@ if grep -q '^telnet ' "$work/catalog.txt"; then
 fi
 termctl catalog describe tcp-test >"$work/probe-description.txt"
 grep -q '^tcp-test:' "$work/probe-description.txt"
+python3 - <<'PY'
+import json
+with open('/etc/safeterm/access/console/users.json') as source:
+    assert json.load(source)['users'] == [], 'installer cloned SSH credentials into Console'
+PY
 termctl user add console --id ci-admin --roles viewer,netops,log-viewer,service-viewer,service-operator,config-viewer,config-operator --password-hash-file "$work/password.hash"
 # The legacy demo root must not be manufactured on a fresh installation.
 [[ ! -e /etc/safeterm-managed ]]
@@ -69,10 +74,7 @@ PY
 termctl check
 python3 "$repo/tests/systemd/console-smoke.py" empty
 # A per-person Linux login enters SafeTerm without its own password prompt.
-useradd --create-home --shell /usr/local/bin/safeterm-console --groups safeterm-clients,safeterm-gateway ci-linux
-printf 'ci-linux:SmokeTest42\n' | chpasswd
-termctl user add console --id ci-admin --os-user ci-linux --roles viewer,netops,config-viewer,config-operator
-termctl service restart all
+python3 "$repo/tests/systemd/console-provision.py"
 wait_ready
 python3 "$repo/tests/systemd/password-smoke.py" linux
 python3 "$repo/tests/systemd/console-smoke.py" linux
@@ -170,7 +172,7 @@ termctl user auth console --id ci-admin --roles viewer,netops,config-viewer,conf
 # the host key, explicit network policy, custom roles and Runner definitions.
 cp /etc/safeterm/network/policy.json "$work/policy-before.json"
 sha256sum /etc/safeterm/access/ssh/users.json /etc/safeterm/access/ssh/ssh_host_ed25519_key \
-  /etc/safeterm/access/console/users.json >"$work/credentials-before.sha256"
+  /etc/safeterm/access/console/users.json /etc/safeterm/access/console/linux-users.json >"$work/credentials-before.sha256"
 for pair in access/ssh:ssh access/console:console access/roles.d:roles.d access/policies.d:policies.d \
   commands/operations.d:operations.d commands/executables.d:executables.d commands/profiles.d:profiles.d \
   network/policy.json:network.json docs/network.md:NETWORK.md docs/network.txt:NETWORK.txt \
@@ -190,4 +192,5 @@ termctl update "$package"
 wait_ready
 python3 "$repo/tests/systemd/console-smoke.py" site
 mv "$work/offline.key" /root/.config/safeterm/catalog-ed25519.key
+python3 "$repo/tests/systemd/console-smoke.py" linux
 printf 'Declarative roles, profiles, operations, scoped sudo, rollback and signed offline update: PASS\n'

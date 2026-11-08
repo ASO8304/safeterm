@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -134,7 +135,8 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl user list")
 	fmt.Fprintln(out, "  termctl user add ssh|console --id ID --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
 	fmt.Fprintln(out, "  termctl user auth ssh|console --id ID [--password-hash-file FILE] [--authorized-key-file FILE]")
-	fmt.Fprintln(out, "  termctl user add|auth|del console --id ID --os-user LINUX_USER [--roles ROLE1,ROLE2] (Linux login, no second password)")
+	fmt.Fprintln(out, "  termctl user add console --os-user NEW_LINUX_USER --roles ROLE1,ROLE2 [--id ID] (create a new Linux Console account; existing usernames are refused)")
+	fmt.Fprintln(out, "  termctl user auth|del console --id ID --os-user LINUX_USER [--roles ROLE1,ROLE2] (manage an existing Console mapping)")
 	fmt.Fprintln(out, "  termctl user password ssh --id ID")
 	fmt.Fprintln(out, "  termctl user password console --id ID")
 	fmt.Fprintln(out, "  termctl user del ssh|console --id ID")
@@ -393,6 +395,12 @@ func userCommand(dir string, args []string, out io.Writer) error {
 	if err != nil {
 		return err
 	}
+	if kind == "console" && options.osUser != "" && options.id == "" {
+		options.id = options.osUser
+	}
+	if kind == "ssh" && options.osUser != "" {
+		return fmt.Errorf("--os-user applies only to Linux Console users; SSH identities are independent service accounts")
+	}
 	cfg, err := config.LoadConfig(layout.Catalog(dir))
 	if err != nil {
 		return err
@@ -401,6 +409,12 @@ func userCommand(dir string, args []string, out io.Writer) error {
 		return fmt.Errorf("--id is required")
 	}
 	if kind == "console" && options.osUser != "" {
+		if args[0] == "add" {
+			if options.roles == "" {
+				return fmt.Errorf("--roles is required")
+			}
+			return provisionLinuxConsoleUser(dir, options, cfg, out)
+		}
 		return linuxConsoleUser(dir, args[0], options, cfg, out)
 	}
 	if args[0] == "del" {
@@ -877,6 +891,35 @@ func execCommand(path string, args ...string) error {
 	return cmd.Run()
 }
 
+// Root-only initialization of a newly created Linux Console password. The
+// password is never passed in argv, an environment variable, a file or output.
+func setLinuxConsolePassword(name string, password []byte) error {
+	if os.Geteuid() != 0 || !consoleAccountName.MatchString(name) || name == "root" || name == "safeterm" || strings.HasPrefix(name, "safeterm-") {
+		return fmt.Errorf("invalid Linux Console password target")
+	}
+	if err := broker.ValidatePasswordComplexity(password); err != nil {
+		return err
+	}
+	input := make([]byte, 0, len(name)+len(password)+2)
+	input = append(input, name...)
+	input = append(input, ':')
+	input = append(input, password...)
+	input = append(input, '\n')
+	defer clear(input)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "/usr/sbin/chpasswd")
+	cmd.Env = []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C", "LC_ALL=C"}
+	cmd.Stdin = bytes.NewReader(input)
+	cmd.Stdout = io.Discard
+	cmd.Stderr = io.Discard
+	cmd.WaitDelay = 2 * time.Second
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("Linux password initialization failed; check the system password policy")
+	}
+	return nil
+}
+
 func writeCompletion(out io.Writer, args []string) error {
 	if len(args) != 1 || (args[0] != "bash" && args[0] != "zsh") {
 		return fmt.Errorf("usage: termctl completion bash|zsh")
@@ -923,6 +966,7 @@ func writeCompletion(out io.Writer, args []string) error {
           case "${COMP_WORDS[2]}" in add|auth|del|password) choices="ssh console" ;; esac
         elif [[ "$cur" == -* ]]; then
           choices="--id --roles --password-hash-file --authorized-key-file"
+          if [[ "${COMP_WORDS[3]}" == console ]]; then choices="$choices --os-user"; fi
         fi ;;
       update)
         if [[ "${COMP_WORDS[COMP_CWORD-1]}" == --signed-catalog ]]; then
@@ -954,6 +998,7 @@ complete -F _termctl_complete termctl
     user)
       if (( CURRENT == 3 )); then _values 'user action' list add auth del password
       elif (( CURRENT == 4 )); then _values 'identity' ssh console
+      elif [[ "$words[4]" == console ]]; then _values 'user option' --id --os-user --roles --password-hash-file --authorized-key-file
       else _values 'user option' --id --roles --password-hash-file --authorized-key-file; fi ;;
     update)
       if (( CURRENT == 3 )); then _files -/

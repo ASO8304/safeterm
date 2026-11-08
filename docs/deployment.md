@@ -88,8 +88,8 @@ Connect with an authorized key:
 ssh -t -p 2222 alice@HOST
 ```
 
-Inside the restricted terminal, run `whoami`, `list`, `execute system_info host`, and
-`config list`. Long-running `trace` output can be stopped with Ctrl+C, which
+Inside the restricted terminal, run `?`, `execute ?`, `execute system_info host`, and
+`config ?`. Long-running capture output can be stopped with Ctrl+C, which
 maps to the semantic terminate protocol.
 
 The prompt includes the authenticated identity, for example
@@ -98,24 +98,24 @@ parameters, config resources, sections, and fields. Arrow keys provide cursor
 movement and session history; Home, End, Delete, Backspace, Ctrl+A, Ctrl+E,
 Ctrl+U, Ctrl+W, and Ctrl+L provide normal line editing.
 
-For local Console access, create internal SafeTerm users, then enter through the
-shared restricted Linux account:
+For local Console access, create a new Linux Console account:
 
 ```bash
-sudo termctl user add console --id alice --roles viewer,netops,config-viewer
-sudo -iu safeterm
-# Username: alice
-# Password: (hidden)
+sudo termctl user add console --os-user alice --roles viewer,netops,config-viewer
+# New Linux password and confirmation: hidden
+sudo -iu alice
 ```
 
-Each person gets an internal identity, not a Linux account. The fixed login shell
-is `/usr/local/bin/safeterm-console`; it authenticates through the isolated
-`safeterm-identity.service` before showing `safeterm::alice>`. Only Identity can
-read the root-managed bcrypt credential file. Gateway and Config Managers verify
+The command refuses existing usernames and configures the new account's groups,
+role mapping and fixed `/usr/local/bin/safeterm-console` login shell. Linux/PAM
+authenticates the local login; no second SafeTerm password is required. Access
+is established through the isolated
+`safeterm-identity.service` before showing `safeterm::alice>`. Legacy internal
+credentials are readable only by Identity and trusted root helpers. Gateway and Config Managers verify
 opaque process-bound sessions and derive roles from Identity, rather than trusting
-the shared Linux UID or caller-provided roles. Passwords never enter command history.
+Linux username alone or caller-provided roles. Passwords never enter command history.
 
-The shared account is initially locked. For physical Linux login, a site may set
+The legacy shared account is initially locked. For physical Linux login, a site may set
 its separate entry password with `sudo passwd safeterm`; Linux PAM is unchanged.
 Internal authentication is still mandatory afterward. Existing Console mappings
 are preserved during upgrade but need an internal password before they can log in:

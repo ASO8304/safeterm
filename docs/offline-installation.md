@@ -19,22 +19,31 @@ sudo ./install.sh
 ```
 
 Use the corresponding arm64 filename on ARM. The guided installer checks OS
-dependencies, asks for the initial SafeTerm username/password and selects local
+dependencies, enrolls the initial SSH identity and selects local
 catalog signing. Only the protected key under /root/.config/safeterm can sign.
-The initial username is created in both internal SSH and Console identity maps;
-it is not a Linux user. Passwords are stored as hashes. Offline signing is
+SSH enrollment asks for its own SafeTerm username and password. Once installation
+is ready, a separate Console step offers to create a new Linux Console account
+with its own username and password. Existing Linux usernames are refused; choose
+an unused name. The Console account gets the SafeTerm login shell, socket groups
+and requested roles. SSH credentials are never copied into a Console store.
+Existing SSH, legacy Console and Linux Console users are preserved on upgrades.
+Passwords are stored as hashes. Offline signing is
 available through --prepare-catalog DIR and --signed-catalog DIR.
 
 ```sh
 sudo termctl service status all
 ssh -tt -p 2222 admin@SERVER_IP
-sudo -iu safeterm
+# Test a newly enrolled Linux Console account:
+sudo -iu console-admin
 ```
 
-The Console entry prompts for your internal username and password. Add independent
-users with `sudo termctl user add console --id alice --roles viewer,netops` or
-`sudo termctl user add ssh --id alice --roles viewer,netops`. SSH map changes
-need `sudo termctl service restart ssh`. Do not grant service account shells or sudo.
+The Linux Console account enters SafeTerm without another login prompt. Add more
+users with `sudo termctl user add console --os-user alice --roles viewer,netops`
+or `sudo termctl user add ssh --id remote-alice --roles viewer,netops`.
+Console provisioning asks for its Linux password, creates only a new account,
+and loads access automatically; existing sessions must reconnect. `--id` is
+optional for Linux Console users and defaults to their Linux username.
+Legacy shared-account internal Console users remain supported separately.
 
 ## Configure and update
 
@@ -77,6 +86,10 @@ Use `sudo ./install.sh --local-signing --non-interactive --ssh-user admin
 plan without installing. `--no-start` stages runtime without starting consumers;
 activation is required before use. Private signing keys are never copied from
 another host by default.
+
+Unattended and `--no-start` installs do not prompt for or clone Console users.
+After starting SafeTerm, provision a new Linux Console account interactively
+with `sudo termctl user add console --os-user NAME --roles ROLE1,ROLE2`.
 
 Build reproducible packages with `make offline-package OUTPUT=/tmp/package
 ARCH=amd64` (or arm64). Go and module dependencies are needed only on the build

@@ -82,25 +82,35 @@ the dedicated service runner's restricted grants, never general sudo.
 ## Users
 
 ```sh
-sudo termctl user add console --id alice --roles viewer,netops,config-viewer,config-operator
-sudo termctl user add ssh --id alice --roles viewer,netops
-sudo termctl user password console --id alice
-sudo termctl user password ssh --id alice
-sudo termctl user auth console --id alice --roles viewer
-sudo termctl user del ssh --id alice
+sudo termctl user add console --os-user alice --roles viewer,netops,config-viewer,config-operator
+sudo termctl user add ssh --id remote-alice --roles viewer,netops
+sudo termctl user password ssh --id remote-alice
+sudo termctl user auth console --id alice --os-user alice --roles viewer
+sudo termctl user del ssh --id remote-alice
 sudo termctl user list
 sudo termctl service restart ssh
-sudo -iu safeterm
+sudo -iu alice
 ```
 
-Add prompts twice without echo and stores bcrypt hashes only. Passwords require
+`add console --os-user` creates a new Linux account with the SafeTerm login shell,
+private primary group, required socket groups and root-controlled role mapping.
+It prompts twice without echo, waits for the reloaded services and sets the Linux
+password through the system's PAM password tool. Existing usernames, groups and
+home paths are refused, never adopted or modified. `--id` defaults to `--os-user`.
+SafeTerm services restart; existing sessions must reconnect. Failure leaves the
+new account locked and removes its new mapping, without deleting home data.
+
+SSH add prompts twice without echo and stores bcrypt hashes only. Passwords require
 8–72 printable ASCII characters with uppercase, lowercase and a number. For
 unattended provisioning use --password-hash-file FILE; an optional SSH key uses
---authorized-key-file FILE. Console and SSH maps are independent. Console users
-share the restricted Linux entry account and authenticate internally; no per-person
-Linux account or PAM alteration is needed. Console changes take effect immediately;
-SSH identity changes require a broker restart. The installer creates its initial
-internal identity in both maps. No user gains root from a SafeTerm role.
+--authorized-key-file FILE. These hash/key options apply to the separate service
+credential stores, not Linux Console provisioning. Console and SSH enrollment
+are separate installer steps with independent usernames and passwords.
+
+For compatibility, `add console --id ID` without `--os-user` still creates an
+internal legacy Console user for the shared `safeterm` entry account. It does not
+create a Linux account. Existing internal users are preserved. No user gains
+root from a SafeTerm role.
 
 ## Packages and completion
 

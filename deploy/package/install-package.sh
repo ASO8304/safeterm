@@ -45,7 +45,7 @@ ssh_user=admin
 ssh_user_set=false
 non_interactive=false
 install_dependencies=false
-bootstrap_console=false
+new_ssh_identity=false
 ssh_public_key=
 ssh_password_hash_file=
 dry_run=false
@@ -152,6 +152,7 @@ trap 'exit 143' TERM
 ssh_source=$(safeterm_admin_source /etc/safeterm access/ssh ssh)
 console_source=$(safeterm_admin_source /etc/safeterm access/console console)
 if [ ! -f "$ssh_source/users.json" ]; then
+  new_ssh_identity=true
   safeterm_enroll
 fi
 
@@ -328,12 +329,6 @@ fi
 
 if [ -f "$console_source/users.json" ]; then
   install -m 0600 "$console_source/users.json" "$work/config/access/console/users.json"
-elif [ "$bootstrap_console" = true ]; then
-  password_hash=$(cat "$ssh_password_hash_file")
-  cat >"$work/config/access/console/users.json" <<EOF
-{"users":[{"user_id":"$ssh_user","roles":["viewer","netops","log-viewer","service-viewer","config-viewer","config-operator"],"password_hash":"$password_hash"}]}
-EOF
-  chmod 0600 "$work/config/access/console/users.json"
 else
   install -m 0600 "$payload/console/users.json" "$work/config/access/console/users.json"
 fi
@@ -428,7 +423,6 @@ if [ "$start_services" = true ]; then
   systemctl --quiet is-active safeterm-network-manager.service safeterm-config-writer.service safeterm-identity.service safeterm-password-manager.service safeterm-audit.service safeterm-runner-diagnostics.service safeterm-runner-network-observer.service safeterm-runner-log-reader.service safeterm-runner-service-manager.service safeterm-gateway.service safeterm-config-manager-application.service safeterm-config-manager-database.service safeterm-config-manager-network.service safeterm-ssh-broker.service
 fi
 safeterm_cleanup_legacy_managed /etc/safeterm-managed
-echo "SafeTerm package installation: PASS"
 # Retain one pre-install snapshot; operators never need to track IDs and
 # repeated upgrades do not accumulate snapshots indefinitely.
 for old_transaction in "$transaction_root"/*; do
@@ -438,8 +432,14 @@ done
 echo "Administration: sudo termctl rollback | sudo termctl uninstall"
 echo "Rollback remains available with: sudo /usr/local/sbin/safeterm-install-rollback $(basename "$transaction")"
 
-if [ "$bootstrap_console" = true ]; then
+if [ "$new_ssh_identity" = true ]; then
   echo "SSH login: ssh -tt -p 2222 $ssh_user@SERVER_IP"
-  echo "Console login: sudo -iu safeterm, then enter username $ssh_user and the password you set."
-  echo "SSH and Console credentials are independent after enrollment."
 fi
+# Account provisioning takes its own lifecycle lock. The installation is fully
+# committed before this optional, independent Console enrollment starts.
+flock -u 9
+exec 9>&-
+if [ "$new_ssh_identity" = true ]; then
+  safeterm_enroll_console
+fi
+echo "SafeTerm package installation: PASS"

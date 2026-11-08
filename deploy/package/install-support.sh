@@ -59,7 +59,7 @@ safeterm_cleanup_legacy_managed() {
 
 safeterm_find_missing() {
   missing=
-  for tool in stty install find awk grep sed tar date realpath cmp flock useradd usermod groupadd getent systemctl ssh-keygen visudo; do
+  for tool in stty install find awk grep sed tar date realpath cmp flock useradd usermod groupadd getent systemctl ssh-keygen visudo passwd chpasswd; do
     command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
   done
   for executable in /usr/bin/uname /usr/bin/tcpdump /usr/bin/tail /usr/bin/systemctl /usr/bin/sudo /usr/bin/ping /usr/bin/free /usr/bin/df /usr/bin/nc.openbsd; do
@@ -105,9 +105,9 @@ safeterm_enroll() {
     return 1
   fi
   terminal_state=$(stty -g 2>/dev/null || true)
-  echo "Create the initial SafeTerm user for SSH and Console (no separate Linux user)." >&2
+  echo "SSH user setup (SafeTerm service account; independent of Linux Console users)." >&2
   if [ "$ssh_user_set" = false ]; then
-    printf 'SafeTerm username [admin]: ' >&2
+    printf 'SSH username [admin]: ' >&2
     IFS= read -r answer || return 1
     ssh_user=${answer:-admin}
   fi
@@ -123,5 +123,36 @@ safeterm_enroll() {
     IFS= read -r answer || return 1
     case "$answer" in n|N|no|NO) return 1 ;; esac
   done
-  bootstrap_console=true
+}
+
+safeterm_console_add() {
+  /usr/local/bin/termctl user add console --os-user "$1" \
+    --roles viewer,netops,log-viewer,service-viewer,config-viewer,config-operator
+}
+
+# Run separately after installation releases its lifecycle lock. The root
+# termctl command owns account validation, hidden password input and activation.
+safeterm_enroll_console() {
+  console_created=
+  if [ "${non_interactive:-false}" = true ] || [ "${start_services:-true}" = false ] || ! safeterm_has_terminal; then
+    echo 'Local Console enrollment: sudo termctl user add console --os-user NEW_NAME --roles viewer,netops,config-viewer,config-operator'
+    return 0
+  fi
+  echo 'Local Console user setup (a new Linux account; independent username and password).' >&2
+  printf 'Create a local Console user? [Y/n]: ' >&2
+  IFS= read -r answer || return 0
+  case "$answer" in n|N|no|NO) return 0 ;; esac
+  while :; do
+    printf 'New Linux Console username [console-admin]: ' >&2
+    IFS= read -r answer || return 0
+    console_name=${answer:-console-admin}
+    if safeterm_console_add "$console_name"; then
+      console_created=$console_name
+      echo "Local console login: log in to Linux as $console_created with its own password; SafeTerm opens without a second login."
+      return 0
+    fi
+    printf 'Choose another unused username and try again? [Y/n]: ' >&2
+    IFS= read -r answer || return 0
+    case "$answer" in n|N|no|NO) return 0 ;; esac
+  done
 }

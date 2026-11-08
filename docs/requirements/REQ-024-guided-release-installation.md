@@ -12,7 +12,8 @@
 - Offline failure gives actionable guidance; dry run never installs packages.
 - Ask for internal username, hidden password and confirmation; enforce existing complexity policy.
 - Persist bcrypt hashes only; temporary hash files are private and cleaned up.
-- Guided initial identity can use both SSH and Console without separate Linux accounts.
+- Enroll SSH and optional Linux Console users in separate steps with independent credentials; never copy the SSH hash into a Console store.
+- Console enrollment creates only a new Linux account with the SafeTerm login shell; existing usernames are refused without modification.
 - Existing users/passwords/catalog/managed values remain intact during update.
 - Explicit hash/key, offline signing and automation flags remain supported.
 - Noninteractive credential failure cannot hang awaiting input; APT needs explicit opt-in without a terminal.
@@ -28,3 +29,4 @@ passwords are not echoed, confirmation is required, invalid passwords do not per
 hashes, and successful hashes have mode 0600.
 
 Related decision: [ADR-028](../decisions/ADR-028-guided-release-installation.md).
+Independent enrollment and Console provisioning: [ADR-056](../decisions/ADR-056-new-console-account-provisioning-and-independent-enrollment.md).
