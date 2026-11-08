@@ -2,7 +2,7 @@
 
 ## Scope and assets
 This model covers the SSH Broker, local Console Broker, Node Gateway, capability-isolated Runners,
-Config Managers, isolated Console Identity service, Audit Service, signed catalogs, root-owned identity/resource
+Config Managers, isolated Console Identity and self-service password services, Audit Service, signed catalogs, root-owned identity/resource
 registries, managed configuration files, Unix sockets, execution results, and
 streaming session state on one Linux host.
 
@@ -21,9 +21,14 @@ Untrusted SSH client
      -> profile-specific Config Manager socket -> exact managed directory
 
 Local console login
-  -> shared Linux entry account / fixed SafeTerm login shell
-  -> internal bcrypt login at isolated Identity service
+  -> individual Linux/PAM login + root-owned Linux-account role mapping
+     OR shared Linux entry account + internal bcrypt login
+  -> fixed SafeTerm Console shell / isolated Identity service
   -> process-bound session -> Gateway and Config Managers verify session + derive roles
+
+Authenticated Console or SSH Broker
+  -> peer/session-scoped password socket -> current-password verification
+  -> only that login's Linux/PAM, internal Console or SSH credential store
 
 Gateway, Runner, and Config Manager UIDs
   -> producer-scoped Audit socket -> append-only Audit UID/store
@@ -44,8 +49,9 @@ UID's peer policy, socket access, filesystem view, capabilities, and cgroup.
 | Threat | Required control | Verification |
 |---|---|---|
 | Shell/argument injection | Whitelisted operations and parameters; whole-token templates; direct argv execution; no shell | Injection corpus, fuzz seeds, AST/source invariant |
-| Forged identity or role | SSH credential authentication or internal Console bcrypt login; Console sessions bound to kernel UID/PID, verified at Gateway and Config Managers with authoritative roles | Live SSH tests, identity/session replay and role-forgery tests, peer-policy tests, privilege-abuse suite |
+| Forged identity or role | SSH credential authentication, internal Console bcrypt login, or kernel-UID-bound Linux Console mapping; Console sessions bound to kernel UID/PID, verified at Gateway and Config Managers with authoritative roles | Live SSH tests, identity/session replay and role-forgery tests, peer-policy tests, privilege-abuse suite |
 | Cross-profile privilege escalation | Separate UIDs/sockets/catalog subsets/capabilities; peer-scoped activation operations | Routing and systemd tests; Config Manager Gateway denial tests |
+| Password helper becomes a root command interface | Fixed targets derived from authenticated peer/session; current-password verification; no caller-selected paths, commands or target account; root-only PAM child with checked numeric IDs and NoNewPrivileges | Store-isolation, forged-identity and conversion tests; disposable deployed Console/SSH/PAM password tests |
 | IPC parser confusion or memory exhaustion | Versioned strict JSON; unknown/trailing rejection; frame/deadline limits; fixed concurrent-connection admission ceilings | Malformed, oversized, and connection-saturation IPC tests plus fuzz seeds |
 | Catalog/executable replacement | Detached signature; canonical path, mode, hash, native ELF, held descriptor | Tamper, symlink, interpreter, and replacement tests |
 | Configuration traversal or corruption | Opaque resource IDs; canonical path rules; no links; schema/full-document validation; atomic rename | Path/link/parser/concurrency/rollback tests |
@@ -86,6 +92,14 @@ OS mappings without bcrypt hashes are denied. Login rate/concurrency bounds,
 short-lived opaque sessions, stream revalidation and expiry cancellation limit
 abuse. Processes sharing that UID can still deny service; never grant it a general
 OS shell. See [Console authentication](../console-authentication.md) and ADR-025.
+
+Individual Linux Console mappings are also supported. Linux/PAM authenticates
+the account; root-managed mappings assign SafeTerm roles and cannot be edited
+by the operator. A mapping does not remove existing sudo, privileged groups or
+other OS access. Restricted operators need the fixed Console shell and no
+unrelated privileged entry points. Root, kernel and PAM administration remain
+trusted; no application-level role can restrict an already privileged Linux
+administrator. See ADR-054 and ADR-055 for mapping and password boundaries.
 
 
 ## Restricted external configuration writer (ADR-029)

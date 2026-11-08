@@ -194,13 +194,15 @@ sudo -iu safeterm
 # Password: the internal password just set
 ```
 
-For other records, use their existing `user_id`. `--os-user` is obsolete. Setting
-the internal password enables that record and removes its legacy OS mapping.
+For other legacy records, use their existing `user_id`. Setting the internal
+password enables that record and removes its old credential-file OS mapping.
 A roles-only update does not enable a disabled record that already has a hash.
 The upgrade does not delete existing Linux accounts or change their passwords.
-Stop using old per-person Console entry accounts: the new executable accepts
-only the shared `safeterm` account. Review/removal of unrelated Linux accounts is
-an administrator decision. Keep an ordinary administrator session available
+Per-person Linux login is now supported through the separate `linux-users.json`
+mapping described above; `termctl user add console --os-user` explicitly provisions
+that mapping. Old credential-file `os_user` metadata does not grant access.
+Review/removal of unrelated Linux accounts is an administrator decision.
+Keep an ordinary administrator session available
 while upgrading; old Console processes lose access to the new authenticated
 boundaries. SSH remains available according to its independent configuration.
 
@@ -215,9 +217,11 @@ boundaries. SSH remains available according to its independent configuration.
   with a read-only filesystem, no capabilities, Unix sockets only, no core dumps
   and finite memory/task limits. Service accounts are infrastructure accounts;
   their count does not grow with the number of Console operators.
-- Identity accepts login/logout only from the shared Console UID. Only Gateway
-  and the three configured Config Manager UIDs can verify sessions. Every client
-  verifies the daemon UID; every server obtains credentials with `SO_PEERCRED`.
+- Identity accepts internal login from the shared Console UID and Linux login
+  from explicitly mapped UIDs; logout is bound to the session's UID/PID. Gateway,
+  the three Config Managers and trusted root helpers can verify sessions.
+  Operators cannot use that verifier API. Every client verifies the daemon UID;
+  every server obtains credentials with `SO_PEERCRED`.
 - Each login issues a cryptographically random 256-bit token, stored by digest
   in daemon memory, bound to kernel UID/PID and an absolute expiry. Possession of
   the shared UID or a caller-supplied role is insufficient. Gateway and Config

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -192,5 +193,17 @@ func TestLinuxPasswordChildRejectsUnprivilegedAndReservedAccounts(t *testing.T) 
 		if LinuxPasswordChild(name) == nil {
 			t.Fatal("unsafe child target accepted")
 		}
+	}
+}
+
+func TestNativeIDsRejectRootOverflowAndUnchangedSentinels(t *testing.T) {
+	for _, a := range []Account{{UID: 0, GID: 1000}, {UID: math.MaxUint32, GID: 1000}, {UID: 1000, GID: math.MaxUint32}, {UID: math.MaxInt32 + 1, GID: 1000}} {
+		if _, _, err := nativeIDs(a); err == nil {
+			t.Fatal("unsafe credential conversion accepted", a)
+		}
+	}
+	uid, gid, err := nativeIDs(Account{UID: 1000, GID: 1001})
+	if err != nil || uid != 1000 || gid != 1001 {
+		t.Fatal(uid, gid, err)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"syscall"
@@ -57,14 +58,27 @@ func LinuxPasswordChild(name string) error {
 	if err != nil {
 		return ErrDenied
 	}
+	uid, gid, err := nativeIDs(a)
+	if err != nil {
+		return err
+	}
 	if err = unix.Setgroups([]int{}); err != nil {
 		return err
 	}
-	if err = unix.Setresgid(int(a.GID), int(a.GID), int(a.GID)); err != nil {
+	if err = unix.Setresgid(gid, gid, gid); err != nil {
 		return err
 	}
-	if err = unix.Setresuid(int(a.UID), 0, 0); err != nil {
+	if err = unix.Setresuid(uid, 0, 0); err != nil {
 		return err
 	}
 	return unix.Exec("/usr/bin/passwd", []string{"passwd", "--", a.Name}, []string{"PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LANG=C", "LC_ALL=C"})
+}
+
+// Exclude overflow and the kernel's all-ones "unchanged" sentinel before any
+// credential transition, including on a future 32-bit build.
+func nativeIDs(a Account) (int, int, error) {
+	if a.UID == 0 || a.UID > math.MaxInt32 || a.GID > math.MaxInt32 {
+		return 0, 0, ErrDenied
+	}
+	return int(a.UID), int(a.GID), nil
 }
