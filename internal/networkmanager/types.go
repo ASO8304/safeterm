@@ -107,14 +107,15 @@ func validateDefaultRouteDeletions(before, after View) error {
 type View struct {
 	Version string `json:"version"`
 	// Link states are display metadata, excluded from configuration identity.
-	States     map[string]string    `json:"states,omitempty"`
-	MACs       map[string]string    `json:"mac_addresses,omitempty"`
-	Names      map[string]string    `json:"persistent_names,omitempty"`
-	Interfaces map[string]Interface `json:"interfaces"`
-	Routes     map[string]Route     `json:"routes"`
-	Pending    bool                 `json:"pending"`
-	Deadline   string               `json:"deadline,omitempty"`
-	Owner      string               `json:"owner,omitempty"`
+	States           map[string]string    `json:"states,omitempty"`
+	MACs             map[string]string    `json:"mac_addresses,omitempty"`
+	Names            map[string]string    `json:"persistent_names,omitempty"`
+	Interfaces       map[string]Interface `json:"interfaces"`
+	AbsentInterfaces map[string]Interface `json:"absent_interfaces"`
+	Routes           map[string]Route     `json:"routes"`
+	Pending          bool                 `json:"pending"`
+	Deadline         string               `json:"deadline,omitempty"`
+	Owner            string               `json:"owner,omitempty"`
 }
 type Change struct {
 	Kind   string   `json:"kind"`
@@ -150,6 +151,17 @@ func Modify(v View, changes []Change) (View, error) {
 		}
 		switch c.Kind {
 		case "interface":
+			if c.Action == "delete" {
+				item, ok := v.AbsentInterfaces[c.Name]
+				if !ok {
+					return v, fmt.Errorf("network: only absent interface definitions can be deleted; use show absent")
+				}
+				if item.ReadOnly != "" {
+					return v, fmt.Errorf("network: %s: %s", c.Name, item.ReadOnly)
+				}
+				delete(v.AbsentInterfaces, c.Name)
+				continue
+			}
 			item, ok := v.Interfaces[c.Name]
 			if !ok {
 				return v, fmt.Errorf("network: unknown interface %q", c.Name)
@@ -362,6 +374,7 @@ func cloneView(v View) View {
 	result.States = maps.Clone(v.States)
 	result.MACs = maps.Clone(v.MACs)
 	result.Names = maps.Clone(v.Names)
+	result.AbsentInterfaces = maps.Clone(v.AbsentInterfaces)
 	result.Interfaces = map[string]Interface{}
 	result.Routes = map[string]Route{}
 	for k, i := range v.Interfaces {

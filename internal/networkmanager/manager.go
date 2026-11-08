@@ -32,6 +32,7 @@ type Options struct {
 type candidate struct {
 	Owner, Base, Revision string
 	View                  View
+	NamedInterfaces       []string `json:",omitempty"`
 }
 type transaction struct {
 	Owner, RequestID, Phase string
@@ -373,6 +374,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		return Reply{}, err
 	}
 	view := s.View
+	var namedHints []string
 	var c candidate
 	cErr := m.loadCandidate(owner(req), &c)
 	if cErr != nil && !os.IsNotExist(cErr) {
@@ -384,7 +386,13 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 	}
 	if hasCandidate && c.Owner == owner(req) {
 		if c.Base == s.View.Version {
+			// Older candidates predate the explicit absent-definition inventory.
+			// A missing field must never become an implicit cleanup request.
+			if c.View.AbsentInterfaces == nil {
+				c.View.AbsentInterfaces = s.View.AbsentInterfaces
+			}
 			view = cloneView(c.View)
+			namedHints = c.NamedInterfaces
 			view.Version = c.Revision
 			view.States = s.View.States
 			view.MACs = s.View.MACs
@@ -402,7 +410,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		return Reply{View: &view, Text: text}, nil
 	case "diff":
-		return Reply{Text: Diff(s.View, view)}, nil
+		return Reply{Text: Diff(s.View, view, namedHints...)}, nil
 	case "save":
 		if hasCandidate && c.Owner != owner(req) {
 			return Reply{}, fmt.Errorf("network: candidate belongs to another identity")
@@ -420,7 +428,17 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if err = ValidateView(modified); err != nil {
 			return Reply{}, err
 		}
-		if _, err = s.Render(modified); err != nil {
+		named := []string{}
+		if hasCandidate && c.Base == s.View.Version {
+			named = append(named, c.NamedInterfaces...)
+		}
+		for _, change := range r.Changes {
+			if change.Kind == "interface" && change.Field == "name" && !contains(named, change.Name) {
+				named = append(named, change.Name)
+			}
+		}
+		sort.Strings(named)
+		if _, err = s.Render(modified, named...); err != nil {
 			return Reply{}, err
 		}
 		if _, _, err = m.planNames(s, modified, p); err != nil {
@@ -436,9 +454,8 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		revision := randomID()
 		modified.Version = revision
-		c = candidate{Owner: owner(req), Base: s.View.Version, Revision: revision, View: modified}
-		// Display metadata must not change the persisted candidate format. This
-		// also lets an older manager read the candidate after package rollback.
+		c = candidate{Owner: owner(req), Base: s.View.Version, Revision: revision, View: modified, NamedInterfaces: named}
+		// Live display metadata is reloaded on read, never saved as configuration.
 		c.View.States = nil
 		c.View.MACs = nil
 		c.View.Names = nil
@@ -464,7 +481,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if err = validateDefaultRouteDeletions(s.View, c.View); err != nil {
 			return Reply{}, err
 		}
-		changed, err := s.Render(c.View)
+		changed, err := s.Render(c.View, c.NamedInterfaces...)
 		if err != nil {
 			return Reply{}, err
 		}
@@ -511,10 +528,16 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		tx.Sources["@link-rules"] = namingRulesDigest(rules)
 		for name, old := range s.View.Interfaces {
-			if !equal(old, c.View.Interfaces[name]) || !equal(routesFor(s.View, name), routesFor(c.View, name)) {
+			if contains(c.NamedInterfaces, name) || !equal(old, c.View.Interfaces[name]) || !equal(routesFor(s.View, name), routesFor(c.View, name)) {
 				tx.Targets = append(tx.Targets, name)
 			}
 		}
+		for id := range s.View.AbsentInterfaces {
+			if _, retained := c.View.AbsentInterfaces[id]; !retained && !contains(tx.Targets, id) {
+				tx.Targets = append(tx.Targets, id)
+			}
+		}
+		sort.Strings(tx.Targets)
 		if err = m.save("pending.json", tx); err != nil {
 			return Reply{}, err
 		}
@@ -828,10 +851,18 @@ func (m *Manager) Close() error {
 	m.closed = true
 	return m.revertLocked(context.Background())
 }
-func Diff(a, b View) string {
+func Diff(a, b View, named ...string) string {
 	lines := []string{}
+	for name := range a.AbsentInterfaces {
+		if _, retained := b.AbsentInterfaces[name]; !retained {
+			lines = append(lines, "absent interface "+name+": delete retained definition and its stored routes")
+		}
+	}
 	for name, old := range a.Interfaces {
 		next := b.Interfaces[name]
+		if next.PersistentName != "" && next.PersistentName != old.ID && (contains(named, name) || !equal(old, next) || !equal(routesFor(a, name), routesFor(b, name))) {
+			lines = append(lines, fmt.Sprintf("interface %s Netplan ID: %s -> %s", name, old.ID, next.PersistentName))
+		}
 		for _, pair := range []struct {
 			key  string
 			a, b any

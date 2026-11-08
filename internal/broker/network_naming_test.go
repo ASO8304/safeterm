@@ -32,6 +32,26 @@ func TestNetworkNamingIsStagedInInterfaceEditor(t *testing.T) {
 	}
 }
 
+func TestReassertPersistentNameReviewsLegacyIDMigration(t *testing.T) {
+	s, api, out := uxNetworkFixture(t)
+	item := api.view.Interfaces["ip1"]
+	item.ID, item.PersistentName = "safeterm-001122334455", "lan0"
+	api.view.Interfaces["ip1"] = item
+	editorCommands(t, s, "config network interface")
+	if s.editorDirty() {
+		t.Fatal("reading old name dirtied editor")
+	}
+	editorCommands(t, s, "edit ip1", "set name lan0", "show", "diff")
+	if !s.editorDirty() || !strings.Contains(out.String(), "Netplan ID") || !strings.Contains(out.String(), "lan0 (staged)") {
+		t.Fatal("reasserted name did not review ID migration", out)
+	}
+	editorCommands(t, s, "next", "save")
+	request := api.requests[len(api.requests)-1]
+	if len(request.Changes) != 1 || request.Changes[0].Field != "name" {
+		t.Fatal("name repair intent lost", request)
+	}
+}
+
 func TestInterfaceMACAndPersistentNameAreVisibleWithoutMutation(t *testing.T) {
 	s, api, out := uxNetworkFixture(t)
 	api.view.MACs = map[string]string{"ip0": "00:0c:29:ef:e4:51", "ip1": "00:0c:29:ef:e4:52"}

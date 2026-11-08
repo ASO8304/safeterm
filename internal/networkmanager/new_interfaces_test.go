@@ -57,7 +57,7 @@ func TestNewInterfaceTrialPersistsOnlyOnConfirmAndRollbackRestoresExistingFile(t
 		t.Fatal("trial changed the persistent source", err)
 	}
 	operatorCall(t, m, Request{Action: "confirm"})
-	if data, err := os.ReadFile(filepath.Join(root, "etc/netplan/arbitrary-name.yaml")); err != nil || !strings.Contains(string(data), "safeterm-001122334466:") {
+	if data, err := os.ReadFile(filepath.Join(root, "etc/netplan/arbitrary-name.yaml")); err != nil || !strings.Contains(string(data), "    ens20:\n") || strings.Contains(string(data), "safeterm-") {
 		t.Fatal("confirmed definition missing", err, string(data))
 	}
 	operatorCall(t, m, Request{Action: "rollback"})
@@ -104,7 +104,7 @@ func TestPersistentRenameReusesMACRuleAndDoesNotRenameLiveInterface(t *testing.T
 	}
 	m.opts.Interfaces = func() map[string]string { return map[string]string{"lan0": "00:0c:29:ef:e4:51"} }
 	view = operatorCall(t, m, Request{Action: "read"})
-	if view.View.Interfaces["lan0"].ReadOnly != "" || view.View.Interfaces["lan0"].ID != "ens19" || len(view.View.Interfaces["lan0"].Addresses) != 1 {
+	if view.View.Interfaces["lan0"].ReadOnly != "" || view.View.Interfaces["lan0"].ID != "lan0" || len(view.View.Interfaces["lan0"].Addresses) != 1 {
 		t.Fatal("renamed NIC lost its configuration match", view)
 	}
 }

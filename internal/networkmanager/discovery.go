@@ -37,6 +37,7 @@ type Snapshot struct {
 	fragments         map[string][]fragment
 	routeNodes        map[string]*yaml.Node
 	definitionIDs     map[string]bool
+	absentFragments   map[string][]fragment
 	unresolvedMatches bool
 }
 
@@ -156,7 +157,7 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			files = append(files, f)
 		}
 	}
-	s := &Snapshot{Files: files, View: View{Interfaces: map[string]Interface{}, Routes: map[string]Route{}}, fragments: map[string][]fragment{}, routeNodes: map[string]*yaml.Node{}, definitionIDs: map[string]bool{}}
+	s := &Snapshot{Files: files, View: View{Interfaces: map[string]Interface{}, AbsentInterfaces: map[string]Interface{}, Routes: map[string]Route{}}, fragments: map[string][]fragment{}, absentFragments: map[string][]fragment{}, routeNodes: map[string]*yaml.Node{}, definitionIDs: map[string]bool{}}
 	ordered := []string{}
 	for name := range selected {
 		ordered = append(ordered, name)
@@ -300,6 +301,7 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 	// Resolve simple physical name/MAC matches without exposing virtual or wildcard sets.
 	resolved := map[string]string{}
 	for id, item := range s.View.Interfaces {
+		sourceReason := item.ReadOnly
 		actual := id
 		var match *yaml.Node
 		rename := ""
@@ -380,6 +382,20 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			item.ReadOnly = fmt.Sprintf("interface is outside administrator policy; a Linux administrator must add %q to interfaces in %s, then reopen config network interface", actual, PolicyPath)
 		}
 		if _, exists := names[actual]; !exists {
+			// Missing hardware remains available only for explicit source cleanup.
+			item.Name = id
+			item.ReadOnly = sourceReason
+			if !simplePhysicalDefinition(s.fragments[id]) {
+				item.ReadOnly = "advanced interface matches require administrator cleanup"
+			}
+			if definitionHasPresentHardware(id, s.fragments[id], names) {
+				item.ReadOnly = "definition matches present hardware under another name; a Linux administrator must resolve its matching or set-name configuration"
+			}
+			if !p.AllowsInterface(id) {
+				item.ReadOnly = "absent Netplan ID is outside administrator policy"
+			}
+			s.View.AbsentInterfaces[id] = item
+			s.absentFragments[id] = s.fragments[id]
 			// Keep the source definition untouched, but do not expose removed
 			// hardware (or its routes) as editable devices.
 			delete(s.View.Interfaces, id)
@@ -451,7 +467,7 @@ func contains(items []string, s string) bool {
 func equal(a, b any) bool { return reflect.DeepEqual(a, b) }
 
 // Render edits only selected field spans. Unrelated bytes remain identical.
-func (s *Snapshot) Render(v View) (map[string][]byte, error) {
+func (s *Snapshot) Render(v View, named ...string) (map[string][]byte, error) {
 	if err := ValidateView(v); err != nil {
 		return nil, err
 	}
@@ -466,7 +482,7 @@ func (s *Snapshot) Render(v View) (map[string][]byte, error) {
 	for path, data := range changed {
 		normalized[path] = data
 	}
-	return normalized, nil
+	return s.reconcileDefinitions(v, normalized, named)
 }
 
 func (s *Snapshot) render(v View) (map[string][]byte, error) {

@@ -122,9 +122,14 @@ func (s *Snapshot) includeUnconfigured(root string, p Policy, names map[string]s
 		}
 		mac, valid := normalizedMAC(names[name])
 		if valid {
-			item.ID = "safeterm-" + strings.ReplaceAll(mac, ":", "")
+			// Prefer the real device name. A temporary, private ID avoids
+			// overwriting a retained definition while staging its explicit deletion;
+			// Render replaces it with the requested/current name before any trial.
 			if s.definitionIDs[item.ID] {
-				item.ReadOnly = "generated Netplan ID conflicts with an existing definition"
+				item.ID = "safeterm-" + strings.ReplaceAll(mac, ":", "")
+				if s.definitionIDs[item.ID] {
+					item.ReadOnly = "temporary interface ID conflicts with an existing definition"
+				}
 			}
 			for _, existing := range s.View.Interfaces {
 				if existing.ID == item.ID {

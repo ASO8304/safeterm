@@ -10,5 +10,7 @@
 - Recover persistent sources and runtime networking after rejected/expired trials or manager restart; bound backup storage.
 - Preserve policy/state across updates and refuse package replacement while a trial is pending.
 - Gate releases on disposable Ubuntu 24.04 live Netplan tests in a separate network namespace, plus the existing test/security/install checks.
+- Keep persistent Netplan IDs consistent with requested names, retaining MAC binding and deferred `.link` activation; reject collisions and dependent references.
+- Retain removed-device definitions until explicit `show absent` / `delete NAME` cleanup, using the same authorized save/trial/confirm/rollback flow. Never delete present hardware this way.
 
 Scope and limits are documented in [the network guide](../network-configuration.md). Design: ADR-040.

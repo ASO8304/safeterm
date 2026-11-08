@@ -60,6 +60,33 @@ source needs it, SafeTerm converts that file to ordinary indented block YAML in
 the candidate, retaining comments and unknown properties. Confirmation commits
 the formatted source; rollback restores the exact original bytes. Newly inserted
 interface definitions use block style so they remain editable after reopening.
+Their Netplan key is the current interface name, or the persistent name assigned
+with `set name`; SafeTerm does not persist a generated `safeterm-<MAC>` key.
+
+Removing a NIC in ESXi or on the host does not delete its stored Netplan
+configuration. SafeTerm excludes that missing hardware and its routes from the
+active editor, but keeps its definition until an operator explicitly removes it:
+
+```text
+config network interface
+show absent
+delete ip0
+diff
+save
+execute network diff
+execute network apply
+execute network confirm
+```
+
+`delete NAME` in the interface editor accepts only absent Netplan IDs. It stages
+removal of the entire definition, including its stored addresses and routes.
+Present interfaces cannot be deleted this way; their default routes remain
+protected. `cancel` or declining the dirty-exit confirmation keeps the existing
+source. The timed trial does not write persistent files, and rollback restores
+their original bytes. File/interface policy still applies: an absent ID must be
+allowed by `interfaces` or `allow_all_interfaces`. Definitions with advanced
+matches or references from bridges/bonds/VLANs require Linux administrator
+resolution before deletion. A hardware change after saving invalidates the draft.
 
 ## Persistent interface names
 
@@ -119,8 +146,21 @@ Occupied filenames and matching drop-in directories in `/etc`, `/run`,
 files keep their names, including MAC-based files from v0.34.0. It also binds the
 Netplan definition to that MAC and removes conflicting `set-name` entries, so
 its IP settings continue matching after the interface changes name. Existing
-Netplan IDs and unrelated configuration remain intact. The detail view shows
-the persistent name and whether it differs from the current live name.
+Netplan IDs follow the requested persistent name, while the MAC match keeps the
+same physical NIC configured under its current live name until activation. For
+example, `set name ip1` changes `safeterm-000c29efe45b:` to `ip1:` without installing
+a Netplan `set-name` or renaming the live interface. The `.link` rule still owns
+the deferred rename. All fragments of the definition keep their existing source
+files; unrelated fields and comments are preserved. An existing `.link` name
+from an earlier release is also used to repair the ID when editing that NIC.
+Repeating `set name ip1` explicitly stages this repair even if the persistent
+name was already `ip1`.
+
+A retained absent definition cannot be overwritten by a rename: explicitly
+`delete` it in the same editor draft first, or choose a different name. References
+from other Netplan definitions and IDs already used by virtual devices block
+renaming rather than silently breaking their configuration. The detail view
+shows the persistent name, Netplan ID and staged ID changes.
 
 The candidate is authorized and audited by the dedicated network manager,
 uses the lifecycle lock, validates Netplan in a temporary root, and journals

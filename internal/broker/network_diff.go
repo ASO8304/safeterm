@@ -57,8 +57,13 @@ func interfaceDiff(before, after networkmanager.Interface) []editorFieldDiff {
 func networkDiffs(e *networkEditSession) []editorItemDiff {
 	var diffs []editorItemDiff
 	if e.kind == "interface" {
-		for name, item := range e.view.Interfaces {
-			if fields := interfaceDiff(e.base.Interfaces[name], item); len(fields) > 0 {
+		for name := range e.base.AbsentInterfaces {
+			if _, retained := e.view.AbsentInterfaces[name]; !retained {
+				diffs = append(diffs, editorItemDiff{name, []editorFieldDiff{{"Retained definition and stored routes", []string{"Present on disk (hardware absent)"}, []string{"Delete on confirmation"}}}})
+			}
+		}
+		for name := range e.view.Interfaces {
+			if fields := networkInterfaceDiff(e, name); len(fields) > 0 {
 				diffs = append(diffs, editorItemDiff{name, fields})
 			}
 		}
@@ -96,6 +101,19 @@ func networkDiffs(e *networkEditSession) []editorItemDiff {
 	}
 	sort.Slice(diffs, func(i, j int) bool { return diffs[i].name < diffs[j].name })
 	return diffs
+}
+
+func networkInterfaceDiff(e *networkEditSession, name string) []editorFieldDiff {
+	item := e.view.Interfaces[name]
+	fields := interfaceDiff(e.base.Interfaces[name], item)
+	named := false
+	for _, change := range e.changes {
+		named = named || change.Kind == "interface" && change.Name == name && change.Field == "name"
+	}
+	if item.PersistentName != "" && item.PersistentName != item.ID && (named || len(fields) > 0) {
+		fields = append(fields, editorFieldDiff{"Netplan ID", []string{item.ID}, []string{item.PersistentName}})
+	}
+	return fields
 }
 
 func (s *Shell) showNetworkDiff(e *networkEditSession) {

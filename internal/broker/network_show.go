@@ -17,9 +17,15 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 		s.showNetworkInterface(e, e.item)
 		return
 	}
+	if len(e.view.AbsentInterfaces) > 0 {
+		s.writeTerminalData([]byte(fmt.Sprintf("%d absent interface definition(s) retained on disk. Use show absent to review; delete NAME stages removal.\n", len(e.view.AbsentInterfaces))))
+	}
 	s.writeStyled(styleHeading, "Interfaces (configuration draft)\n\n")
 	if len(e.view.Interfaces) == 0 {
 		s.writeTerminalData([]byte("No supported interfaces found in Netplan configuration.\nUse exit to return to the network menu.\n"))
+		if len(networkDiffs(e)) > 0 {
+			s.writeStyled(styleWarning, "Unsaved removals staged. Use diff to review; save commits the candidate.\n")
+		}
 		return
 	}
 	names := make([]string, 0, len(e.view.Interfaces))
@@ -30,7 +36,7 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 	var table bytes.Buffer
 	writer := tabwriter.NewWriter(&table, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(writer, "NAME\tMAC ADDRESS\tSTATE\tDHCP4\tADDRESSES\tEDITING")
-	readOnly, changed := []string{}, false
+	readOnly, changed := []string{}, len(networkDiffs(e)) > 0
 	for _, name := range names {
 		item := e.view.Interfaces[name]
 		editing := "Allowed"
@@ -86,8 +92,43 @@ func (s *Shell) showNetworkInterfaces(e *networkEditSession) {
 	s.writeTerminalData([]byte("Details: edit NAME, then show.\nSTATE recorded at editor entry; use execute network status for live details.\n"))
 }
 
+func (e *networkEditSession) absentChoices() []string {
+	names := []string{}
+	for name, item := range e.view.AbsentInterfaces {
+		if item.ReadOnly == "" {
+			names = append(names, name)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (s *Shell) showAbsentInterfaces(e *networkEditSession) {
+	s.writeStyled(styleHeading, "Retained Netplan definitions (hardware absent)\n\n")
+	names := []string{}
+	for name := range e.view.AbsentInterfaces {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		s.writeTerminalData([]byte("No absent interface definitions retained in this draft.\n"))
+		return
+	}
+	for _, name := range names {
+		item := e.view.AbsentInterfaces[name]
+		s.networkParagraph("", name+": "+strings.Join(item.Addresses, ", "))
+		for _, path := range item.Files {
+			s.networkParagraph("  ", "Source: /"+path)
+		}
+		if item.ReadOnly != "" {
+			s.networkParagraph("  ", "Read-only: "+item.ReadOnly)
+		}
+	}
+	s.networkParagraph("", "delete NAME stages removal of this definition, including its stored addresses and routes. Nothing changes until save, apply and confirm.")
+}
+
 func interfaceHasEdits(e *networkEditSession, name string) bool {
-	return len(interfaceDiff(e.base.Interfaces[name], e.view.Interfaces[name])) > 0
+	return len(networkInterfaceDiff(e, name)) > 0
 }
 
 func interfaceRestrictionLabel(reason string) string {
@@ -142,7 +183,7 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 		s.writeTerminalData([]byte("\n"))
 	}
 	changed := map[string]bool{}
-	for _, field := range interfaceDiff(e.base.Interfaces[name], item) {
+	for _, field := range networkInterfaceDiff(e, name) {
 		changed[field.label] = true
 	}
 	row := func(label, empty string, values ...string) {
@@ -184,8 +225,12 @@ func (s *Shell) showNetworkInterface(e *networkEditSession, name string) {
 	row("DNS Servers", "System default", item.DNS...)
 	row("Search Domains", "System default", item.SearchDomains...)
 	row("MTU", "", optionalNumber(item.MTU))
-	if item.ID != "" && item.ID != name {
-		row("Netplan ID", "", item.ID)
+	id := item.ID
+	if changed["Netplan ID"] {
+		id = item.PersistentName
+	}
+	if id != "" && id != name {
+		row("Netplan ID", "", id)
 	}
 	files := make([]string, 0, len(item.Files))
 	for _, file := range item.Files {

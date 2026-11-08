@@ -174,4 +174,35 @@ func TestDisposableNetplanTrial(t *testing.T) {
 	if data, err := os.ReadFile(rulePath); err != nil || !strings.Contains(string(data), "Name=vmnic0") || !strings.Contains(string(data), "# Keep this comment") {
 		t.Fatal("existing rule was not updated in place", string(data), err)
 	}
+	data, _ = os.ReadFile(source)
+	if !strings.Contains(string(data), "    vmnic0:") || strings.Contains(string(data), "    host0:") {
+		t.Fatal("confirmed name did not update the Netplan ID", string(data))
+	}
+	// A removed device's definition is retained until explicitly requested.
+	// Delete it in the same confirmed transaction as an address edit on the
+	// present MAC-matched NIC, without changing host0's live name.
+	withAbsent := string(data) + "    old0:\n      dhcp4: false\n      addresses: [203.0.113.10/24]\n      routes:\n        - to: default\n          via: 203.0.113.1\n"
+	if err := os.WriteFile(source, []byte(withAbsent), 0640); err != nil {
+		t.Fatal(err)
+	}
+	v = operatorCall(t, m, Request{Action: "read"})
+	if _, ok := v.View.AbsentInterfaces["old0"]; !ok {
+		t.Fatal("removed device definition not available for explicit cleanup")
+	}
+	operatorCall(t, m, Request{Action: "save", Version: v.View.Version, Changes: []Change{
+		{Kind: "interface", Name: "old0", Action: "delete"},
+		{Kind: "interface", Name: "host0", Field: "addresses", Action: "set", Values: []string{"192.0.2.20/24"}},
+	}})
+	operatorCall(t, m, Request{Action: "apply"})
+	if current, _ := os.ReadFile(source); string(current) != withAbsent || !hasAddress("192.0.2.20") {
+		t.Fatal("cleanup trial changed source or failed the present NIC")
+	}
+	operatorCall(t, m, Request{Action: "confirm"})
+	if current, _ := os.ReadFile(source); strings.Contains(string(current), "old0:") || !strings.Contains(string(current), "vmnic0:") {
+		t.Fatal("explicit cleanup did not preserve the named present NIC", string(current))
+	}
+	operatorCall(t, m, Request{Action: "rollback"})
+	if current, _ := os.ReadFile(source); string(current) != withAbsent || !hasAddress("192.0.2.10") {
+		t.Fatal("cleanup rollback lost the original definitions/address", string(current))
+	}
 }

@@ -67,9 +67,9 @@ func (s *Shell) networkActionHelp(fields []string) error {
 	return fmt.Errorf("usage: execute network ? or execute network ACTION ?")
 }
 func (s *Shell) networkContextHelp(kind string, selected bool) {
-	values := []string{"edit", "show", "diff", "save", "cancel", "exit", "clear"}
+	values := []string{"edit", "show", "diff", "save", "cancel", "exit", "clear", "delete"}
 	if kind == "route" {
-		values = append(values, "delete", "add")
+		values = append(values, "add")
 	}
 	if selected {
 		values = append(values, "set", "next")
@@ -96,6 +96,12 @@ func (s *Shell) networkContextHelp(kind string, selected bool) {
 		if name == "show" && kind == "route" {
 			desc = "Show routes by ID and deletion protection; show details when a route is selected"
 		}
+		if name == "show" && kind == "interface" {
+			desc = "Show present interfaces; show absent lists retained definitions for removed hardware"
+		}
+		if name == "delete" && kind == "interface" {
+			desc = "Stage removal of an absent interface definition and its stored routes; use show absent"
+		}
 		s.networkHelpRow(name, desc)
 	}
 }
@@ -111,8 +117,13 @@ func (s *Shell) networkEditorHelp(fields []string) error {
 	command := fields[0]
 	switch command {
 	case "edit", "delete":
-		if command == "delete" && e.kind != "route" {
-			return fmt.Errorf("delete is available only in the route context")
+		if command == "delete" && e.kind == "interface" {
+			for _, name := range e.absentChoices() {
+				if len(fields) == 1 || len(fields) == 2 && strings.HasPrefix(name, fields[1]) {
+					s.networkHelpRow(name, "Delete retained definition and stored routes (hardware absent)")
+				}
+			}
+			return nil
 		}
 		prefix := ""
 		if len(fields) == 2 {

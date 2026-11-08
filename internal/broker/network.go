@@ -176,6 +176,10 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		s.writeTerminalData([]byte("Edits kept in this editor; nothing saved.\n"))
 		return nil
 	case "show":
+		if len(f) == 2 && f[1] == "absent" && e.kind == "interface" {
+			s.showAbsentInterfaces(e)
+			return nil
+		}
 		if len(f) != 1 {
 			break
 		}
@@ -242,8 +246,19 @@ func (s *Shell) networkEditor(ctx context.Context, line string) error {
 		}
 		return nil
 	case "delete":
-		if len(f) != 2 || e.kind != "route" {
+		if len(f) != 2 {
 			break
+		}
+		if e.kind == "interface" {
+			c := networkmanager.Change{Kind: "interface", Name: f[1], Action: "delete"}
+			v, err := networkmanager.Modify(e.view, []networkmanager.Change{c})
+			if err != nil {
+				return err
+			}
+			e.view = v
+			e.changes = append(e.changes, c)
+			s.writeStyled(styleWarning, "Staged deletion of absent interface '"+f[1]+"' and its stored configuration. Review diff, then save.\n")
+			return nil
 		}
 		name, exists := e.resolveItem(f[1])
 		if !exists {
@@ -281,9 +296,9 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 		f = f[:len(f)-1]
 	}
 	if e := s.networkEdit; e != nil {
-		values := []string{"edit", "show", "diff", "save", "cancel", "exit", "clear"}
+		values := []string{"edit", "show", "diff", "save", "cancel", "exit", "clear", "delete"}
 		if e.kind == "route" {
-			values = append(values, "delete", "add")
+			values = append(values, "add")
 		}
 		if e.item != "" {
 			values = append(values, "set", "next")
@@ -303,10 +318,18 @@ func (s *Shell) networkCompletion(before, prefix string) ([]string, bool) {
 			case "edit", "delete":
 				if len(f) == 1 {
 					values = e.itemChoices()
-					if f[0] == "delete" && e.kind == "route" {
-						values = e.deletableRoutes()
+					if f[0] == "delete" {
+						if e.kind == "route" {
+							values = e.deletableRoutes()
+						} else {
+							values = e.absentChoices()
+						}
 					}
 					return matching(values, prefix), true
+				}
+			case "show":
+				if len(f) == 1 && e.kind == "interface" {
+					values = []string{"absent"}
 				}
 			case "set", "unset", "append", "unselect":
 				if len(f) == 1 {
