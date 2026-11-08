@@ -43,6 +43,7 @@ for entry in audit network-manager config-manager config-writer console gateway 
 done
 
 cp -R "$repo_dir/internal/defaults/catalog/." "$staging/payload/catalog-source/"
+cp "$repo_dir/configs/terminal.json" "$staging/payload/catalog-source/"
 cp "$repo_dir/configs/README.md" "$staging/payload/catalog-source/"
 cp -R "$repo_dir/configs/docs" "$repo_dir/configs/network" "$staging/payload/catalog-source/"
 for definitions in resources.d access/roles.d commands/profiles.d commands/operations.d commands/executables.d access/policies.d; do
@@ -51,6 +52,7 @@ for definitions in resources.d access/roles.d commands/profiles.d commands/opera
 done
 cp "$repo_dir/deploy/runtime/resources.json" "$staging/payload/resources.json"
 cp "$repo_dir/deploy/console/users.example.json" "$staging/payload/console/users.json"
+cp "$repo_dir/deploy/console/linux-users.example.json" "$staging/payload/console/linux-users.json"
 cp "$repo_dir/deploy/console/users.template.jsonc" "$staging/payload/templates/console-users.template.jsonc"
 cp "$repo_dir/deploy/ssh/users.template.jsonc" "$staging/payload/templates/ssh-users.template.jsonc"
 cp "$repo_dir/deploy/systemd/"*.service "$staging/payload/systemd/"

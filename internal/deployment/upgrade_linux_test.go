@@ -199,6 +199,17 @@ func TestInstallRefreshesResourceTemplateAndPreservesCustomizedDefinitions(t *te
 	if err := os.WriteFile(filepath.Join(target, "resources.d", "TEMPLATE.json"), []byte("old reference"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	for _, name := range []string{"terminal.json", "access/console/linux-users.json"} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(source, name)), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(source, name), []byte("packaged defaults"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(target, name), []byte("customer settings"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	if err := InstallAdministration(source, target); err != nil {
 		t.Fatal(err)
 	}
@@ -210,5 +221,11 @@ func TestInstallRefreshesResourceTemplateAndPreservesCustomizedDefinitions(t *te
 	data, _ = os.ReadFile(filepath.Join(target, "resources.d", "TEMPLATE.json"))
 	if string(data) != "new reference" {
 		t.Fatal("template not refreshed")
+	}
+	for _, name := range []string{"terminal.json", "access/console/linux-users.json"} {
+		data, err := os.ReadFile(filepath.Join(target, name))
+		if err != nil || string(data) != "customer settings" {
+			t.Fatal("customer settings overwritten", name, err)
+		}
 	}
 }

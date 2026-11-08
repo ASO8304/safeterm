@@ -15,6 +15,7 @@ All SafeTerm administrator settings live under `/etc/safeterm`:
     profiles.d/          Runner isolation and resource limits
   resources.d/           Application configuration, services and logs
   network/policy.json    Editable interfaces and network roles
+  terminal.json          Terminal brand and prompt template
   trust/                 Trusted catalog public key
   docs/                  Administration, network and diagnostic guides
 ```
@@ -22,9 +23,12 @@ All SafeTerm administrator settings live under `/etc/safeterm`:
 Copy a directory's inactive `TEMPLATE.json` to a new JSON filename, edit it,
 then run `sudo termctl check` and `sudo termctl apply`. Inside SafeTerm, login
 shows the command menu, `?` help keeps your input, and `exit` moves up one
-level while discarding edits to the item being left. Context changes are quiet. `next` keeps staged item edits.
+level and asks before discarding unsaved edits to the item being left. Context changes are quiet. `next` keeps staged item edits.
 Manage credentials with
 `sudo termctl user`; preserve their existing roles when changing them.
+Individual Linux accounts can use `termctl user add console --id ID --os-user USER --roles ROLES`
+for Console access without a second login. See `docs/console-authentication.md`
+in the project and `docs/terminal.md` for branding and prompt settings.
 
 `show` in the network interface editor displays a compact table; use `edit NAME`
 and `show` for one interface's details. Editing access is separate from live link

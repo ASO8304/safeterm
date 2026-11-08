@@ -37,6 +37,7 @@ type Session struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 type grant struct {
+	local      bool
 	session    Session
 	peer       Peer
 	credential [32]byte
@@ -226,7 +227,7 @@ func (s *Service) Login(ctx context.Context, p Peer, user string, password []byt
 	key := sha256.Sum256([]byte(session.Token))
 	stored := session
 	stored.Token = ""
-	s.sessions[key] = grant{stored, p, credential(*selected)}
+	s.sessions[key] = grant{session: stored, peer: p, credential: credential(*selected)}
 	return session, nil
 }
 func (s *Service) Verify(token string, p Peer) (Session, error) {
@@ -239,6 +240,14 @@ func (s *Service) Verify(token string, p Peer) (Session, error) {
 	s.mu.Unlock()
 	if !ok || g.peer != p || !s.now().UTC().Before(g.session.ExpiresAt) {
 		return Session{}, ErrDenied
+	}
+	if g.local {
+		if !s.verifyLocal(g) {
+			return Session{}, ErrDenied
+		}
+		result := g.session
+		result.Roles = append([]string(nil), result.Roles...)
+		return result, nil
 	}
 	users, err := s.load()
 	if err != nil {

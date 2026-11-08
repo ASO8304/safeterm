@@ -96,6 +96,16 @@ func run(profile, registryPath, socket, brokerUsers, auditSocket, auditUser, gat
 	if err != nil {
 		return err
 	}
+	localUIDs, err := identity.LocalUIDs(identity.LocalUsersPath)
+	if err != nil {
+		return err
+	}
+	for _, uid := range localUIDs {
+		if seenUIDs[uid] {
+			return fmt.Errorf("config-manager: Linux Console UID conflicts with a Broker identity")
+		}
+		allowedUIDs = append(allowedUIDs, uid)
+	}
 	server, err := configmanager.ListenUnix(socket, 0o660, allowedUIDs, manager)
 	if err != nil {
 		return err
@@ -110,7 +120,25 @@ func run(profile, registryPath, socket, brokerUsers, auditSocket, auditUser, gat
 		return err
 	}
 	identityClient := identity.NewClient(identity.SocketPath, identityUID)
-	server.SetActorAuthorizer(consoleActorAuthorizer(consoleUID, identityClient))
+	legacyAuthorize := consoleActorAuthorizer(consoleUID, identityClient)
+	localSet := map[uint32]bool{}
+	for _, uid := range localUIDs {
+		localSet[uid] = true
+	}
+	server.SetActorAuthorizer(func(actor *configmanager.Actor, uid uint32, pid int32) error {
+		if !localSet[uid] {
+			return legacyAuthorize(actor, uid, pid)
+		}
+		if actor == nil || actor.BrokerType != "console" {
+			return identity.ErrDenied
+		}
+		session, err := identityClient.Verify(context.Background(), actor.ConsoleSession, identity.Peer{UID: uid, PID: pid})
+		if err != nil || session.UserID != actor.UserID {
+			return identity.ErrDenied
+		}
+		actor.Roles = append([]string(nil), session.Roles...)
+		return nil
+	})
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return server.Serve(ctx)

@@ -129,6 +129,16 @@ func run() error {
 			return identity.ErrDenied
 		}},
 	}
+	localUIDs, err := identity.LocalUIDs(identity.LocalUsersPath)
+	if err != nil {
+		return err
+	}
+	for _, uid := range localUIDs {
+		if _, exists := policies[uid]; exists {
+			return fmt.Errorf("network: Linux Console UID conflicts with a service identity")
+		}
+		policies[uid] = policies[console]
+	}
 	server, err := isolation.ListenUnixWithPeerPolicies(networkmanager.Socket, 0660, policies, manager)
 	if err != nil {
 		return err

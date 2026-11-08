@@ -273,6 +273,20 @@ func InstallAdministration(source, target string) error {
 		}
 		return os.Rename(f.Name(), dst)
 	}
+	if _, err := os.Stat(filepath.Join(source, "terminal.json")); err == nil {
+		if err := copyOne("terminal.json", true, 0644); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if _, err := os.Stat(filepath.Join(source, "access/console/linux-users.json")); err == nil {
+		if err := copyOne("access/console/linux-users.json", true, 0644); err != nil {
+			return err
+		}
+	} else if !os.IsNotExist(err) {
+		return err
+	}
 	for _, name := range []string{"access/ssh/users.json", "access/ssh/ssh_host_ed25519_key", "access/ssh/ssh_host_ed25519_key.pub", "access/console/users.json"} {
 		if _, err := os.Stat(filepath.Join(source, name)); os.IsNotExist(err) {
 			continue
@@ -290,7 +304,7 @@ func InstallAdministration(source, target string) error {
 	if err := copyOne("trust/catalog-ed25519.pub", false, 0644); err != nil {
 		return err
 	}
-	for _, name := range []string{"docs/administration.md", "docs/administration.txt", "docs/network.md", "docs/network.txt", "docs/network-diagnostics.md", "docs/network-diagnostics.txt"} {
+	for _, name := range []string{"docs/administration.md", "docs/administration.txt", "docs/network.md", "docs/network.txt", "docs/network-diagnostics.md", "docs/network-diagnostics.txt", "docs/terminal.md", "docs/terminal.txt", "docs/console-authentication.md", "docs/console-authentication.txt"} {
 		if _, err := os.Stat(filepath.Join(source, name)); err == nil {
 			if err = copyOne(name, false, 0644); err != nil {
 				return err

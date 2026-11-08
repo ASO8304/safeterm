@@ -336,6 +336,7 @@ else
   install -m 0600 "$payload/console/users.json" "$work/config/access/console/users.json"
 fi
 install -m 0644 "$payload/resources.json" "$work/config/resources.json"
+install -m 0644 "$payload/console/linux-users.json" "$work/config/access/console/linux-users.json"
 
 
 mkdir -p "$work/bundle/bin" "$work/bundle/etc" "$work/bundle/managed" "$work/bundle/systemd"
@@ -343,6 +344,7 @@ for name in audit network-manager config-manager config-writer console gateway r
   install -m 0555 "$payload/bin/safeterm-$name" "$work/bundle/bin/safeterm-$name"
 done
 cp -R "$work/config" "$work/bundle/etc/safeterm"
+cp "$payload/catalog-source/terminal.json" "$work/bundle/etc/safeterm/"
 cp "$payload/catalog-source/README.md" "$work/bundle/etc/safeterm/"
 cp -R "$payload/catalog-source/docs" "$payload/catalog-source/network" "$work/bundle/etc/safeterm/"
 for definitions in resources.d access/roles.d commands/profiles.d commands/operations.d commands/executables.d access/policies.d; do

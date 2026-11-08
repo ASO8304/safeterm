@@ -32,10 +32,12 @@ type fragment struct {
 	node *yaml.Node
 }
 type Snapshot struct {
-	View       View
-	Files      []File
-	fragments  map[string][]fragment
-	routeNodes map[string]*yaml.Node
+	View              View
+	Files             []File
+	fragments         map[string][]fragment
+	routeNodes        map[string]*yaml.Node
+	definitionIDs     map[string]bool
+	unresolvedMatches bool
 }
 
 func child(n *yaml.Node, key string) *yaml.Node {
@@ -154,7 +156,7 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			files = append(files, f)
 		}
 	}
-	s := &Snapshot{Files: files, View: View{Interfaces: map[string]Interface{}, Routes: map[string]Route{}}, fragments: map[string][]fragment{}, routeNodes: map[string]*yaml.Node{}}
+	s := &Snapshot{Files: files, View: View{Interfaces: map[string]Interface{}, Routes: map[string]Route{}}, fragments: map[string][]fragment{}, routeNodes: map[string]*yaml.Node{}, definitionIDs: map[string]bool{}}
 	ordered := []string{}
 	for name := range selected {
 		ordered = append(ordered, name)
@@ -178,6 +180,7 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 				return nil, fmt.Errorf("network: invalid Ethernet definition in %s", f.Path)
 			}
 			item := s.View.Interfaces[id]
+			s.definitionIDs[id] = true
 			item.ID = id
 			item.Name = id
 			item.Files = append(item.Files, f.Path)
@@ -309,6 +312,31 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			}
 		}
 		if match != nil || rename != "" {
+			simple := true
+			if rename != "" && !interfaceNamePattern.MatchString(rename) {
+				simple = false
+			}
+			if match != nil {
+				if match.Kind != yaml.MappingNode {
+					simple = false
+				} else {
+					for j := 0; j < len(match.Content); j += 2 {
+						key, value := match.Content[j].Value, match.Content[j+1].Value
+						switch key {
+						case "macaddress":
+							if _, valid := normalizedMAC(value); !valid {
+								simple = false
+							}
+						case "name":
+							if !interfaceNamePattern.MatchString(value) {
+								simple = false
+							}
+						default:
+							simple = false
+						}
+					}
+				}
+			}
 			candidates := []string{}
 			for name, mac := range names {
 				ok := true
@@ -338,6 +366,11 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			}
 			if len(candidates) != 1 {
 				item.ReadOnly = "interface match must resolve to exactly one present physical interface"
+				if !simple || len(candidates) > 1 {
+					s.unresolvedMatches = true
+				} else {
+					actual = ""
+				}
 			} else {
 				actual = candidates[0]
 			}
@@ -347,7 +380,16 @@ func Discover(root string, p Policy, names map[string]string) (*Snapshot, error)
 			item.ReadOnly = fmt.Sprintf("interface is outside administrator policy; a Linux administrator must add %q to interfaces in %s, then reopen config network interface", actual, PolicyPath)
 		}
 		if _, exists := names[actual]; !exists {
-			item.ReadOnly = "physical interface is not present"
+			// Keep the source definition untouched, but do not expose removed
+			// hardware (or its routes) as editable devices.
+			delete(s.View.Interfaces, id)
+			for name, route := range s.View.Routes {
+				if route.Interface == id {
+					delete(s.View.Routes, name)
+					delete(s.routeNodes, name)
+				}
+			}
+			continue
 		}
 		if previous, exists := resolved[actual]; exists && previous != id {
 			return nil, fmt.Errorf("network: multiple Netplan IDs resolve to interface %s", actual)

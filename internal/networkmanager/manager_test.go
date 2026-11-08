@@ -60,7 +60,7 @@ func TestLinkStateDoesNotInvalidateSavedCandidates(t *testing.T) {
 		t.Fatal("link state leaked interfaces or changed configuration identity", before, after)
 	}
 	operatorCall(t, m, Request{Action: "save", Version: before.View.Version, Changes: []Change{{Kind: "interface", Name: "ens19", Field: "mtu", Action: "set", Values: []string{"1400"}}}})
-	data, err := os.ReadFile(filepath.Join(root, "state", "candidate.json"))
+	data, err := os.ReadFile(filepath.Join(root, "state", candidateFile("ssh:admin")))
 	if err != nil || strings.Contains(string(data), `"states"`) {
 		t.Fatal("display metadata changed the persisted candidate format", err)
 	}
@@ -191,8 +191,8 @@ func TestRefuseAmbiguousAndUnsafeSources(t *testing.T) {
 	if err := os.Chmod(filepath.Join(root, "etc/netplan/arbitrary-name.yaml"), 0666); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Discover(root, p, nil); err == nil {
-		t.Fatal("writable source accepted")
+	if _, err := Discover(root, p, nil); err != nil {
+		t.Fatal("Netplan mode must not block discovery", err)
 	}
 }
 func TestFileReplacementPreservesMetadataAndRejectsConflict(t *testing.T) {
@@ -487,11 +487,7 @@ func TestUnsafeSourceReportsSpecificMetadataFailures(t *testing.T) {
 		prepare func(*testing.T, string)
 		want    []string
 	}{
-		{"writable", func(t *testing.T, path string) {
-			if err := os.Chmod(path, 0666); err != nil {
-				t.Fatal(err)
-			}
-		}, []string{"mode=0666", "group/world write"}},
+
 		{"hardlink", func(t *testing.T, path string) {
 			if err := os.Link(path, path+".link"); err != nil {
 				t.Fatal(err)

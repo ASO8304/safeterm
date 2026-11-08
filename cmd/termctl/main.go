@@ -133,6 +133,7 @@ func writeHelp(out io.Writer) {
 	fmt.Fprintln(out, "  termctl user list")
 	fmt.Fprintln(out, "  termctl user add ssh|console --id ID --roles ROLE1,ROLE2 [--password-hash-file FILE] [--authorized-key-file FILE]")
 	fmt.Fprintln(out, "  termctl user auth ssh|console --id ID [--password-hash-file FILE] [--authorized-key-file FILE]")
+	fmt.Fprintln(out, "  termctl user add|auth|del console --id ID --os-user LINUX_USER [--roles ROLE1,ROLE2] (Linux login, no second password)")
 	fmt.Fprintln(out, "  termctl user password ssh --id ID")
 	fmt.Fprintln(out, "  termctl user password console --id ID")
 	fmt.Fprintln(out, "  termctl user del ssh|console --id ID")
@@ -399,7 +400,7 @@ func userCommand(dir string, args []string, out io.Writer) error {
 		return fmt.Errorf("--id is required")
 	}
 	if kind == "console" && options.osUser != "" {
-		return fmt.Errorf("Console users are internal; use --id without --os-user")
+		return linuxConsoleUser(dir, args[0], options, cfg, out)
 	}
 	if args[0] == "del" {
 		return deleteUser(dir, kind, options, cfg, out)
@@ -463,6 +464,13 @@ func listUsers(dir string, out io.Writer) error {
 		for _, u := range console.Users {
 			fmt.Fprintf(out, "console/%-16s roles=%s password=%t disabled=%t\n", u.UserID, strings.Join(u.Roles, ","), u.PasswordHash != "", u.Disabled || u.PasswordHash == "")
 		}
+	}
+	localUsers, err := identity.LoadLocalUsers(filepath.Join(dir, "access/console/linux-users.json"), nil)
+	if err != nil {
+		return err
+	}
+	for _, u := range localUsers.Users {
+		fmt.Fprintf(out, "console-linux/%-16s os_user=%s roles=%s disabled=%t\n", u.UserID, u.OSUser, strings.Join(u.Roles, ","), u.Disabled)
 	}
 	return nil
 }

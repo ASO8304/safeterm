@@ -31,6 +31,7 @@ type Server struct {
 	listener  *net.UnixListener
 	service   *Service
 	console   uint32
+	locals    map[uint32]bool
 	verifiers map[uint32]bool
 	slots     chan struct{}
 }
@@ -54,7 +55,7 @@ func Listen(path string, service *Service, console uint32, verifiers []uint32) (
 		l.Close()
 		return nil, err
 	}
-	return &Server{l, service, console, allowed, make(chan struct{}, 32)}, nil
+	return &Server{listener: l, service: service, console: console, verifiers: allowed, slots: make(chan struct{}, 32)}, nil
 }
 func (s *Server) Close() error { return s.listener.Close() }
 func (s *Server) Serve(ctx context.Context) error {
@@ -80,7 +81,7 @@ func (s *Server) handle(c *net.UnixConn) {
 	defer c.Close()
 	_ = c.SetDeadline(time.Now().Add(5 * time.Second))
 	p, err := peer(c)
-	if err != nil || p.UID != s.console && !s.verifiers[p.UID] {
+	if err != nil || p.UID != s.console && !s.locals[p.UID] && !s.verifiers[p.UID] {
 		return
 	}
 	data, err := bufio.NewReader(io.LimitReader(c, maxFrame+1)).ReadBytes('\n')
@@ -111,8 +112,16 @@ func (s *Server) handle(c *net.UnixConn) {
 		if e == nil {
 			reply = response{Session: &session}
 		}
+	case "local-login":
+		if !s.locals[p.UID] || req.UserID != "" || len(req.Password) != 0 || req.Token != "" || req.PeerUID != 0 || req.PeerPID != 0 {
+			return
+		}
+		session, e := s.service.LoginLocal(ctx, p)
+		if e == nil {
+			reply = response{Session: &session}
+		}
 	case "verify":
-		if !s.verifiers[p.UID] || req.PeerUID != s.console || req.UserID != "" || len(req.Password) != 0 {
+		if !s.verifiers[p.UID] || (req.PeerUID != s.console && !s.locals[req.PeerUID]) || req.UserID != "" || len(req.Password) != 0 {
 			return
 		}
 		session, e := s.service.Verify(req.Token, Peer{req.PeerUID, req.PeerPID})
@@ -120,7 +129,7 @@ func (s *Server) handle(c *net.UnixConn) {
 			reply = response{Session: &session}
 		}
 	case "logout":
-		if p.UID != s.console || req.UserID != "" || len(req.Password) != 0 || req.PeerUID != 0 || req.PeerPID != 0 {
+		if (p.UID != s.console && !s.locals[p.UID]) || req.UserID != "" || len(req.Password) != 0 || req.PeerUID != 0 || req.PeerPID != 0 {
 			return
 		}
 		if s.service.Logout(ctx, req.Token, p) == nil {
@@ -191,4 +200,25 @@ func (c *Client) Verify(ctx context.Context, token string, p Peer) (Session, err
 func (c *Client) Logout(ctx context.Context, token string) error {
 	_, e := c.call(ctx, request{Action: "logout", Token: token})
 	return e
+}
+
+// SetLocalUIDs is called before Serve. Console operators cannot verify tokens
+// or claim another process's UID/PID through the login API.
+func (s *Server) SetLocalUIDs(uids []uint32) error {
+	s.locals = map[uint32]bool{}
+	for _, uid := range uids {
+		if uid == 0 || uid == s.console || s.verifiers[uid] {
+			return ErrDenied
+		}
+		s.locals[uid] = true
+	}
+	return nil
+}
+
+func (c *Client) LoginLocal(ctx context.Context) (Session, error) {
+	r, err := c.call(ctx, request{Action: "local-login"})
+	if err != nil || r.Session == nil {
+		return Session{}, ErrDenied
+	}
+	return *r.Session, nil
 }

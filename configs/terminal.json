@@ -1,0 +1,4 @@
+{
+  "name": "safeterm",
+  "prompt": "{brand}::{user}{context}{dirty}> "
+}

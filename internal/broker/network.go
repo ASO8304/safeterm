@@ -78,6 +78,9 @@ func (s *Shell) networkCommand(ctx context.Context, f []string) (bool, error) {
 	if r.View == nil || r.View.Pending {
 		return true, fmt.Errorf("network trial pending; use execute network confirm|rollback")
 	}
+	if r.Text != "" {
+		s.writeStyled(styleWarning, r.Text+"\n")
+	}
 	s.networkEdit = &networkEditSession{kind: f[2], base: *r.View, view: *r.View}
 	s.configMenu = nil
 	s.networkEdit.ensureRouteNumbers()

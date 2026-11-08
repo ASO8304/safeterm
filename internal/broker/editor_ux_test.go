@@ -106,7 +106,7 @@ func TestGlobalsInsideAllEditorsDoNotSaveAndHelpCannotExit(t *testing.T) {
 				if !strings.Contains(out.String(), "\x1b[2J\x1b[H") || s.prompt() != prompt {
 					t.Fatal("global help changed draft", out)
 				}
-				exit, err := s.executeLine(context.Background(), "exit", nil)
+				exit, err := s.executeLine(context.Background(), "exit", confirmYes())
 				if exit || err != nil {
 					t.Fatal("context exit closed session", exit, err)
 				}
@@ -327,7 +327,7 @@ func TestExitDiscardsRetainedLogicalDraftEvenWithCleanActiveEditor(t *testing.T)
 	for !s.atRoot() {
 		editorCommands(t, s, "exit")
 	}
-	exit, err := s.executeLine(context.Background(), "exit", nil)
+	exit, err := s.executeLine(context.Background(), "exit", confirmYes())
 	if err != nil || !exit || len(s.stagedLogical) != 0 || !strings.Contains(out.String(), "Discarded unsaved edits for 'tunnel'.") {
 		t.Fatal(exit, err, out)
 	}

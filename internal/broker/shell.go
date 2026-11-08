@@ -13,6 +13,7 @@ import (
 	"safeterm/internal/contract"
 	"safeterm/internal/isolation"
 	"safeterm/internal/networkmanager"
+	"safeterm/internal/terminalconfig"
 )
 
 const maxShellLineBytes = 4096
@@ -26,6 +27,7 @@ type GatewayClient interface {
 }
 
 type Shell struct {
+	presentation  terminalconfig.Config
 	color         bool
 	network       networkmanager.API
 	networkEdit   *networkEditSession
@@ -88,7 +90,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 	defer close(done)
 	go readBytes(s.input, input, done, cancel)
 	if s.consoleLogin != nil {
-		s.writeStyled(styleHeading, "\nSafeTerm Console login (Ctrl+] exits)\n")
+		s.writeStyled(styleHeading, "\n"+s.presentation.Title()+" Console login (Ctrl+] exits)\n")
 		authenticated := false
 		for attempt := 0; attempt < 3; attempt++ {
 			user, err := s.readLine(ctx, input, s.styled(styleCommand, "Username: "), false, false)
@@ -126,7 +128,7 @@ func (s *Shell) Run(ctx context.Context) (runErr error) {
 			return fmt.Errorf("broker: Console login denied")
 		}
 	}
-	s.writeStyled(styleHeading, "\nSafeTerm restricted shell\n")
+	s.writeStyled(styleHeading, "\n"+s.presentation.Title()+" restricted shell\n")
 	fmt.Fprintf(s.output, "Authenticated as %s.\r\nQuick start: '?' lists commands; 'execute ?' lists operations; 'config ?' lists files. '?' + Enter shows contextual help. Ctrl+] exits the session.\r\n", s.principal.UserID)
 	if err := s.questionHelp(ctx, nil); err != nil {
 		return err
@@ -187,6 +189,11 @@ func (s *Shell) executeLine(ctx context.Context, line string, input <-chan byte)
 	fields := strings.Fields(line)
 	if len(fields) == 0 {
 		return false, nil
+	}
+	if len(fields) == 1 && (fields[0] == "exit" || fields[0] == "quit" || fields[0] == "logout") && s.exitWouldDiscard() {
+		if !s.confirmDiscard(ctx, input) {
+			return false, nil
+		}
 	}
 	if handled, exit, err := s.globalCommand(ctx, fields); handled {
 		return exit, err
@@ -582,4 +589,12 @@ func (s *Shell) writeTerminalData(data []byte) {
 			fmt.Fprint(s.output, string(character))
 		}
 	}
+}
+
+func (s *Shell) SetPresentation(c terminalconfig.Config) error {
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	s.presentation = c.WithDefaults()
+	return nil
 }

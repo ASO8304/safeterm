@@ -41,7 +41,7 @@ func editorFixture(t *testing.T) (*Shell, string, *bytes.Buffer) {
 func editorCommands(t *testing.T, s *Shell, commands ...string) {
 	t.Helper()
 	for _, c := range commands {
-		exit, err := s.executeLine(context.Background(), c, nil)
+		exit, err := s.executeLine(context.Background(), c, confirmYes())
 		if exit || err != nil {
 			t.Fatalf("%q: exit=%v err=%v", c, exit, err)
 		}
@@ -223,3 +223,7 @@ func TestSystemInfoGroupRequiresAuthorizedSubcommand(t *testing.T) {
 		t.Fatal("removed root command dispatched")
 	}
 }
+
+// Existing navigation cases explicitly consent to discarding; confirmation
+// refusal/default behavior is exercised separately.
+func confirmYes() <-chan byte { ch := make(chan byte, 2); ch <- 'y'; ch <- '\r'; close(ch); return ch }

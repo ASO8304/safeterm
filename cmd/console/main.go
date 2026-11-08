@@ -24,6 +24,7 @@ import (
 	"safeterm/internal/isolation"
 	"safeterm/internal/layout"
 	"safeterm/internal/networkmanager"
+	"safeterm/internal/terminalconfig"
 )
 
 const (
@@ -49,8 +50,8 @@ func run() error {
 		return fmt.Errorf("console: an interactive terminal is required")
 	}
 	current, err := user.Current()
-	if err != nil || current.Username != "safeterm" {
-		return fmt.Errorf("console: use the shared safeterm OS account")
+	if err != nil || os.Getuid() != os.Geteuid() || os.Geteuid() == 0 {
+		return fmt.Errorf("console: run as your mapped Linux account without sudo; the shared safeterm entry supports legacy internal login")
 	}
 	// Prevent sibling processes of the shared UID from reading login credentials
 	// or tokens through ptrace/proc; prohibit gaining privileges through exec.
@@ -106,23 +107,51 @@ func run() error {
 		return err
 	}
 	identityClient := identity.NewClient(identity.SocketPath, identityUID)
-	shell, err := broker.NewAuthenticatedConsoleShell(client, catalog, os.Stdin, os.Stdout, configs,
-		func(ctx context.Context, user string, password []byte) (broker.Principal, time.Time, error) {
-			session, err := identityClient.Login(ctx, user, password)
-			return broker.Principal{UserID: session.UserID, Roles: session.Roles, BrokerType: "console", ConsoleSession: session.Token}, session.ExpiresAt, err
-		}, func(ctx context.Context, p broker.Principal) error {
-			return identityClient.Logout(ctx, p.ConsoleSession)
-		})
+	var shell *broker.Shell
+	var expires time.Time
+	if current.Username != "safeterm" {
+		session, loginErr := identityClient.LoginLocal(context.Background())
+		if loginErr != nil {
+			return fmt.Errorf("console: Linux account %q has no enabled SafeTerm mapping or socket access; ask a Linux administrator to provision it", current.Username)
+		}
+		expires = session.ExpiresAt
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_ = identityClient.Logout(ctx, session.Token)
+		}()
+		shell, err = broker.NewShellForBroker(client, catalog, broker.Principal{UserID: session.UserID, Roles: session.Roles, ConsoleSession: session.Token}, os.Stdin, os.Stdout, configs, "console")
+	} else {
+		shell, err = broker.NewAuthenticatedConsoleShell(client, catalog, os.Stdin, os.Stdout, configs,
+			func(ctx context.Context, user string, password []byte) (broker.Principal, time.Time, error) {
+				session, err := identityClient.Login(ctx, user, password)
+				return broker.Principal{UserID: session.UserID, Roles: session.Roles, BrokerType: "console", ConsoleSession: session.Token}, session.ExpiresAt, err
+			}, func(ctx context.Context, p broker.Principal) error {
+				return identityClient.Logout(ctx, p.ConsoleSession)
+			})
+	}
 	if err != nil {
 		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if !expires.IsZero() {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, expires)
+		defer cancel()
+	}
 	networkClient, err := networkmanager.NewClient(networkmanager.Socket, 0)
 	if err != nil {
 		return err
 	}
 	shell.SetTerminal(os.Getenv("TERM"))
+	presentation, err := terminalconfig.Load(terminalconfig.Path)
+	if err != nil {
+		return err
+	}
+	if err := shell.SetPresentation(presentation); err != nil {
+		return err
+	}
 	shell.SetNetworkClient(networkClient)
 	return shell.Run(ctx)
 }

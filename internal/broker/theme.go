@@ -44,9 +44,20 @@ func (s *Shell) writeStyled(style, value string) {
 }
 
 func (s *Shell) formatPrompt(path, dirty string) string {
-	return s.styled(styleHeading, "safeterm") + "::" +
-		s.styled(styleSuccess, s.principal.UserID) + s.styled(stylePath, path) +
-		s.styled(styleWarning, dirty) + s.styled(styleCommand, ">") + " "
+	cfg := s.presentation.WithDefaults()
+	prompt := strings.NewReplacer(
+		"{brand}", s.styled(styleHeading, cfg.Name),
+		"{user}", s.styled(styleSuccess, s.principal.UserID),
+		"{context}", s.styled(stylePath, path),
+		"{dirty}", s.styled(styleWarning, dirty),
+	).Replace(cfg.Prompt)
+	if s.color {
+		if strings.HasSuffix(prompt, " ") {
+			return strings.TrimSuffix(prompt, " ") + "\x1b[0m "
+		}
+		return prompt + "\x1b[0m"
+	}
+	return prompt
 }
 
 func (s *Shell) helpRow(name, description string) {

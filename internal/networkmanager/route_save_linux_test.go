@@ -16,7 +16,7 @@ func TestImportedInvalidGatewayExplainsUnrelatedSaveFailureAndCanBeRepaired(t *t
 	if err == nil || !strings.Contains(err.Error(), "default IPv4 route on interface ens19") || !strings.Contains(err.Error(), "set gateway 192.0.2.1") || strings.Contains(err.Error(), "route-") {
 		t.Fatal("save blamed opaque internal route", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "state/candidate.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(root, "state/"+candidateFile("ssh:admin"))); !os.IsNotExist(err) {
 		t.Fatal("invalid candidate saved", err)
 	}
 	var name string

@@ -32,7 +32,11 @@ func (n *networkFixtureAPI) Call(_ context.Context, actor contract.Metadata, r n
 		n.view = v
 	}
 	v := n.view
-	return networkmanager.Reply{View: &v, Text: r.Action}, nil
+	text := r.Action
+	if r.Action == "read" {
+		text = ""
+	}
+	return networkmanager.Reply{View: &v, Text: text}, nil
 }
 func TestNetworkCandidateCLIAndCompletion(t *testing.T) {
 	s, _, out := editorFixture(t)

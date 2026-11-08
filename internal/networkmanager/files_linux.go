@@ -68,10 +68,11 @@ func readTrusted(root, relative string) (File, error) {
 	if !info.Mode().IsRegular() {
 		reasons = append(reasons, fmt.Sprintf("type=%s; expected a regular file", info.Mode().Type()))
 	}
-	if info.Mode().Perm()&0022 != 0 {
+	netplan := isNetplanFile(relative)
+	if !netplan && info.Mode().Perm()&0022 != 0 {
 		reasons = append(reasons, fmt.Sprintf("mode=%04o permits group/world write; remove those write permissions", info.Mode().Perm()))
 	}
-	if st.Uid != expected {
+	if !netplan && st.Uid != expected {
 		reasons = append(reasons, fmt.Sprintf("owner uid=%d; expected uid=%d", st.Uid, expected))
 	}
 	if st.Nlink != 1 {
@@ -378,4 +379,13 @@ func LifecycleLock() (io.Closer, error) {
 		return nil, fmt.Errorf("network: a SafeTerm lifecycle operation is active")
 	}
 	return f, nil
+}
+
+// Relax only Netplan file ownership/mode, never policy, state or .link files.
+func isNetplanFile(relative string) bool {
+	if filepath.Clean(relative) != relative {
+		return false
+	}
+	dir := filepath.ToSlash(filepath.Dir(relative))
+	return (dir == "etc/netplan" || dir == "run/netplan" || dir == "lib/netplan") && strings.HasSuffix(relative, ".yaml")
 }

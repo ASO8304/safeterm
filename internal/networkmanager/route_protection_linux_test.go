@@ -25,7 +25,7 @@ func TestManagerRejectsDefaultDeletionAcrossSavedDraftsAndOldCandidates(t *testi
 	}
 	operatorCall(t, m, Request{Action: "save", Version: read.View.Version, Changes: []Change{{Kind: "route", Name: name, Action: "set", Field: "destination", Values: []string{"10.0.0.0/8"}}}})
 	read = operatorCall(t, m, Request{Action: "read"})
-	path := filepath.Join(root, "state", "candidate.json")
+	path := filepath.Join(root, "state", candidateFile("ssh:admin"))
 	before, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -40,11 +40,11 @@ func TestManagerRejectsDefaultDeletionAcrossSavedDraftsAndOldCandidates(t *testi
 	}
 	// Candidates saved by older releases must obey the same rule at apply time.
 	var old candidate
-	if err := m.load("candidate.json", &old); err != nil {
+	if err := m.load(candidateFile("ssh:admin"), &old); err != nil {
 		t.Fatal(err)
 	}
 	delete(old.View.Routes, name)
-	if err := m.save("candidate.json", old); err != nil {
+	if err := m.save(candidateFile("ssh:admin"), old); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := callTest(m, "admin", []string{"network-operator"}, Request{Action: "apply"}); err == nil || !strings.Contains(err.Error(), "default routes cannot be deleted") {

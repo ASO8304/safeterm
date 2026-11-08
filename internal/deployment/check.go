@@ -231,6 +231,9 @@ func Check(options CheckOptions) (Report, error) {
 	if _, err := identity.ParseUsers(consoleData, knownRoles); err != nil {
 		return Report{}, err
 	}
+	if _, err := identity.LoadLocalUsers(filepath.Join(adminDir, "access/console/linux-users.json"), knownRoles); err != nil {
+		return Report{}, err
+	}
 	registryPath := filepath.Join(configDir, "resources.json")
 	var registry *configmanager.Registry
 	if options.Installed {

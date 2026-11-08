@@ -42,7 +42,7 @@ func (m *Manager) recoverCandidateNames(tx *transaction) (bool, error) {
 	if err := m.save("last.json", tx); err != nil {
 		return false, err
 	}
-	if err := m.remove("candidate.json"); err != nil {
+	if err := m.removeCandidate(tx.Owner); err != nil {
 		return false, err
 	}
 	return true, m.remove("pending.json")

@@ -10,11 +10,11 @@ import (
 )
 
 const dirtyDraftReminder = "[!] Unsaved edits exist. Use 'next' to stage them or 'save' to commit."
-const exitDescription = "Move up one level (discards unsaved edits to this item)"
+const exitDescription = "Move up one level; asks before discarding unsaved edits"
 const nextDescription = "Move up (keeps unsaved edits staged)"
 
 var globalDescriptions = map[string]string{
-	"exit":   "Close session; discard unsaved drafts",
+	"exit":   "Close session; asks before discarding unsaved drafts",
 	"clear":  "Clear the screen",
 	"whoami": "Show your identity and roles",
 }

@@ -16,14 +16,14 @@ if os.geteuid() != 0 or os.environ.get('SAFETERM_DISPOSABLE_HOST') != '1':
     raise SystemExit('requires disposable root CI VM')
 
 mode = sys.argv[1]
-if mode not in ('empty', 'configured', 'site', 'logical', 'logs', 'services'):
+if mode not in ('empty', 'configured', 'site', 'logical', 'logs', 'services', 'linux'):
     raise SystemExit('expected empty, configured, site, logical, logs or services')
 pid, fd = pty.fork()
 if pid == 0:
     # Exercise the colored Console explicitly rather than inheriting CI's dumb TERM.
     os.environ['TERM'] = 'xterm-256color'
     os.environ.pop('NO_COLOR', None)
-    os.execv('/usr/bin/sudo', ['sudo', '-iu', 'safeterm'])
+    os.execv('/usr/bin/sudo', ['sudo', '-iu', 'ci-linux' if mode == 'linux' else 'safeterm'])
 pending = b''
 transcript = b''
 
@@ -62,15 +62,24 @@ def command(text, prompt=b'\nsafeterm::ci-admin> '):
 
 
 try:
-    expect(b'Username: ')
-    os.write(fd, b'ci-admin\r')
-    expect(b'Password: ')
-    os.write(fd, b'SmokeTest42\r')
+    if mode != 'linux':
+        expect(b'Username: ')
+        os.write(fd, b'ci-admin\r')
+        expect(b'Password: ')
+        os.write(fd, b'SmokeTest42\r')
     login_menu = expect(b'\nsafeterm::ci-admin> ')
     if b'\x1b[1;36msafeterm\x1b[0m::\x1b[32mci-admin\x1b[0m' not in transcript:
         raise RuntimeError('Console did not enable colors for the interactive terminal')
     if b'Show available commands' not in login_menu or b'Show your identity and roles' not in login_menu:
         raise RuntimeError('login did not show the command menu')
+    if mode == 'linux':
+        if b'Username:' in login_menu or b'Password:' in login_menu:
+            raise RuntimeError('Linux login asked for second authentication')
+        if b'user: ci-admin' not in command('whoami'):
+            raise RuntimeError('Linux mapping did not establish SafeTerm identity')
+        command('config network interface', b'\nsafeterm::ci-admin(network/interface)> ')
+        command('show', b'\nsafeterm::ci-admin(network/interface)> ')
+        command('cancel')
     if mode == 'empty':
         entered = command('config network', b'\nsafeterm::ci-admin(network)> ')
         if b'Choose an interface' in entered or b'Show available commands' in entered:
@@ -186,7 +195,16 @@ try:
         if b'8080' not in result:
             raise RuntimeError('registered INI value not read')
         command('set Po\t9090', b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
-        command('exit', b'\nsafeterm::ci-admin(fresh-options)> ')
+        os.write(fd, b'exit\r')
+        expect(b'[y/N]: ')
+        os.write(fd, b'n\r')
+        expect(b'\nsafeterm::ci-admin(fresh-options/Server)*> ')
+        if b'9090' not in command('show', b'\nsafeterm::ci-admin(fresh-options/Server)*> '):
+            raise RuntimeError('declining exit lost the draft')
+        os.write(fd, b'exit\r')
+        expect(b'[y/N]: ')
+        os.write(fd, b'y\r')
+        expect(b'\nsafeterm::ci-admin(fresh-options)> ')
         if 'Port = 8080' not in open('/etc/safeterm-ci/options.ini', encoding='utf-8-sig').read():
             raise RuntimeError('exit saved the section')
         command('edit Server', b'\nsafeterm::ci-admin(fresh-options/Server)> ')

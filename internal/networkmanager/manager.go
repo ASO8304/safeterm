@@ -356,49 +356,53 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		}
 		return Reply{}, fmt.Errorf("network: a trial is pending; confirm or rollback it first")
 	}
+	// Live diagnostics and discarding this identity's saved draft do not depend
+	// on parsing Netplan or loading a possibly stale/damaged candidate.
+	if r.Action == "status" {
+		text, err := m.opts.Backend.Status(ctx, allowedNames)
+		return Reply{Text: text}, err
+	}
+	if r.Action == "discard" {
+		if err := m.report(ctx, req, "rollback-authorized", "network-v1"); err != nil {
+			return Reply{}, err
+		}
+		return Reply{Text: "Candidate discarded; active Netplan files unchanged."}, m.removeCandidate(owner(req))
+	}
 	s, err := m.snapshot(p)
 	if err != nil {
 		return Reply{}, err
 	}
 	view := s.View
 	var c candidate
-	cErr := m.load("candidate.json", &c)
+	cErr := m.loadCandidate(owner(req), &c)
 	if cErr != nil && !os.IsNotExist(cErr) {
-		return Reply{}, cErr
+		return Reply{}, fmt.Errorf("network: could not load your saved candidate; execute network discard to remove it without changing active networking: %w", cErr)
 	}
 	hasCandidate := cErr == nil
 	if r.Action == "rename" {
 		return Reply{}, fmt.Errorf("network: use config network interface, edit NAME, set name NEW_NAME, then save")
 	}
 	if hasCandidate && c.Owner == owner(req) {
-		if c.Base != s.View.Version && r.Action != "discard" {
-			return Reply{}, fmt.Errorf("network: Netplan sources or policy changed; execute network discard before editing")
+		if c.Base == s.View.Version {
+			view = cloneView(c.View)
+			view.Version = c.Revision
+			view.States = s.View.States
+			view.MACs = s.View.MACs
+			view.Names = s.View.Names
 		}
-		view = cloneView(c.View)
-		view.Version = c.Revision
-		view.States = s.View.States
-		view.MACs = s.View.MACs
-		view.Names = s.View.Names
 	}
 	switch r.Action {
 	case "read":
 		if err := m.report(ctx, req, "read", s.View.Version); err != nil {
 			return Reply{}, err
 		}
-		return Reply{View: &view}, nil
-	case "status":
-		text, err := m.opts.Backend.Status(ctx, allowedNames)
-		return Reply{Text: text}, err
+		text := ""
+		if hasCandidate && c.Base != s.View.Version {
+			text = "Network hardware, sources or policy changed. Showing current devices; your saved candidate is retained until you save a replacement or discard it."
+		}
+		return Reply{View: &view, Text: text}, nil
 	case "diff":
 		return Reply{Text: Diff(s.View, view)}, nil
-	case "discard":
-		if hasCandidate && c.Owner != owner(req) {
-			return Reply{}, fmt.Errorf("network: candidate belongs to another identity")
-		}
-		if err := m.report(ctx, req, "rollback-authorized", s.View.Version); err != nil {
-			return Reply{}, err
-		}
-		return Reply{Text: "Candidate discarded; active Netplan files unchanged."}, m.remove("candidate.json")
 	case "save":
 		if hasCandidate && c.Owner != owner(req) {
 			return Reply{}, fmt.Errorf("network: candidate belongs to another identity")
@@ -425,6 +429,11 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		if err = m.report(ctx, req, "preview-created", s.View.Version); err != nil {
 			return Reply{}, err
 		}
+		if hasCandidate && c.Base != s.View.Version {
+			if err := m.save("stale-"+candidateFile(owner(req)), c); err != nil {
+				return Reply{}, err
+			}
+		}
 		revision := randomID()
 		modified.Version = revision
 		c = candidate{Owner: owner(req), Base: s.View.Version, Revision: revision, View: modified}
@@ -433,7 +442,7 @@ func (m *Manager) dispatch(ctx context.Context, req *contract.ExecutionRequest, 
 		c.View.States = nil
 		c.View.MACs = nil
 		c.View.Names = nil
-		if err = m.save("candidate.json", c); err != nil {
+		if err = m.save(candidateFile(owner(req)), c); err != nil {
 			return Reply{}, err
 		}
 		return Reply{View: &modified, Text: "Network candidate saved. Active network and /etc/netplan are unchanged."}, nil
@@ -620,7 +629,7 @@ func (m *Manager) confirm(ctx context.Context, req *contract.ExecutionRequest, p
 	if err := m.save("last.json", tx); err != nil {
 		return Reply{}, err
 	}
-	if err := m.remove("candidate.json"); err != nil {
+	if err := m.removeCandidate(owner(req)); err != nil {
 		return Reply{}, err
 	}
 	if err := m.remove("pending.json"); err != nil {
@@ -810,7 +819,7 @@ func (m *Manager) rollback(ctx context.Context, req *contract.ExecutionRequest, 
 		return Reply{}, err
 	}
 	_ = m.remove("last.json")
-	_ = m.remove("candidate.json")
+	_ = m.removeCandidate(owner(req))
 	return Reply{Text: "Last confirmed network change rolled back."}, nil
 }
 func (m *Manager) Close() error {

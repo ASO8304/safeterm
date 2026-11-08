@@ -11,6 +11,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"safeterm/internal/networkmanager"
+	"safeterm/internal/terminalconfig"
 )
 
 var terminalPattern = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
@@ -18,16 +19,17 @@ var terminalPattern = regexp.MustCompile(`^[A-Za-z0-9._+-]{1,64}$`)
 const maxSSHConnections = 128
 
 type SSHServer struct {
-	network networkmanager.API
-	address string
-	config  *ssh.ServerConfig
-	client  GatewayClient
-	catalog *Catalog
-	configs *ConfigBroker
-	mu      sync.Mutex
-	active  map[net.Conn]bool
-	slots   chan struct{}
-	wg      sync.WaitGroup
+	presentation terminalconfig.Config
+	network      networkmanager.API
+	address      string
+	config       *ssh.ServerConfig
+	client       GatewayClient
+	catalog      *Catalog
+	configs      *ConfigBroker
+	mu           sync.Mutex
+	active       map[net.Conn]bool
+	slots        chan struct{}
+	wg           sync.WaitGroup
 }
 
 func NewSSHServer(address string, hostKey ssh.Signer, authenticator *SSHAuthenticator, client GatewayClient, catalog *Catalog) (*SSHServer, error) {
@@ -211,6 +213,7 @@ func (s *SSHServer) handleSession(ctx context.Context, channel ssh.Channel, requ
 						accepted = false
 						shellStarted = false
 					} else {
+						_ = shell.SetPresentation(s.presentation)
 						shell.SetTerminal(terminal)
 						shell.SetNetworkClient(s.network)
 						go func() { shellDone <- shell.Run(ctx) }()
@@ -247,3 +250,11 @@ func validWindowChange(payload []byte) bool {
 
 // SetNetworkClient must be called before serving connections.
 func (s *SSHServer) SetNetworkClient(client networkmanager.API) { s.network = client }
+
+func (s *SSHServer) SetPresentation(c terminalconfig.Config) error {
+	if err := c.Validate(); err != nil {
+		return err
+	}
+	s.presentation = c.WithDefaults()
+	return nil
+}

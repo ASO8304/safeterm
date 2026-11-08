@@ -347,9 +347,9 @@ Tab in a configuration menu lists only its child names, such as interface and
 route. At an editor item list it offers item names or route IDs. Inside a selected
 item, use set followed by Tab for field names; empty Tab does not dump commands.
 
-exit moves up one level and discards unsaved edits to the item being left, naming
+exit moves up one level and asks before discarding unsaved edits to the item being left, naming
 it if changes were discarded. Other staged items remain. At an item list, exit
-leaves that editor and discards its remaining draft. At the root prompt only,
+asks before leaving that editor and discarding its remaining draft. At the root prompt only,
 exit closes the session. Ctrl+] closes the whole session from any level.
 The former back command is removed.
 
@@ -372,13 +372,13 @@ apply starts the separately confirmed trial. A * after the prompt context marks
 unsaved edits. Local diff uses - and + lines and hides secrets. Interface show
 includes STATE at editor entry, clear editing permissions and staged values.
 
-exit moves up and discards edits to the item; next moves up and keeps them.
+exit moves up and asks before discarding unsaved edits to the item; next moves up and keeps them.
 Logical contexts retain drafts in their parent menu; reopen the context to
 continue or save. Parent-menu exit discards drafts under that menu. Each logical
 context saves independently with its original version check.
 
 exit moves up one level; root exit closes the session. whoami is root-only,
-and clear works everywhere. Leaving a dirty item discards its edits. execute tcp-test IP [PORT] is the port
+and clear works everywhere. Leaving a dirty item with exit asks for confirmation before discarding its edits. execute tcp-test IP [PORT] is the port
 probe; execute telnet remains an alias and prints a migration notice.
 
 ## Terminal colors
@@ -392,3 +392,5 @@ The theme uses the terminal's ANSI palette and resets before typed input. An
 unset TERM or TERM=dumb keeps plain output. Set NO_COLOR=1 in the Console or
 SSH broker process environment to disable colors. SSH reads TERM from the PTY
 request; arbitrary client environment variables are not accepted.
+
+Linux-account Console login without a second prompt is described in docs/console-authentication.md. Terminal branding and prompt templates live in terminal.json; see docs/terminal.md.

@@ -99,6 +99,9 @@ func (r *catalogRuntime) validate(cfg, baseline *config.Config, dir string) erro
 	if _, err = identity.ParseUsers(users, catalog.KnownRoles()); err != nil {
 		return err
 	}
+	if _, err = identity.LoadLocalUsers(filepath.Join(layout.Authority(r.live), "access/console/linux-users.json"), catalog.KnownRoles()); err != nil {
+		return err
+	}
 	loadRegistry := r.registry
 	if loadRegistry == nil {
 		loadRegistry = configmanager.LoadRegistry

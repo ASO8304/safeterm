@@ -100,6 +100,13 @@ func run() error {
 		return e
 	}
 	defer server.Close()
+	localUIDs, e := identity.LocalUIDs(identity.LocalUsersPath)
+	if e != nil {
+		return e
+	}
+	if e = server.SetLocalUIDs(localUIDs); e != nil {
+		return e
+	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	return server.Serve(ctx)

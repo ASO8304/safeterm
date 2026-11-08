@@ -99,6 +99,9 @@ func (s *Snapshot) includeUnconfigured(root string, p Policy, names map[string]s
 		return nil
 	}
 	destination, reason := s.newInterfaceDestination(p)
+	if s.unresolvedMatches {
+		reason = "existing Netplan matches must resolve uniquely before adding interface definitions"
+	}
 	for _, file := range s.Files {
 		if renderer := scalar(child(child(file.doc.Content[0], "network"), "renderer")); renderer != "" && renderer != "networkd" {
 			reason = "Interface controlled by unsupported Netplan renderer (" + renderer + ")."
@@ -120,6 +123,9 @@ func (s *Snapshot) includeUnconfigured(root string, p Policy, names map[string]s
 		mac, valid := normalizedMAC(names[name])
 		if valid {
 			item.ID = "safeterm-" + strings.ReplaceAll(mac, ":", "")
+			if s.definitionIDs[item.ID] {
+				item.ReadOnly = "generated Netplan ID conflicts with an existing definition"
+			}
 			for _, existing := range s.View.Interfaces {
 				if existing.ID == item.ID {
 					item.ReadOnly = "generated Netplan ID conflicts with an existing definition"

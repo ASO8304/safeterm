@@ -1,4 +1,73 @@
-# Internal Console authentication
+# Console authentication
+
+## Single login through an individual Linux account
+
+Console operators can use their existing Linux login, mapped explicitly to a
+SafeTerm identity and roles. After Linux authenticates the account, the Console
+opens without another Username/Password prompt. SSH authentication is unchanged.
+
+Provision an existing individual account from a normal Linux administrator shell:
+
+```sh
+sudo usermod -a -G safeterm-clients,safeterm-gateway alice
+sudo termctl user add console --id alice --os-user alice --roles viewer,netops,config-viewer,config-operator
+sudo termctl service restart all
+```
+
+Use only roles appropriate for that operator. Group membership takes effect on
+a new Linux login. From that login, run `termctl` without sudo. For a restricted
+account that should enter SafeTerm immediately at Linux login, set its shell:
+
+```sh
+sudo usermod --shell /usr/local/bin/safeterm-console alice
+```
+
+SafeTerm does not create the account, set its Linux password, change its shell,
+or grant groups automatically. Keep a separate Linux maintenance account. The
+mapping is stored without secrets in
+`/etc/safeterm/access/console/linux-users.json`, root-owned mode 0644:
+
+```json
+{
+  "users": [
+    {
+      "os_user": "alice",
+      "user_id": "alice",
+      "roles": ["viewer", "netops", "config-viewer", "config-operator"]
+    }
+  ]
+}
+```
+
+The file is optional and defaults to no mappings. Root, the shared `safeterm`
+account and SafeTerm service accounts cannot be mapped. Duplicate account names,
+SafeTerm IDs and Linux UIDs are rejected. Old `os_user` fields in legacy
+`users.json` remain migration metadata and do not authenticate anyone.
+
+Identity obtains the connecting process's UID/PID from the kernel, rather than
+trusting environment variables or caller-supplied names. It issues the same
+audited, expiring, process-bound tokens used by legacy Console authentication.
+Every Gateway/network/configuration boundary verifies the token and supplies
+authoritative roles. Linux operators cannot use the privileged token-verifier
+API or impersonate the SSH Broker. Removal, disabling or role changes invalidate
+sessions on their next verification; streams recheck within 15 seconds. A new
+Linux UID requires a coordinated service restart. Linux account names and UIDs
+should not be recycled while their SafeTerm mappings remain enabled.
+
+Update and remove mappings with:
+
+```sh
+sudo termctl user auth console --id alice --os-user alice --roles viewer,config-viewer
+sudo termctl user del console --id alice --os-user alice
+sudo termctl user list
+```
+
+Linux manages these users' passwords (`sudo passwd alice`); SafeTerm password
+commands apply to the separate legacy internal users. Package upgrades preserve
+both mapping and credential files. See [terminal presentation](../configs/docs/terminal.md)
+for branding, prompt formatting and confirmation before discarding drafts.
+
+## Legacy shared-account login
 
 Console operators have SafeTerm usernames and passwords, independent of Linux
 accounts and SSH users. One shared, unprivileged Linux account, `safeterm`, starts
@@ -82,7 +151,7 @@ absolute authentication expiry also cancels execution. Already accepted bounded
 unary/config transactions finish under their existing operation deadline;
 revocation cannot undo a committed edit. Login again after changing credentials.
 
-## Upgrade from OS-user mappings
+## Historical upgrade from pre-internal-login OS-user mappings
 
 Upgrade through `sudo termctl update PACKAGE_DIR` using your normal local or
 offline signing mode. The package preserves existing Console records and sets

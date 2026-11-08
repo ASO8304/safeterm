@@ -54,6 +54,12 @@ wait_ready() {
 }
 wait_ready
 python3 "$repo/tests/systemd/console-smoke.py" empty
+# A per-person Linux login enters SafeTerm without its own password prompt.
+useradd --create-home --shell /usr/local/bin/safeterm-console --groups safeterm-clients,safeterm-gateway ci-linux
+termctl user add console --id ci-admin --os-user ci-linux --roles viewer,netops,config-viewer,config-operator
+termctl service restart all
+wait_ready
+python3 "$repo/tests/systemd/console-smoke.py" linux
 install -d -m 0755 /etc/safeterm-ci
 printf '\357\273\277[Server]\n\n; untouched comment\n\nPort = 8080 ; keep comment\n' >/etc/safeterm-ci/options.ini
 chmod 0644 /etc/safeterm-ci/options.ini

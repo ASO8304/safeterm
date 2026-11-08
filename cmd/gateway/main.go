@@ -156,6 +156,16 @@ func run(configDir, socketPath, brokerUser, consoleUser, configManagerUsers, con
 		}
 		peerPolicies[uid] = isolation.PeerPolicy{Authorize: configManagerPeerAuthorizer(profile, allowed)}
 	}
+	localUIDs, err := identity.LocalUIDs(identity.LocalUsersPath)
+	if err != nil {
+		return err
+	}
+	for _, uid := range localUIDs {
+		if _, exists := peerPolicies[uid]; exists {
+			return fmt.Errorf("gateway: Linux Console UID conflicts with a service identity")
+		}
+		peerPolicies[uid] = consolePeerPolicy(identityClient)
+	}
 	server, err := isolation.ListenUnixStreamingWithPeerPolicies(socketPath, 0o660, peerPolicies, gateway, gateway)
 	if err != nil {
 		return err

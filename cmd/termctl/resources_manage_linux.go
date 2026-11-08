@@ -20,6 +20,7 @@ import (
 	"safeterm/internal/networkmanager"
 	"safeterm/internal/resources"
 	"safeterm/internal/siteconfig"
+	"safeterm/internal/terminalconfig"
 )
 
 type resourceRuntime struct {
@@ -138,6 +139,9 @@ func resourceCommand(dir string, args []string, out io.Writer) error {
 	}
 	if _, err := networkmanager.ReadPolicy("/"); err != nil {
 		return fmt.Errorf("network/policy.json: %w", err)
+	}
+	if _, err := terminalconfig.Load(filepath.Join(dir, "terminal.json")); err != nil {
+		return err
 	}
 	if action == "initialize" {
 		// The installer has staged verified package defaults; identities may already

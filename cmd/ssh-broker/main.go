@@ -19,6 +19,7 @@ import (
 	"safeterm/internal/isolation"
 	"safeterm/internal/layout"
 	"safeterm/internal/networkmanager"
+	"safeterm/internal/terminalconfig"
 )
 
 func main() {
@@ -110,6 +111,13 @@ func run(configDir, listenAddress, hostKeyPath, identitiesPath, gatewaySocket, g
 	}
 	networkClient, err := networkmanager.NewClient(networkmanager.Socket, 0)
 	if err != nil {
+		return err
+	}
+	presentation, err := terminalconfig.Load(terminalconfig.Path)
+	if err != nil {
+		return err
+	}
+	if err := server.SetPresentation(presentation); err != nil {
 		return err
 	}
 	server.SetNetworkClient(networkClient)
